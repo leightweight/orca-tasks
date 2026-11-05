@@ -63,13 +63,14 @@ func (w *Web) changePassword(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := w.checkSecondFactor(ctx, r, *user, false); err != nil {
+	// Check the form before the code, so a typo doesn't use up a code.
+	hash, err := readPassword(r)
+	if err != nil {
 		w.redirect(rw, r, "/account", "The password wasn't changed: "+err.Error()+".")
 		return
 	}
 
-	hash, err := readPassword(r)
-	if err != nil {
+	if err := w.checkSecondFactor(ctx, r, *user, false); err != nil {
 		w.redirect(rw, r, "/account", "The password wasn't changed: "+err.Error()+".")
 		return
 	}
@@ -162,11 +163,6 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := w.checkSecondFactor(ctx, r, *user, false); err != nil {
-		w.redirect(rw, r, "/account/keys", "No key was created: "+err.Error()+".")
-		return
-	}
-
 	name := strings.TrimSpace(r.PostFormValue("name"))
 	if name == "" {
 		w.redirect(rw, r, "/account/keys", "A key needs a name.")
@@ -223,6 +219,12 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 	var expires *time.Time
 	if days, err := strconv.Atoi(r.PostFormValue("expires")); err == nil && days > 0 {
 		expires = new(w.Now().AddDate(0, 0, days))
+	}
+
+	// The code comes last, so a mistake elsewhere in the form doesn't use it up.
+	if err := w.checkSecondFactor(ctx, r, *user, false); err != nil {
+		w.redirect(rw, r, "/account/keys", "No key was created: "+err.Error()+".")
+		return
 	}
 
 	key, hash := auth.NewAPIKey()

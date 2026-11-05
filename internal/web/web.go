@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -114,6 +115,13 @@ func (w *Web) Register(mux *http.ServeMux) error {
 
 	protect := http.NewCrossOriginProtection()
 
+	// Browsers that send Sec-Fetch-Site pass on that alone. Older ones are
+	// checked by Origin against Host, which a proxy may rewrite, so the base
+	// URL's origin is trusted outright.
+	if err := protect.AddTrustedOrigin(origin(w.BaseURL)); err != nil {
+		return err
+	}
+
 	page := func(pattern string, h http.HandlerFunc) {
 		mux.Handle(pattern, w.Sessions.LoadAndSave(protect.Handler(w.headers(w.loadUser(h)))))
 	}
@@ -162,6 +170,16 @@ func (w *Web) Register(mux *http.ServeMux) error {
 	page("GET /browse/{key}", w.signedIn(w.browse))
 
 	return nil
+}
+
+// origin is a URL's scheme and host.
+func origin(baseURL string) string {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return baseURL
+	}
+
+	return u.Scheme + "://" + u.Host
 }
 
 func (w *Web) parseTemplates() error {
