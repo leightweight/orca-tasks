@@ -74,6 +74,10 @@ func (s *Server) uploadAttachments(w http.ResponseWriter, r *http.Request, c *Ca
 			break
 		}
 
+		if tooLarge(err) {
+			return errRequestTooLarge
+		}
+
 		if err != nil {
 			return badRequest("Malformed upload: %s", err)
 		}
@@ -107,6 +111,10 @@ func (s *Server) saveAttachment(r *http.Request, actor int64, issue db.Issue, pa
 		return db.Attachment{}, &httpError{status: http.StatusRequestEntityTooLarge, message: "The file is over the upload limit."}
 	}
 
+	if tooLarge(err) {
+		return db.Attachment{}, errRequestTooLarge
+	}
+
 	if err != nil {
 		return db.Attachment{}, err
 	}
@@ -132,6 +140,19 @@ func (s *Server) saveAttachment(r *http.Request, actor int64, issue db.Issue, pa
 	}
 
 	return attachment, nil
+}
+
+// errRequestTooLarge is an upload whose files together pass the request's cap.
+// Files before the one that passed it are already saved.
+var errRequestTooLarge = &httpError{
+	status:  http.StatusRequestEntityTooLarge,
+	message: "The upload is over the size limit. Files before the one that went over it were saved; send the rest separately.",
+}
+
+// tooLarge reports whether reading the request hit its size cap.
+func tooLarge(err error) bool {
+	var maxBytes *http.MaxBytesError
+	return errors.As(err, &maxBytes)
 }
 
 // maxFilename is the longest filename kept, in bytes.

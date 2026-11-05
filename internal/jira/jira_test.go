@@ -471,16 +471,26 @@ func TestSearchPagesAndOrders(t *testing.T) {
 func upload(t *testing.T, a *api, key, issue, filename, content string) (int, []byte) {
 	t.Helper()
 
+	return uploadFiles(t, a, key, issue, map[string]string{filename: content})
+}
+
+// uploadFiles sends several files in one request.
+func uploadFiles(t *testing.T, a *api, key, issue string, files map[string]string) (int, []byte) {
+	t.Helper()
+
 	var body bytes.Buffer
 
 	form := multipart.NewWriter(&body)
 
-	part, err := form.CreateFormFile("file", filename)
-	if err != nil {
-		t.Fatal(err)
+	for filename, content := range files {
+		part, err := form.CreateFormFile("file", filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, _ = part.Write([]byte(content))
 	}
 
-	_, _ = part.Write([]byte(content))
 	_ = form.Close()
 
 	request, err := http.NewRequestWithContext(testutil.Context(t), "POST", a.server.URL+"/rest/api/2/issue/"+issue+"/attachments", &body)
@@ -731,5 +741,21 @@ func TestErrorsIsAnObject(t *testing.T) {
 
 	if string(body["errors"]) != "{}" {
 		t.Errorf("errors = %s, want {}", body["errors"])
+	}
+}
+
+func TestUploadsOverTheRequestCapGet413(t *testing.T) {
+	t.Parallel()
+
+	a := newAPI(t)
+	key := a.create(a.alice, "OPS", "Attach the logs")
+
+	// Each file is under the 1 MiB file limit, but together they pass the
+	// request's cap of one file's limit plus 1 MiB.
+	part := strings.Repeat("x", 900<<10)
+	files := map[string]string{"a.log": part, "b.log": part, "c.log": part}
+
+	if status, body := uploadFiles(t, a, a.alice, key, files); status != http.StatusRequestEntityTooLarge {
+		t.Errorf("status %d, want 413: %s", status, body)
 	}
 }
