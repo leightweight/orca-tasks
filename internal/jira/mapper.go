@@ -2,7 +2,9 @@ package jira
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/yuin/goldmark"
 
+	"github.com/leightweight/orca-tasks/internal/jql"
 	"github.com/leightweight/orca-tasks/internal/store"
 	"github.com/leightweight/orca-tasks/internal/store/db"
 )
@@ -261,4 +264,46 @@ func deref(s *string) string {
 	}
 
 	return *s
+}
+
+// Compare orders the fields whose text doesn't sort: keys by project and then
+// number, so OPS-2 comes before OPS-10, priorities by rank, where ascending is
+// Lowest first as in Jira, and statuses in workflow order.
+func (r issueRecord) Compare(field string, other jql.Record) (int, bool) {
+	o, ok := other.(issueRecord)
+	if !ok {
+		return 0, false
+	}
+
+	switch field {
+	case "key":
+		if byProject := strings.Compare(r.row.ProjectKey, o.row.ProjectKey); byProject != 0 {
+			return byProject, true
+		}
+
+		return cmp.Compare(int64(r.row.Issue.Number), int64(o.row.Issue.Number)), true
+	case "priority":
+		return cmp.Compare(r.priorityRank(), o.priorityRank()), true
+	case "status":
+		return cmp.Compare(int64(r.catalog.StatusByID(r.row.Issue.StatusID).Position), int64(r.catalog.StatusByID(o.row.Issue.StatusID).Position)), true
+	case "statuscategory":
+		return cmp.Compare(categoryRank[r.catalog.StatusByID(r.row.Issue.StatusID).Category],
+			categoryRank[r.catalog.StatusByID(o.row.Issue.StatusID).Category]), true
+	default:
+		return 0, false
+	}
+}
+
+// categoryRank orders status categories through the workflow.
+var categoryRank = map[string]int64{store.CategoryNew: 0, store.CategoryIndeterminate: 1, store.CategoryDone: 2}
+
+// priorityRank is higher for a more urgent priority, and lowest with none.
+// Positions count down from Highest, which is 1.
+func (r issueRecord) priorityRank() int64 {
+	p := r.catalog.PriorityByID(r.row.Issue.PriorityID)
+	if p == nil {
+		return math.MinInt64
+	}
+
+	return -int64(p.Position)
 }

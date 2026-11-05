@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -649,5 +650,38 @@ func TestAgentsAreNotAssignees(t *testing.T) {
 		if strings.Contains(p.Name, "/") {
 			t.Errorf("user search listed the agent %s", p.Name)
 		}
+	}
+}
+
+func TestOrderByKeyAndPriority(t *testing.T) {
+	t.Parallel()
+
+	a := newAPI(t)
+
+	for i := 1; i <= 11; i++ {
+		a.create(a.alice, "OPS", fmt.Sprintf("Task %d", i))
+	}
+
+	for key, priority := range map[string]string{"OPS-2": "Low", "OPS-3": "Highest", "OPS-10": "Medium"} {
+		a.mustCall(a.alice, "PUT", "/rest/api/2/issue/"+key, fmt.Sprintf(`{"fields":{"priority":{"name":%q}}}`, priority), nil)
+	}
+
+	keys := func(query string) []string {
+		issues := a.search(a.alice, query).Issues
+
+		got := make([]string, 0, len(issues))
+		for _, issue := range issues {
+			got = append(got, issue.Key)
+		}
+
+		return got
+	}
+
+	if got := keys("ORDER BY key ASC"); len(got) != 11 || got[1] != "OPS-2" || got[9] != "OPS-10" {
+		t.Errorf("ORDER BY key = %v, want OPS-1, OPS-2, ..., OPS-10, OPS-11", got)
+	}
+
+	if got := keys("priority IS NOT EMPTY ORDER BY priority DESC"); !slices.Equal(got, []string{"OPS-3", "OPS-10", "OPS-2"}) {
+		t.Errorf("ORDER BY priority DESC = %v, want Highest, Medium, Low", got)
 	}
 }
