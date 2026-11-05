@@ -98,6 +98,9 @@ jobs:
       - name: Release the image and the CLI
         run: goreleaser release --clean
         env:
+          # Several tags can point at one commit, such as v0.1.0 and v0.1.0-rc.4,
+          # and goreleaser would otherwise pick one of them itself.
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Release the Helm chart
         env:
