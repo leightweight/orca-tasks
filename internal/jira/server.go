@@ -222,15 +222,19 @@ func (s *Server) authenticate(r *http.Request) (*Caller, error) {
 		return s.LocalCaller(ctx)
 	}
 
+	// A request without an API key isn't a guess, so it doesn't count. Any
+	// website can make a browser send those, with img tags or no-cors fetches,
+	// and counting them would let it lock its visitor out. A browser can't add
+	// an Authorization header to a cross-site request without a preflight.
+	key, username := credentials(r)
+	if !strings.HasPrefix(key, auth.APIKeyPrefix) {
+		return nil, errBadCredentials
+	}
+
 	ip := "ip:" + s.ClientIP(r)
 
 	if s.Limiter != nil && !s.Limiter.Allowed(ctx, ip) {
 		return nil, errTooManyFailures
-	}
-
-	key, username := credentials(r)
-	if !strings.HasPrefix(key, auth.APIKeyPrefix) {
-		return nil, s.failed(ctx, ip)
 	}
 
 	row, err := s.Store.AuthenticateAPIKey(ctx, auth.HashToken(key))

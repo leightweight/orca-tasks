@@ -468,3 +468,36 @@ func TestConcurrentSignInsAreLimited(t *testing.T) {
 		t.Errorf("%d of 30 concurrent guesses were checked, want at most 10", checked)
 	}
 }
+
+// TestRequestsWithoutKeysDontLockOut covers what any website can make a
+// visitor's browser send: requests to the API with no Authorization header.
+func TestRequestsWithoutKeysDontLockOut(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	b := s.browser()
+
+	for range 15 {
+		if r := b.get("/rest/api/2/myself"); r.status != http.StatusForbidden {
+			t.Fatalf("a request with no key: status %d, want 403", r.status)
+		}
+	}
+
+	if r := b.post("/login", url.Values{"username": {"carol"}, "password": {"guess"}}); strings.Contains(r.body, "too many failed attempts") {
+		t.Error("requests with no key locked the address out of signing in")
+	}
+
+	request, err := http.NewRequestWithContext(testutil.Context(t), "GET", s.url+"/rest/api/2/myself", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for range 15 {
+		request.Header.Set("Authorization", "Bearer otk_wrong")
+		if r := b.do(request); r.status == http.StatusTooManyRequests {
+			return
+		}
+	}
+
+	t.Error("wrong keys were never limited")
+}
