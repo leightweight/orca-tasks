@@ -297,9 +297,17 @@ func logRequests(log *slog.Logger, clientIP func(*http.Request) string, next htt
 			return
 		}
 
+		// The matched route rather than the path, which can hold a secret: a
+		// reset link's token takes over the account. ServeMux sets the
+		// pattern on this request as it routes it.
+		route := r.Pattern
+		if route == "" {
+			route = r.URL.Path
+		}
+
 		log.Info("request",
 			"method", r.Method,
-			"path", r.URL.Path,
+			"route", route,
 			"status", recorder.status,
 			"client", clientIP(r),
 			"duration", time.Since(started).Round(time.Millisecond),
