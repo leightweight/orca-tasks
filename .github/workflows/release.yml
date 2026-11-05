@@ -31,9 +31,9 @@ jobs:
         run: |
           want="${GITHUB_REF_NAME#v}"
           want="${want%%-*}"
-          got="$(jq -r .version plugins/orca-tasks/.claude-plugin/plugin.json)"
+          got="$(jq -r '.plugins[] | select(.name == "orca-tasks").version' .claude-plugin/marketplace.json)"
           if [ "$got" != "$want" ]; then
-            echo "::error::plugin.json says $got, but the tag $GITHUB_REF_NAME needs $want."
+            echo "::error::marketplace.json says $got, but the tag $GITHUB_REF_NAME needs $want."
             exit 1
           fi
 

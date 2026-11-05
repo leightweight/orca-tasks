@@ -1,13 +1,17 @@
 {
   "name": "orca-tasks",
+  "description": "The orca-tasks plugin for Claude Code.",
   "owner": {
     "name": "Jonathon Leight"
   },
   "plugins": [
     {
       "name": "orca-tasks",
-      "source": "./plugins/orca-tasks",
-      "description": "Lets Claude keep its work in an orca-tasks server, the task list Orca shows on its Tasks page."
+      "source": "./.claude-plugin/orca-tasks",
+      "description": "Lets Claude keep its work in an orca-tasks server, the task list Orca shows on its Tasks page.",
+      "version": "0.1.0",
+      "license": "MIT",
+      "repository": "https://github.com/leightweight/orca-tasks"
     }
   ]
 }
