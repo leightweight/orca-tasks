@@ -177,6 +177,9 @@ var (
 	recoveryPattern = regexp.MustCompile(`<pre>([a-z2-7]{4}-[a-z2-7]{4}-[a-z2-7]{4}-[a-z2-7]{4})`)
 )
 
+// regexpFor compiles a pattern for find.
+func regexpFor(pattern string) *regexp.Regexp { return regexp.MustCompile(pattern) }
+
 func find(t *testing.T, pattern *regexp.Regexp, body string) string {
 	t.Helper()
 

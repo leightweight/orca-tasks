@@ -1,0 +1,127 @@
+package server_test
+
+import (
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+
+	"github.com/leightweight/orca-tasks/internal/auth"
+	"github.com/leightweight/orca-tasks/internal/testutil"
+)
+
+// signIn signs a new browser in as alice with a TOTP code for the next step.
+func signIn(t *testing.T, s *site, password, secret string) *browser {
+	t.Helper()
+
+	b := s.browser()
+	b.expectRedirect(b.post("/login", url.Values{"username": {"alice"}, "password": {password}}), "/login/totp")
+	b.expectRedirect(b.post("/login/totp", url.Values{"code": {b.code(secret)}}), "/")
+
+	return b
+}
+
+func TestATOTPCodeWorksOnce(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	_, secret := signUp(t, s)
+	code := auth.TOTPCode(secret, s.clock.step())
+
+	first := s.browser()
+	first.expectRedirect(first.post("/login", url.Values{"username": {"alice"}, "password": {"correct horse battery"}}), "/login/totp")
+	first.expectRedirect(first.post("/login/totp", url.Values{"code": {code}}), "/projects")
+
+	second := s.browser()
+	second.expectRedirect(second.post("/login", url.Values{"username": {"alice"}, "password": {"correct horse battery"}}), "/login/totp")
+
+	if r := second.post("/login/totp", url.Values{"code": {code}}); r.status != http.StatusBadRequest {
+		t.Errorf("the same code a second time: status %d, want 400", r.status)
+	}
+}
+
+func TestAPasswordChangeEndsOtherSessions(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, secret := signUp(t, s)
+	other := signIn(t, s, "correct horse battery", secret)
+
+	alice.expectRedirect(alice.post("/account/password", url.Values{
+		"current": {"correct horse battery"}, "password": {"a new long password"}, "confirm": {"a new long password"}, "code": {alice.code(secret)},
+	}), "/account")
+
+	if r := alice.get("/account"); r.status != http.StatusOK {
+		t.Errorf("the session that changed the password: status %d, want 200", r.status)
+	}
+
+	other.expectRedirect(other.get("/account"), "/login")
+}
+
+func TestDisablingAndResettingEndSessions(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+
+	// alice invites bob, who signs up through the link.
+	alice.expectRedirect(alice.post("/admin/users", url.Values{"username": {"bob"}}), "/admin/users")
+	link := find(t, linkPattern, alice.get("/admin/users").body)
+
+	bob := s.browser()
+	bob.expectRedirect(bob.post(link, url.Values{"password": {"bob's long password"}, "confirm": {"bob's long password"}}), "/enroll")
+	bob.enroll()
+
+	// The link worked once.
+	if r := s.browser().get(link); r.status != http.StatusNotFound {
+		t.Errorf("a used link: status %d, want 404", r.status)
+	}
+
+	bobID := find(t, regexpFor(`action="/admin/users/(\d+)/disable"`), alice.get("/admin/users").body)
+
+	// A reset ends bob's session, since it sets new credentials.
+	alice.expectRedirect(alice.post("/admin/users/"+bobID+"/reset", nil), "/admin/users")
+	reset := find(t, linkPattern, alice.get("/admin/users").body)
+
+	again := s.browser()
+	again.expectRedirect(again.post(reset, url.Values{"password": {"bob's newer password"}, "confirm": {"bob's newer password"}}), "/enroll")
+	again.enroll()
+
+	bob.expectRedirect(bob.get("/account"), "/login")
+
+	// Disabling ends the session bob just made.
+	alice.expectRedirect(alice.post("/admin/users/"+bobID+"/disable", nil), "/admin/users")
+	again.expectRedirect(again.get("/account"), "/login")
+}
+
+func TestCrossOriginPostsAreRefused(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+
+	request, err := http.NewRequestWithContext(testutil.Context(t), "POST", s.url+"/projects", strings.NewReader("key=EVIL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Origin", "https://evil.example")
+	request.Header.Set("Sec-Fetch-Site", "cross-site")
+
+	if r := alice.do(request); r.status != http.StatusForbidden {
+		t.Errorf("a cross-site form post: status %d, want 403", r.status)
+	}
+}
+
+func TestSignInReturnsToThePageYouWanted(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	_, secret := signUp(t, s)
+
+	b := s.browser()
+	b.expectRedirect(b.get("/account/keys"), "/login")
+	b.expectRedirect(b.post("/login", url.Values{"username": {"alice"}, "password": {"correct horse battery"}}), "/login/totp")
+	b.expectRedirect(b.post("/login/totp", url.Values{"code": {b.code(secret)}}), "/account/keys")
+}
