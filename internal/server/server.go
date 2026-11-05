@@ -181,13 +181,19 @@ func Build(ctx context.Context, s *store.Store, cfg Config, log *slog.Logger) (*
 	})
 
 	mux.HandleFunc("GET /readyz", func(rw http.ResponseWriter, r *http.Request) {
+		// Anyone can reach this, so the details go to the log, not the response:
+		// a database error can name its host and user.
 		if err := s.Pool.Ping(r.Context()); err != nil {
-			http.Error(rw, "database: "+err.Error(), http.StatusServiceUnavailable)
+			log.Error("not ready: the database doesn't answer", "error", err)
+			http.Error(rw, "the database isn't available", http.StatusServiceUnavailable)
+
 			return
 		}
 
 		if err := files.Writable(); err != nil {
-			http.Error(rw, "data directory: "+err.Error(), http.StatusServiceUnavailable)
+			log.Error("not ready: the data directory isn't writable", "error", err)
+			http.Error(rw, "the data directory isn't writable", http.StatusServiceUnavailable)
+
 			return
 		}
 
