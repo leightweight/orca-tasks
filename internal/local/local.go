@@ -10,7 +10,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -20,6 +19,7 @@ import (
 	"time"
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
+	"github.com/google/renameio/v2"
 )
 
 // PostgresVersion is the Postgres the local database runs. Changing it needs
@@ -32,19 +32,12 @@ const (
 // SecretKey reads the secret key in a data directory, creating one the first
 // time.
 func SecretKey(dir string) (string, error) {
-	path := filepath.Join(dir, "secret-key")
+	return readOrCreate(filepath.Join(dir, "secret-key"), func() string {
+		key := make([]byte, 32)
+		_, _ = rand.Read(key)
 
-	if data, err := os.ReadFile(filepath.Clean(path)); err == nil {
-		return strings.TrimSpace(string(data)), nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", err
-	}
-
-	key := make([]byte, 32)
-	_, _ = rand.Read(key)
-	encoded := base64.StdEncoding.EncodeToString(key)
-
-	return encoded, writeNew(path, encoded+"\n")
+		return base64.StdEncoding.EncodeToString(key)
+	})
 }
 
 // Postgres is the embedded database.
@@ -134,19 +127,12 @@ func checkVersion(data string) error {
 }
 
 func postgresPassword(dir string) (string, error) {
-	path := filepath.Join(dir, "postgres-password")
+	return readOrCreate(filepath.Join(dir, "postgres-password"), func() string {
+		b := make([]byte, 24)
+		_, _ = rand.Read(b)
 
-	if data, err := os.ReadFile(filepath.Clean(path)); err == nil {
-		return strings.TrimSpace(string(data)), nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", err
-	}
-
-	b := make([]byte, 24)
-	_, _ = rand.Read(b)
-	password := hex.EncodeToString(b)
-
-	return password, writeNew(path, password+"\n")
+		return hex.EncodeToString(b)
+	})
 }
 
 func freePort(ctx context.Context) (uint32, error) {
@@ -167,19 +153,28 @@ func freePort(ctx context.Context) (uint32, error) {
 	return uint32(port), nil
 }
 
-// writeNew writes a file only its owner can read, failing if it exists.
-func writeNew(path, content string) error {
-	f, err := os.OpenFile(filepath.Clean(path), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-	if err != nil {
-		return err
+// readOrCreate reads a generated secret, or generates and saves one the first
+// time. The file is written to a temporary file and renamed into place, so a
+// crash can't leave it half written, and only its owner can read it. An empty
+// file is refused rather than trusted, since a server needs the value it held.
+func readOrCreate(path string, generate func() string) (string, error) {
+	data, err := os.ReadFile(filepath.Clean(path))
+	if err == nil {
+		value := strings.TrimSpace(string(data))
+		if value == "" {
+			return "", fmt.Errorf("%s is empty, so it doesn't hold the value this server was set up with", path)
+		}
+
+		return value, nil
 	}
 
-	if _, err := io.WriteString(f, content); err != nil {
-		_ = f.Close()
-		return err
+	if !errors.Is(err, os.ErrNotExist) {
+		return "", err
 	}
 
-	return f.Close()
+	value := generate()
+
+	return value, renameio.WriteFile(path, []byte(value+"\n"), 0o600)
 }
 
 // logWriter passes Postgres's output to the debug log.

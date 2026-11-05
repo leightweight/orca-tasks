@@ -62,3 +62,16 @@ func TestSecretsAreMadeOnceAndPrivate(t *testing.T) {
 		t.Errorf("secret-key mode = %v, %v; want 0600", info.Mode().Perm(), err)
 	}
 }
+
+func TestEmptySecretsAreRefused(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "secret-key"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := SecretKey(dir); err == nil {
+		t.Error("an empty secret-key was trusted")
+	}
+}
