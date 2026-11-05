@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/alexedwards/argon2id"
 )
 
 func TestPassword(t *testing.T) {
@@ -123,5 +125,29 @@ func TestTOTP(t *testing.T) {
 
 	if _, ok := CheckTOTP(enrollment.Secret, "12345", now, 0); ok {
 		t.Error("a five-digit code was accepted")
+	}
+}
+
+func TestPasswordParameters(t *testing.T) {
+	t.Parallel()
+
+	hash, err := HashPassword("correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(hash, "m=19456,t=2,p=1") {
+		t.Errorf("hash %q doesn't use the capped parameters", hash)
+	}
+
+	// A hash made with the library's defaults, as older servers did, still
+	// verifies.
+	old, err := argon2id.CreateHash("correct horse battery", argon2id.DefaultParams)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !CheckPassword("correct horse battery", old) {
+		t.Error("a hash with the old parameters no longer verifies")
 	}
 }
