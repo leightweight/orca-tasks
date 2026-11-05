@@ -51,7 +51,7 @@ func TestAuthenticateAPIKey(t *testing.T) {
 	s := testutil.Store(t)
 	user := createUser(t, s, "jleight")
 
-	agent, err := s.CreateAgent(testutil.Context(t), db.CreateAgentParams{Username: "jleight-claude", DisplayName: "Claude", OwnerID: &user.ID})
+	agent, err := s.CreateAgent(testutil.Context(t), user.ID, "jleight-claude", "Claude")
 	if err != nil {
 		t.Fatal(err)
 	}
