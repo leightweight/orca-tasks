@@ -86,8 +86,10 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, c *Caller, reque
 
 	jql.Sort(records, query.Terms())
 
-	maxResults := request.MaxResults
-	if maxResults <= 0 || maxResults > maxPageSize {
+	// A request over the cap gets the cap, not the default, so a client that
+	// pages by the size it asked for doesn't skip issues.
+	maxResults := min(request.MaxResults, maxPageSize)
+	if maxResults <= 0 {
 		maxResults = 50
 	}
 
@@ -206,9 +208,11 @@ func (s *Server) users(w http.ResponseWriter, r *http.Request, c *Caller) error 
 	}
 
 	maxResults, err := strconv.ParseInt(query.Get("maxResults"), 10, 32)
-	if err != nil || maxResults <= 0 || maxResults > 1000 {
+	if err != nil || maxResults <= 0 {
 		maxResults = 50
 	}
+
+	maxResults = min(maxResults, 1000)
 
 	params := db.SearchPeopleParams{
 		PrincipalID: c.PrincipalID,

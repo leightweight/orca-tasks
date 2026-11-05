@@ -759,3 +759,19 @@ func TestUploadsOverTheRequestCapGet413(t *testing.T) {
 		t.Errorf("status %d, want 413: %s", status, body)
 	}
 }
+
+func TestMaxResultsIsClampedToTheCap(t *testing.T) {
+	t.Parallel()
+
+	a := newAPI(t)
+
+	var page struct {
+		MaxResults int `json:"maxResults"`
+	}
+
+	a.mustCall(a.alice, "POST", "/rest/api/2/search", `{"jql":"","maxResults":500}`, &page)
+
+	if page.MaxResults != maxPageSize {
+		t.Errorf("maxResults = %d, want the cap, %d", page.MaxResults, maxPageSize)
+	}
+}
