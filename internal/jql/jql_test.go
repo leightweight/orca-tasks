@@ -18,7 +18,7 @@ func (r fakeRecord) Timestamp(name string) (time.Time, bool) {
 }
 
 func testContext() Context {
-	return Context{CurrentUsers: []string{"jleight"}, Now: time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)}
+	return Context{CurrentUsers: []string{"alice"}, Now: time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)}
 }
 
 func openRecord() fakeRecord {
@@ -31,8 +31,8 @@ func openRecord() fakeRecord {
 			"status":         {"In Progress"},
 			"statuscategory": {"indeterminate", "In Progress"},
 			"type":           {"Bug"},
-			"assignee":       {"jleight", "Jonathon Leight"},
-			"reporter":       {"jleight"},
+			"assignee":       {"alice", "Alice Example"},
+			"reporter":       {"alice"},
 			"labels":         {"backend", "flaky"},
 			"priority":       {"High"},
 		},
@@ -148,7 +148,7 @@ func TestAdHocQueries(t *testing.T) {
 		{`created > 2026-08-15`, false},
 		{`created > "2026-08-01T08:00:00Z"`, true},
 		{`(project = ORCA OR project = OTHER) AND type = Bug`, true},
-		{`assignee = "Jonathon Leight"`, true},
+		{`assignee = "Alice Example"`, true},
 		{`Project = orca and Type = bug`, true},
 		{`issuetype = Bug`, true},
 		{`key = ORCA-1`, true},
@@ -219,7 +219,7 @@ func TestSort(t *testing.T) {
 func TestCurrentUserMatchesAnAgentsOwner(t *testing.T) {
 	t.Parallel()
 
-	ctx := Context{CurrentUsers: []string{"jleight/claude", "jleight"}}
+	ctx := Context{CurrentUsers: []string{"alice/claude", "alice"}}
 
 	query, err := Parse("assignee = currentUser() AND reporter IN (currentUser())")
 	if err != nil {

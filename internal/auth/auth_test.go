@@ -92,7 +92,7 @@ func TestSecretBox(t *testing.T) {
 func TestTOTP(t *testing.T) {
 	t.Parallel()
 
-	enrollment, err := NewEnrollment("orca-tasks", "jleight")
+	enrollment, err := NewEnrollment("orca-tasks", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}

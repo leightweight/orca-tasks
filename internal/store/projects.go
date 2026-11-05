@@ -194,7 +194,7 @@ func (s *Store) SetMemberKey(ctx context.Context, projectID, userID int64, key s
 }
 
 // AgentSeparator joins an agent's owner and name into its username, as in
-// jleight/claude. Usernames can't contain it, so an agent's username never
+// alice/claude. Usernames can't contain it, so an agent's username never
 // collides with a user's, and each owner's agent names are their own.
 const AgentSeparator = "/"
 

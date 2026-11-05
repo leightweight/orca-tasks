@@ -45,7 +45,7 @@ There are two kinds.
 
 A username starts with a lowercase letter and holds only lowercase letters, digits, `.`, `_`, and `-`.
 An agent's name follows the same rule, but only has to be unique among its owner's agents.
-Its username is the owner's and its name joined by `/`, as in `jleight/claude`.
+Its username is the owner's and its name joined by `/`, as in `alice/claude`.
 Jira identifies people by name alone, so the API and JQL use that full username, and because usernames can't contain `/`, it never collides with a user's.
 Each principal also has a display name, and users have an optional email address.
 
@@ -246,7 +246,7 @@ Only a user who signed in with TOTP can create one.
 ### Agents
 
 A user creates agents from their account page.
-An agent has a name, such as `claude`, which makes its username `jleight/claude`, and a display name, such as `Claude`.
+An agent has a name, such as `claude`, which makes its username `alice/claude`, and a display name, such as `Claude`.
 The owner can rename, disable, and enable their agents.
 
 ### API keys
@@ -411,7 +411,7 @@ The server-side commands are `orca-tasks serve`, which also applies migrations, 
 Like `admin reset-link`, it connects to the database directly, so it runs inside the server's container.
 
 ```sh
-kubectl exec -i deploy/orca-tasks -- /orca-tasks admin import --owner jleight - < export.json
+kubectl exec -i deploy/orca-tasks -- /orca-tasks admin import --owner alice - < export.json
 ```
 
 The file is JSON, with `format` set to `orca-tasks-export` and `version` set to 1.
@@ -452,7 +452,7 @@ The file is JSON, with `format` set to `orca-tasks-export` and `version` set to 
   An issue or comment with an empty reporter or author is theirs.
 - People in the file are usernames.
   `--user OLD=NEW` maps one to a user or agent here.
-  A name it doesn't map is looked up as a user, then as one of the owner's agents, so an export's `claude` finds `jleight/claude` with no mapping.
+  A name it doesn't map is looked up as a user, then as one of the owner's agents, so an export's `claude` finds `alice/claude` with no mapping.
 - Every user the file names joins the project as a member, and every agent joins with its owner.
 - An issue assigned to an agent goes to the agent's owner.
 - Issues keep their numbers and times, and comments keep their authors and times, so `OPS-12` is still `OPS-12` for the owner.

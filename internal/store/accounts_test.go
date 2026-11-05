@@ -49,7 +49,7 @@ func TestAuthenticateAPIKey(t *testing.T) {
 	t.Parallel()
 
 	s := testutil.Store(t)
-	user := createUser(t, s, "jleight")
+	user := createUser(t, s, "alice")
 
 	agent, err := s.CreateAgent(testutil.Context(t), user.ID, "claude", "Claude")
 	if err != nil {
@@ -66,7 +66,7 @@ func TestAuthenticateAPIKey(t *testing.T) {
 		t.Fatalf("live key: %+v, %v", row, err)
 	}
 
-	if row, err := s.AuthenticateAPIKey(testutil.Context(t), agentKey); err != nil || row.Username != "jleight/claude" || row.UserUsername != "jleight" {
+	if row, err := s.AuthenticateAPIKey(testutil.Context(t), agentKey); err != nil || row.Username != "alice/claude" || row.UserUsername != "alice" {
 		t.Fatalf("agent key: %+v, %v", row, err)
 	}
 
@@ -109,7 +109,7 @@ func TestTOTPStepsAndRecoveryCodesAreSingleUse(t *testing.T) {
 	t.Parallel()
 
 	s := testutil.Store(t)
-	user := createUser(t, s, "jleight")
+	user := createUser(t, s, "alice")
 
 	if n, _ := s.UseTOTPStep(testutil.Context(t), db.UseTOTPStepParams{ID: user.ID, Step: 100}); n != 1 {
 		t.Error("the first use of a step was refused")
@@ -142,7 +142,7 @@ func TestResetLinks(t *testing.T) {
 	t.Parallel()
 
 	s := testutil.Store(t)
-	user := createUser(t, s, "jleight")
+	user := createUser(t, s, "alice")
 
 	_, live := auth.NewToken("")
 	_, stale := auth.NewToken("")

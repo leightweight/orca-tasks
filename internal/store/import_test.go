@@ -22,7 +22,7 @@ func importFile() store.ImportFile {
 			Name:       "Operations",
 			NextNumber: 5,
 			Issues: []store.ImportIssue{
-				{Number: 1, Summary: "First", Status: "Done", Type: "Task", Reporter: "jleight", Created: created, Updated: created},
+				{Number: 1, Summary: "First", Status: "Done", Type: "Task", Reporter: "ally", Created: created, Updated: created},
 				{
 					Number: 3, Summary: "Third", Status: "in progress", Type: "Bug", Priority: "High",
 					Reporter: "claude", Assignee: "bob", Labels: []string{"a"}, Created: created, Updated: created.Add(time.Hour),
@@ -43,7 +43,7 @@ func TestImport(t *testing.T) {
 
 	// newFixture already gave alice an OPS, so import as bob, who's only a
 	// member there; the agent of alice and alice herself appear in the file.
-	options := store.ImportOptions{Owner: "bob", Users: map[string]string{"claude": "alice/claude", "jleight": "alice"}}
+	options := store.ImportOptions{Owner: "bob", Users: map[string]string{"claude": "alice/claude", "ally": "alice"}}
 
 	file := importFile()
 	file.Projects[0].Issues[1].Assignee = "bob"
@@ -105,7 +105,7 @@ func TestImportReportsEveryUnknownName(t *testing.T) {
 	f := newFixture(t)
 
 	_, err := f.s.Import(testutil.Context(t), f.catalog, importFile(), store.ImportOptions{Owner: "bob"})
-	if err == nil || !strings.Contains(err.Error(), `"jleight"`) || !strings.Contains(err.Error(), `"claude"`) {
+	if err == nil || !strings.Contains(err.Error(), `"ally"`) || !strings.Contains(err.Error(), `"claude"`) {
 		t.Errorf("import with unmapped names: %v", err)
 	}
 
@@ -125,7 +125,7 @@ func TestImportFindsTheOwnersAgents(t *testing.T) {
 	file.Projects[0].Key = "OLD"
 	file.Projects[0].Issues[1].Assignee = "claude"
 
-	if _, err := f.s.Import(testutil.Context(t), f.catalog, file, store.ImportOptions{Owner: "alice", Users: map[string]string{"jleight": "alice"}}); err != nil {
+	if _, err := f.s.Import(testutil.Context(t), f.catalog, file, store.ImportOptions{Owner: "alice", Users: map[string]string{"ally": "alice"}}); err != nil {
 		t.Fatal(err)
 	}
 
