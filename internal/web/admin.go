@@ -46,7 +46,7 @@ func NewResetLink(ctx context.Context, s *store.Store, baseURL string, userID in
 }
 
 func (w *Web) revealLink(r *http.Request, username, link string) {
-	w.Sessions.Put(r.Context(), sessionReveal, reveal{
+	w.putSealed(r.Context(), sessionReveal, reveal{
 		Title: "Link for " + username,
 		Note:  "Give this to " + username + ". It sets their password and authenticator, works once, and expires in 24 hours.",
 		Lines: []string{link},

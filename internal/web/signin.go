@@ -138,7 +138,7 @@ func (w *Web) startEnrollment(rw http.ResponseWriter, r *http.Request, e enrollm
 	}
 
 	e.Secret, e.URL = key.Secret, key.URL
-	w.Sessions.Put(r.Context(), sessionEnroll, e)
+	w.putSealed(r.Context(), sessionEnroll, e)
 
 	http.Redirect(rw, r, "/enroll", http.StatusSeeOther)
 }
@@ -155,8 +155,8 @@ func enrollPage(e *auth.Enrollment) enrollQR {
 }
 
 func (w *Web) enrollForm(rw http.ResponseWriter, r *http.Request) {
-	e, ok := w.Sessions.Get(r.Context(), sessionEnroll).(enrollment)
-	if !ok {
+	var e enrollment
+	if !w.getSealed(r.Context(), sessionEnroll, &e) {
 		http.Redirect(rw, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -175,8 +175,8 @@ func (w *Web) enrollForm(rw http.ResponseWriter, r *http.Request) {
 func (w *Web) enroll(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	e, ok := w.Sessions.Get(ctx, sessionEnroll).(enrollment)
-	if !ok {
+	var e enrollment
+	if !w.getSealed(ctx, sessionEnroll, &e) {
 		http.Redirect(rw, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -315,7 +315,7 @@ func (w *Web) saveCredentials(rw http.ResponseWriter, r *http.Request, e enrollm
 		return
 	}
 
-	w.Sessions.Put(ctx, sessionReveal, recoveryReveal(f.codes))
+	w.putSealed(ctx, sessionReveal, recoveryReveal(f.codes))
 	http.Redirect(rw, r, "/account", http.StatusSeeOther)
 }
 

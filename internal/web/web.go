@@ -6,7 +6,7 @@ package web
 import (
 	"context"
 	"embed"
-	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"html/template"
 	"io/fs"
@@ -48,11 +48,6 @@ const (
 	sessionReveal         = "reveal"
 	sessionNext           = "next"
 )
-
-func init() {
-	gob.Register(enrollment{})
-	gob.Register(reveal{})
-}
 
 // Limiter counts failed attempts; see server.Limiter.
 type Limiter = jira.Limiter
@@ -256,6 +251,28 @@ type view struct {
 	Data         any
 }
 
+// putSealed stores a value in the session encrypted with the secret key. The
+// session store keeps its data in Postgres as it is, and these values are
+// secrets: a TOTP secret during enrollment, recovery codes, a new API key, or
+// a reset link waiting to be shown.
+func (w *Web) putSealed(ctx context.Context, key string, value any) {
+	// The values are plain structs, which always encode.
+	data, _ := json.Marshal(value)
+	w.Sessions.Put(ctx, key, w.Box.Seal(data))
+}
+
+// getSealed reads a value putSealed stored, reporting whether there was one.
+func (w *Web) getSealed(ctx context.Context, key string, into any) bool {
+	sealed, ok := w.Sessions.Get(ctx, key).([]byte)
+	if !ok {
+		return false
+	}
+
+	data, err := w.Box.Open(sealed)
+
+	return err == nil && json.Unmarshal(data, into) == nil
+}
+
 // reveal is a secret shown once, after the redirect that follows creating it.
 type reveal struct {
 	Title string
@@ -275,7 +292,9 @@ func (w *Web) render(rw http.ResponseWriter, r *http.Request, status int, name, 
 		Data:         data,
 	}
 
-	if shown, ok := w.Sessions.Pop(ctx, sessionReveal).(reveal); ok {
+	var shown reveal
+	if w.getSealed(ctx, sessionReveal, &shown) {
+		w.Sessions.Remove(ctx, sessionReveal)
 		v.Reveal = &shown
 	}
 

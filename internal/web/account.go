@@ -135,7 +135,7 @@ func (w *Web) newRecoveryCodes(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Sessions.Put(ctx, sessionReveal, recoveryReveal(codes))
+	w.putSealed(ctx, sessionReveal, recoveryReveal(codes))
 	http.Redirect(rw, r, "/account", http.StatusSeeOther)
 }
 
@@ -270,7 +270,7 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Sessions.Put(ctx, sessionReveal, reveal{
+	w.putSealed(ctx, sessionReveal, reveal{
 		Title: "Your new API key for " + username,
 		Note:  "Copy it now: this is the only time it's shown. Anyone with it can act as " + username + ".",
 		Lines: []string{key},

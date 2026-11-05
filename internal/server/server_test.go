@@ -18,8 +18,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexedwards/scs/pgxstore"
+
 	"github.com/leightweight/orca-tasks/internal/auth"
 	"github.com/leightweight/orca-tasks/internal/server"
+	"github.com/leightweight/orca-tasks/internal/store"
 	"github.com/leightweight/orca-tasks/internal/testutil"
 )
 
@@ -55,6 +58,7 @@ type site struct {
 	url   string
 	clock *clock
 	setup string
+	store *store.Store
 }
 
 func newSite(t *testing.T) *site {
@@ -81,7 +85,9 @@ func newSiteWith(t *testing.T, configure func(*server.Config)) *site {
 	}
 	configure(&cfg)
 
-	app, err := server.Build(testutil.Context(t), testutil.Store(t), cfg, slog.New(slog.DiscardHandler))
+	s := testutil.Store(t)
+
+	app, err := server.Build(testutil.Context(t), s, cfg, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +96,7 @@ func newSiteWith(t *testing.T, configure func(*server.Config)) *site {
 	listener.Start()
 	t.Cleanup(listener.Close)
 
-	return &site{t: t, url: base, clock: c, setup: app.SetupCode}
+	return &site{t: t, url: base, clock: c, setup: app.SetupCode, store: s}
 }
 
 // browser is a client with its own cookies that doesn't follow redirects.
@@ -500,4 +506,54 @@ func TestRequestsWithoutKeysDontLockOut(t *testing.T) {
 	}
 
 	t.Error("wrong keys were never limited")
+}
+
+// sessionData is every session's stored bytes, as they sit in Postgres.
+func (s *site) sessionData() string {
+	s.t.Helper()
+
+	all, err := pgxstore.New(s.store.Pool).AllCtx(testutil.Context(s.t))
+	if err != nil {
+		s.t.Fatal(err)
+	}
+
+	var data strings.Builder
+	for _, value := range all {
+		data.Write(value)
+	}
+
+	return data.String()
+}
+
+func TestSessionsDontHoldSecretsInPlainText(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice := s.browser()
+
+	alice.expectRedirect(alice.post("/setup", url.Values{
+		"code": {s.setup}, "username": {"alice"}, "password": {"correct horse battery"}, "confirm": {"correct horse battery"},
+	}), "/enroll")
+
+	secret := find(t, secretPattern, alice.get("/enroll").body)
+	if strings.Contains(s.sessionData(), secret) {
+		t.Error("the TOTP secret is in the session in plain text during enrollment")
+	}
+
+	alice.expectRedirect(alice.post("/enroll", url.Values{"code": {alice.code(secret)}}), "/account")
+	alice.get("/account")
+
+	you := find(t, regexp.MustCompile(`<option value="(\d+)">alice \(you\)`), alice.get("/account/keys").body)
+	alice.expectRedirect(alice.post("/account/keys", url.Values{
+		"name": {"orca"}, "principal": {you}, "access": {"write"}, "scope": {"all"}, "expires": {"0"}, "code": {alice.code(secret)},
+	}), "/account/keys")
+
+	// The key waits in the session until the next page shows it.
+	if strings.Contains(s.sessionData(), "otk_") {
+		t.Error("a new API key is in the session in plain text")
+	}
+
+	if keyPattern.FindString(alice.get("/account/keys").body) == "" {
+		t.Error("the new key wasn't shown")
+	}
 }
