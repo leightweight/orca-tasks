@@ -21,6 +21,11 @@ If a task you need doesn't exist, add it to `.config/mise/config.toml` and list 
   The whole run has a 2-minute limit, and each test step has its own deadline of a few seconds.
 - `mise run lint`: run all linters.
 - `mise run lint-fix` (alias `fix`): run all linters and apply fixes.
+- `mise run docker-build [image]`: build the image from source.
+- `mise run release:snapshot`: build the release binaries and images locally without publishing them.
+  The output goes in `.cache/dist/`.
+- Pushing a `v*` tag publishes a release through `.github/workflows/release.yml`.
+  Only push release tags when the user asks.
 - `mise tasks ls`: list all available tasks.
 
 ## Configuration
@@ -28,5 +33,6 @@ If a task you need doesn't exist, add it to `.config/mise/config.toml` and list 
 `.config/mise/config.toml` pins the tool versions and defines the tasks.
 File tasks live in `.config/mise/tasks/`.
 Linter configuration lives in `.config/hk.pkl`, `.config/rumdl.toml`, and `.golangci.yml`.
+The `helm` step lints the chart with `charts/orca-tasks/ci/lint-values.yaml`, and the `goreleaser` step checks `.goreleaser.yaml`.
 sqlc reads `.config/sqlc.yaml`.
 `mise run lint-fix` formats SQL with steveql-fmt.

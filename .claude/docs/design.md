@@ -180,6 +180,7 @@ The server creates the first user in a transaction under a Postgres advisory loc
 ### Sessions and passwords
 
 The web interface uses cookie sessions stored in Postgres through `alexedwards/scs` and its `pgxstore`.
+A session lasts 30 days, or 7 without use.
 The cookie is `HttpOnly` and `SameSite=Lax`, and `Secure` when the base URL is HTTPS.
 `net/http.CrossOriginProtection` rejects cross-origin form posts.
 
@@ -201,7 +202,8 @@ It connects to the database directly, so it needs no API key.
 The server limits failed sign-ins with `sethvargo/go-limiter`, keyed by client IP and separately by username.
 It allows 10 failures in 15 minutes for each, counting wrong passwords, TOTP codes, and recovery codes.
 Further attempts get HTTP 429 until the window passes.
-The limits apply to the setup code, reset links, and API key authentication too.
+The limits apply to the setup code and API key authentication too.
+Reset links are 256-bit random tokens, so guessing one isn't worth limiting.
 The counters are in memory, which is enough for the chart's one replica.
 
 The client IP comes from the [trusted proxies](#client-addresses), so the limit applies per client and not to the ingress as a whole.
@@ -300,7 +302,7 @@ Version 2 sends descriptions and comments as plain text, so Markdown reaches Orc
 | `GET`, `POST /rest/api/2/issue/{key}/comment` | List or add comments. |
 | `POST /rest/api/2/issue/{key}/attachments` | Upload attachments. |
 | `GET`, `DELETE /rest/api/2/attachment/{id}` | Read an attachment's metadata or delete it. |
-| `GET /secure/attachment/{id}/{filename}` | Download an attachment's contents. |
+| `GET /secure/attachment/{id}/{filename}`, `GET /rest/api/2/attachment/content/{id}` | Download an attachment's contents. |
 | `GET /rest/api/2/issue/createmeta/{project}/issuetypes[/{type}]` | Create metadata. |
 | `GET /rest/agile/1.0/board`, `GET /rest/agile/1.0/board/{id}/configuration` | One board per project, with a column per status. |
 
@@ -378,7 +380,7 @@ orca-tasks task attach OPS-12 diagram.png
 Names of projects, statuses, types, and priorities are case-insensitive.
 An unknown one exits with status 2 and lists the valid choices.
 
-Output is a table by default and JSON with `--format json`.
+Output is a table by default and JSON with `-f json`.
 `-` in place of a description or comment reads it from stdin.
 
 Projects are created and managed in the web interface, not the CLI.
@@ -395,6 +397,7 @@ The skill tells the agent to use the commands above, look before it writes, move
 
 Postgres 16 or later.
 goose applies migrations at startup, under its own advisory lock, so several replicas starting at once apply each migration once.
+Migrations only go forward; there are no down migrations.
 sqlc generates the query code from `.sql` files, and pgx runs it.
 
 Tables:
@@ -432,6 +435,7 @@ The server reads its configuration from flags or environment variables.
 | `ORCA_TASKS_TRUSTED_PROXIES` | None | Proxies whose forwarding headers to trust, as comma-separated IPs and CIDRs, or `private` for the private, link-local, and unique local ranges. |
 | `ORCA_TASKS_ADDR` | `:8080` | Address to listen on. |
 | `ORCA_TASKS_LOG_LEVEL` | `info` | Log level. |
+| `ORCA_TASKS_LOG_FORMAT` | `json` | Log format, `json` or `text`. |
 
 Losing the secret key makes every TOTP secret unreadable, so each user then needs a reset link.
 
@@ -467,6 +471,8 @@ The server builds links and decides whether cookies are `Secure` from `ORCA_TASK
 | JQL parsing | `github.com/alecthomas/participle/v2` |
 | Markdown to HTML | `github.com/yuin/goldmark` |
 | CLI tables | `github.com/jedib0t/go-pretty/v6` |
+| Human-readable sizes and times | `github.com/dustin/go-humanize` |
+| SQL formatting | steveql-fmt |
 | Tests against Postgres | `github.com/testcontainers/testcontainers-go` |
 
 ## Distribution
@@ -483,6 +489,7 @@ A release publishes the following.
 ### Helm chart
 
 The chart runs one replica as a Deployment with a Service, a PersistentVolumeClaim for the data directory, and an optional Ingress.
+The Deployment uses the Recreate strategy, since the volume is ReadWriteOnce.
 It doesn't run Postgres.
 It reads the database URL and the secret key from existing Secrets, so a CloudNativePG cluster's generated app Secret works through its `uri` key.
 
