@@ -49,6 +49,7 @@ linters:
       - linters:
           - dupl
           - gosec
+          - goconst
         path: _test\.go
 formatters:
   enable:
