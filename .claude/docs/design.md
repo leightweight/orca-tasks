@@ -393,7 +393,7 @@ orca-tasks task attach OPS-12 diagram.png
 `catalog` lists the projects, statuses, issue types, priorities, and users the other commands accept.
 `task list` takes JQL.
 `task show` prints the fields, the Markdown description, the comments, and the attachments.
-`task create` prints the new key.
+`task create`, `task edit`, and `task move` print the task: a table row, or with `-f json` one object with the same fields as a `task list` row.
 `task edit --priority ""` clears the priority, and `--assignee ""` unassigns.
 `--assignee` takes a user.
 `--assign-to-me` on `create`, `edit`, and `move` assigns the caller's user, which with an agent's key is the agent's owner.

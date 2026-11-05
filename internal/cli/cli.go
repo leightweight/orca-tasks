@@ -486,6 +486,12 @@ func (f *Flags) printIssue(ctx context.Context, env *Env, api *client.Client, ke
 		return err
 	}
 
+	// One task is an object in JSON, with the same fields as a task list row,
+	// so a script can read its key with jq -r .key.
+	if f.Format == "json" {
+		return f.render(env, summarize(*issue), nil)
+	}
+
 	return f.renderIssues(env, []client.Issue{*issue})
 }
 

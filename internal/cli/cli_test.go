@@ -203,3 +203,24 @@ func TestBadInputExitsWithUsage(t *testing.T) {
 		t.Errorf("an unknown status should list the valid ones: %v", err)
 	}
 }
+
+func TestChangesPrintOneTaskAsAnObject(t *testing.T) {
+	t.Parallel()
+
+	base, key := newServer(t)
+
+	for _, args := range [][]string{
+		{"task", "create", "OPS", "Rotate the keys", "-f", "json"},
+		{"task", "edit", "OPS-1", "--add-label", "security", "-f", "json"},
+		{"task", "move", "OPS-1", "Done", "-f", "json"},
+	} {
+		var task struct {
+			Key    string `json:"key"`
+			Status string `json:"status"`
+		}
+
+		if err := json.Unmarshal([]byte(mustRun(t, base, key, "", args...)), &task); err != nil || task.Key != "OPS-1" {
+			t.Errorf("%q printed %+v, %v; want an object with key OPS-1", args[1], task, err)
+		}
+	}
+}

@@ -51,8 +51,8 @@ orca-tasks task move OPS-12 Done --comment "All environments rotated; old keys r
   Put it in a description or comment, and Orca shows images inline.
 - Names are case-insensitive.
   An unknown status, type, priority, or project exits 2 with the valid choices listed.
-- `create` prints the new task, including its key.
-  Use that key rather than guessing the number.
+- `create`, `edit`, and `move` print the task, with `-f json` as one object with the same fields as a `task list` row.
+  Read the new key from `create`, as in `orca-tasks task create OPS "..." -f json | jq -r .key`, rather than guessing the number.
 
 Move a task to `In Progress` when you start it and to `Done` when it's finished, with a comment saying what was done.
 Leave tasks assigned to other people alone unless asked.
