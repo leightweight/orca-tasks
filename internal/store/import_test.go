@@ -43,7 +43,7 @@ func TestImport(t *testing.T) {
 
 	// newFixture already gave alice an OPS, so import as bob, who's only a
 	// member there; the agent of alice and alice herself appear in the file.
-	options := store.ImportOptions{Owner: "bob", Users: map[string]string{"claude": "alice-claude", "jleight": "alice"}}
+	options := store.ImportOptions{Owner: "bob", Users: map[string]string{"claude": "alice/claude", "jleight": "alice"}}
 
 	file := importFile()
 	file.Projects[0].Issues[1].Assignee = "bob"
@@ -78,13 +78,13 @@ func TestImport(t *testing.T) {
 	}
 
 	third := rows[0]
-	if third.ReporterUsername != "alice-claude" || third.AssigneeUsername == nil || *third.AssigneeUsername != "bob" ||
+	if third.ReporterUsername != "alice/claude" || third.AssigneeUsername == nil || *third.AssigneeUsername != "bob" ||
 		!third.Issue.UpdatedAt.Equal(time.Date(2026, 9, 1, 13, 0, 0, 0, time.UTC)) {
 		t.Errorf("OLD-3 = reporter %s, assignee %v, updated %s", third.ReporterUsername, third.AssigneeUsername, third.Issue.UpdatedAt)
 	}
 
 	comments, err := f.s.ListComments(testutil.Context(t), third.Issue.ID)
-	if err != nil || len(comments) != 2 || comments[0].AuthorUsername != "alice-claude" || comments[1].AuthorUsername != "bob" {
+	if err != nil || len(comments) != 2 || comments[0].AuthorUsername != "alice/claude" || comments[1].AuthorUsername != "bob" {
 		t.Errorf("comments = %+v, %v", comments, err)
 	}
 
@@ -111,5 +111,30 @@ func TestImportReportsEveryUnknownName(t *testing.T) {
 
 	if got := f.visible(t, f.bob, nil); len(got) != 0 {
 		t.Errorf("a failed import saved issues: %v", got)
+	}
+}
+
+func TestImportFindsTheOwnersAgents(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+
+	// alice owns the import, so "claude" is her agent without a mapping, and
+	// an issue assigned to it goes to her.
+	file := importFile()
+	file.Projects[0].Key = "OLD"
+	file.Projects[0].Issues[1].Assignee = "claude"
+
+	if _, err := f.s.Import(testutil.Context(t), f.catalog, file, store.ImportOptions{Owner: "alice", Users: map[string]string{"jleight": "alice"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := f.s.VisibleIssues(testutil.Context(t), db.VisibleIssuesParams{PrincipalID: f.alice.ID, Key: new("OLD"), Number: new(int32(3))})
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("OLD-3: %+v, %v", rows, err)
+	}
+
+	if rows[0].ReporterUsername != "alice/claude" || rows[0].AssigneeUsername == nil || *rows[0].AssigneeUsername != "alice" {
+		t.Errorf("OLD-3 = reporter %s, assignee %v; want alice/claude and alice", rows[0].ReporterUsername, rows[0].AssigneeUsername)
 	}
 }

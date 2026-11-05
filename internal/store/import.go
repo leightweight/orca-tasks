@@ -67,7 +67,7 @@ type ImportOptions struct {
 	Owner string
 
 	// Users maps the export's usernames to this server's. A name it doesn't
-	// list is looked up as it is.
+	// list is looked up as a user, then as one of the owner's agents.
 	Users map[string]string
 
 	// DryRun checks and applies everything, then rolls it back.
@@ -163,8 +163,15 @@ func (im *importer) resolve(ctx context.Context, name string) error {
 	}
 
 	p, err := im.q.GetPrincipalByUsername(ctx, username)
+
+	// A name that isn't a user may be one of the owner's agents, which export
+	// files usually name without their owner.
+	if errors.Is(err, pgx.ErrNoRows) && !strings.Contains(username, AgentSeparator) {
+		p, err = im.q.GetPrincipalByUsername(ctx, im.owner.Username+AgentSeparator+username)
+	}
+
 	if errors.Is(err, pgx.ErrNoRows) {
-		return fmt.Errorf("there's no user or agent named %q here; map it with --user %s=USERNAME", username, name)
+		return fmt.Errorf("there's no user named %q, and %s has no agent by that name; map it with --user %s=USERNAME", username, im.owner.Username, name)
 	}
 
 	if err != nil {
@@ -278,8 +285,16 @@ func (im *importer) project(ctx context.Context, p ImportProject, taken []string
 			row.PriorityID = &priority.ID
 		}
 
+		// Agents can't be assignees, so an agent's issues go to its owner.
 		if i.Assignee != "" {
-			row.AssigneeID = new(member(i.Assignee))
+			assignee := im.mustPrincipal(i.Assignee)
+
+			user := assignee.ID
+			if assignee.OwnerID != nil {
+				user = *assignee.OwnerID
+			}
+
+			row.AssigneeID = new(members[user])
 		}
 
 		issues = append(issues, row)
@@ -360,12 +375,16 @@ func (im *importer) memberships(ctx context.Context, project db.Project, p Impor
 			}
 		}
 
-		m, err := im.q.GetMembership(ctx, db.GetMembershipParams{ProjectID: project.ID, PrincipalID: principal.ID})
-		if err != nil {
-			return fmt.Errorf("%s has no membership in the project: %w", principal.Username, err)
-		}
+		// An agent's owner is recorded too, since its issues are assigned to the
+		// owner.
+		for _, id := range []int64{principal.ID, user} {
+			m, err := im.q.GetMembership(ctx, db.GetMembershipParams{ProjectID: project.ID, PrincipalID: id})
+			if err != nil {
+				return fmt.Errorf("%s has no membership in the project: %w", principal.Username, err)
+			}
 
-		members[principal.ID] = m.ID
+			members[id] = m.ID
+		}
 
 		return nil
 	}

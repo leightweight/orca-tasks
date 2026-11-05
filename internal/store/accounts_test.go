@@ -51,7 +51,7 @@ func TestAuthenticateAPIKey(t *testing.T) {
 	s := testutil.Store(t)
 	user := createUser(t, s, "jleight")
 
-	agent, err := s.CreateAgent(testutil.Context(t), user.ID, "jleight-claude", "Claude")
+	agent, err := s.CreateAgent(testutil.Context(t), user.ID, "claude", "Claude")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestAuthenticateAPIKey(t *testing.T) {
 		t.Fatalf("live key: %+v, %v", row, err)
 	}
 
-	if row, err := s.AuthenticateAPIKey(testutil.Context(t), agentKey); err != nil || row.Username != "jleight-claude" {
+	if row, err := s.AuthenticateAPIKey(testutil.Context(t), agentKey); err != nil || row.Username != "jleight/claude" || row.UserUsername != "jleight" {
 		t.Fatalf("agent key: %+v, %v", row, err)
 	}
 

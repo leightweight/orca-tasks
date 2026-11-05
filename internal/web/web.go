@@ -433,7 +433,7 @@ func (w *Web) SessionCaller(r *http.Request) *jira.Caller {
 		return nil
 	}
 
-	return &jira.Caller{PrincipalID: user.ID, Username: user.Username, DisplayName: user.DisplayName, Email: user.Email}
+	return &jira.Caller{PrincipalID: user.ID, Username: user.Username, DisplayName: user.DisplayName, Email: user.Email, User: user.Username}
 }
 
 // signIn starts a session for a user who has passed both factors.

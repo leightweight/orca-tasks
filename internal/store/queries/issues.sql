@@ -113,19 +113,21 @@ ORDER BY created_at
         ,id;
 
 -- name: ActiveMembership :one
--- The membership a username has in a project, if it's active and the
--- principal isn't disabled. Assignment looks people up this way.
+-- The membership a user has in a project, if it's active and the user isn't
+-- disabled. Assignment looks people up this way; agents can't be assignees.
 SELECT  m.id
 FROM    memberships m
 JOIN    principals  u   ON  u.id = m.principal_id
 WHERE   m.project_id = @project_id
         AND u.username = LOWER(@username)
         AND m.removed_at IS NULL
-        AND u.disabled_at IS NULL;
+        AND u.disabled_at IS NULL
+        AND u.kind = 'user';
 
 -- name: SearchPeople :many
--- The principals that share a project with the caller, optionally in one
--- project, and matching a search on username or display name.
+-- The users that share a project with the caller, optionally in one project,
+-- and matching a search on username or display name. Agents aren't listed:
+-- nobody picks them.
 SELECT DISTINCT
          u.username
         ,u.display_name
@@ -135,6 +137,7 @@ JOIN    memberships other   ON  other.project_id = mine.project_id
                             AND other.removed_at IS NULL
 JOIN    principals  u       ON  u.id = other.principal_id
                             AND u.disabled_at IS NULL
+                            AND u.kind = 'user'
 WHERE   mine.principal_id = @principal_id
         AND mine.removed_at IS NULL
         AND (

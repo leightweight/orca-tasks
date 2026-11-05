@@ -71,7 +71,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, c *Caller, reque
 		return err
 	}
 
-	ctx := jql.Context{CurrentUser: c.Username, Now: s.Now()}
+	ctx := jql.Context{CurrentUsers: c.names(), Now: s.Now()}
 
 	records := make([]issueRecord, 0, len(rows))
 	for _, row := range rows {
@@ -358,7 +358,7 @@ func (s *Server) createIssue(w http.ResponseWriter, r *http.Request, c *Caller) 
 		issue.PriorityID = &p.ID
 	}
 
-	if issue.Assignee, err = s.person(ctx, project.ID, decodeReference(request.Fields["assignee"])); err != nil {
+	if issue.Assignee, err = s.person(ctx, c, project.ID, decodeReference(request.Fields["assignee"])); err != nil {
 		return err
 	}
 
@@ -434,7 +434,7 @@ func (s *Server) updateIssue(w http.ResponseWriter, r *http.Request, c *Caller) 
 
 	if raw, ok := request.Fields["assignee"]; ok {
 		change.SetAssignee = true
-		if change.Assignee, err = s.person(ctx, row.Issue.ProjectID, decodeReference(raw)); err != nil {
+		if change.Assignee, err = s.person(ctx, c, row.Issue.ProjectID, decodeReference(raw)); err != nil {
 			return err
 		}
 	}
@@ -479,7 +479,7 @@ func (s *Server) assign(w http.ResponseWriter, r *http.Request, c *Caller) error
 
 	// Server and Data Center name the assignee by name. accountId is accepted
 	// too.
-	assignee, err := s.person(r.Context(), row.Issue.ProjectID, firstNonEmpty(decodeString(body["name"]), decodeString(body["accountId"])))
+	assignee, err := s.person(r.Context(), c, row.Issue.ProjectID, firstNonEmpty(decodeString(body["name"]), decodeString(body["accountId"])))
 	if err != nil {
 		return err
 	}

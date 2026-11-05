@@ -18,7 +18,7 @@ func (r fakeRecord) Timestamp(name string) (time.Time, bool) {
 }
 
 func testContext() Context {
-	return Context{CurrentUser: "jleight", Now: time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)}
+	return Context{CurrentUsers: []string{"jleight"}, Now: time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)}
 }
 
 func openRecord() fakeRecord {
@@ -213,5 +213,20 @@ func TestSort(t *testing.T) {
 
 	if got := records[0].fields["key"][0]; got != "ORCA-1" {
 		t.Errorf("key ASC put %s first, want ORCA-1", got)
+	}
+}
+
+func TestCurrentUserMatchesAnAgentsOwner(t *testing.T) {
+	t.Parallel()
+
+	ctx := Context{CurrentUsers: []string{"jleight/claude", "jleight"}}
+
+	query, err := Parse("assignee = currentUser() AND reporter IN (currentUser())")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !query.Match(openRecord(), ctx) {
+		t.Error("currentUser() for an agent should match its owner")
 	}
 }

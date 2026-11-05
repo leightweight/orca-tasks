@@ -35,8 +35,9 @@ var (
 	// ErrInvalidUsername is returned for a username that doesn't fit the pattern.
 	ErrInvalidUsername = errors.New("a username starts with a lowercase letter and has only lowercase letters, digits, '.', '_', and '-', up to 64 characters")
 
-	// ErrUsernameTaken is returned when a user or agent already has a username.
-	ErrUsernameTaken = errors.New("that username is taken")
+	// ErrUsernameTaken is returned when a user already has a username, or an
+	// owner already has an agent with a name.
+	ErrUsernameTaken = errors.New("that name is taken")
 )
 
 // NormalizeKey uppercases a project key and checks its shape.
@@ -192,9 +193,23 @@ func (s *Store) SetMemberKey(ctx context.Context, projectID, userID int64, key s
 	return err
 }
 
-// CreateAgent creates an agent with memberships in its owner's projects.
-func (s *Store) CreateAgent(ctx context.Context, ownerID int64, username, displayName string) (db.Principal, error) {
-	username, err := NormalizeUsername(username)
+// AgentSeparator joins an agent's owner and name into its username, as in
+// jleight/claude. Usernames can't contain it, so an agent's username never
+// collides with a user's, and each owner's agent names are their own.
+const AgentSeparator = "/"
+
+// AgentName is the name an agent's owner gave it: its username without the
+// owner.
+func AgentName(agent db.Principal) string {
+	_, name, _ := strings.Cut(agent.Username, AgentSeparator)
+	return name
+}
+
+// CreateAgent creates an agent with memberships in its owner's projects. Its
+// username is the owner's and the name together, so the name only has to be
+// unique among the owner's agents.
+func (s *Store) CreateAgent(ctx context.Context, ownerID int64, name, displayName string) (db.Principal, error) {
+	name, err := NormalizeUsername(name)
 	if err != nil {
 		return db.Principal{}, err
 	}
@@ -202,9 +217,14 @@ func (s *Store) CreateAgent(ctx context.Context, ownerID int64, username, displa
 	var agent db.Principal
 
 	err = s.InTx(ctx, func(q *db.Queries, _ pgx.Tx) error {
+		owner, err := q.GetPrincipal(ctx, ownerID)
+		if err != nil {
+			return err
+		}
+
 		agent, err = q.CreateAgent(ctx, db.CreateAgentParams{
-			Username:    username,
-			DisplayName: cmpOr(strings.TrimSpace(displayName), username),
+			Username:    owner.Username + AgentSeparator + name,
+			DisplayName: cmpOr(strings.TrimSpace(displayName), name),
 			OwnerID:     &ownerID,
 		})
 		if err != nil {

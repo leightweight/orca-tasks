@@ -17,6 +17,7 @@ WHERE   m.project_id = $1
         AND u.username = LOWER($2)
         AND m.removed_at IS NULL
         AND u.disabled_at IS NULL
+        AND u.kind = 'user'
 `
 
 type ActiveMembershipParams struct {
@@ -24,8 +25,8 @@ type ActiveMembershipParams struct {
 	Username  string
 }
 
-// The membership a username has in a project, if it's active and the
-// principal isn't disabled. Assignment looks people up this way.
+// The membership a user has in a project, if it's active and the user isn't
+// disabled. Assignment looks people up this way; agents can't be assignees.
 func (q *Queries) ActiveMembership(ctx context.Context, arg ActiveMembershipParams) (int64, error) {
 	row := q.db.QueryRow(ctx, activeMembership, arg.ProjectID, arg.Username)
 	var id int64
@@ -216,6 +217,7 @@ JOIN    memberships other   ON  other.project_id = mine.project_id
                             AND other.removed_at IS NULL
 JOIN    principals  u       ON  u.id = other.principal_id
                             AND u.disabled_at IS NULL
+                            AND u.kind = 'user'
 WHERE   mine.principal_id = $1
         AND mine.removed_at IS NULL
         AND (
@@ -249,8 +251,9 @@ type SearchPeopleRow struct {
 	Email       string
 }
 
-// The principals that share a project with the caller, optionally in one
-// project, and matching a search on username or display name.
+// The users that share a project with the caller, optionally in one project,
+// and matching a search on username or display name. Agents aren't listed:
+// nobody picks them.
 func (q *Queries) SearchPeople(ctx context.Context, arg SearchPeopleParams) ([]SearchPeopleRow, error) {
 	rows, err := q.db.Query(ctx, searchPeople,
 		arg.PrincipalID,

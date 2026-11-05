@@ -318,6 +318,12 @@ func (c *Client) Move(ctx context.Context, key, status, comment string) error {
 	}
 }
 
+// Assign assigns an issue. "-1" assigns the caller's user, which for an
+// agent is its owner.
+func (c *Client) Assign(ctx context.Context, key, username string) error {
+	return c.send(ctx, http.MethodPut, "/rest/api/2/issue/"+url.PathEscape(key)+"/assignee", map[string]string{"name": username}, nil)
+}
+
 // AddComment comments on an issue.
 func (c *Client) AddComment(ctx context.Context, key, body string) (*Comment, error) {
 	var comment Comment

@@ -33,6 +33,9 @@ type Caller struct {
 	Email       string
 	ReadOnly    bool
 
+	// User is the user the caller acts for: itself, or an agent's owner.
+	User string
+
 	// ProjectIDs limits the caller to some projects. Nil means every project
 	// the principal is a member of.
 	ProjectIDs []int64
@@ -40,6 +43,15 @@ type Caller struct {
 
 func (c *Caller) canSee(projectID int64) bool {
 	return c.ProjectIDs == nil || slices.Contains(c.ProjectIDs, projectID)
+}
+
+// names are what currentUser() matches: the caller, and the user it acts for.
+func (c *Caller) names() []string {
+	if c.User == "" || c.User == c.Username {
+		return []string{c.Username}
+	}
+
+	return []string{c.Username, c.User}
 }
 
 // Limiter counts failed sign-ins and API key checks.
@@ -211,6 +223,7 @@ func (s *Server) authenticate(r *http.Request) (*Caller, error) {
 		DisplayName: row.DisplayName,
 		Email:       row.Email,
 		ReadOnly:    row.ReadOnly,
+		User:        row.UserUsername,
 	}
 
 	if !row.AllProjects {
@@ -346,17 +359,22 @@ func (s *Server) actor(ctx context.Context, c *Caller, projectID int64) (int64, 
 	return m.ID, err
 }
 
-// person looks up someone to assign an issue to, who must be an active member
-// of its project.
-func (s *Server) person(ctx context.Context, projectID int64, username string) (*store.Person, error) {
+// person looks up someone to assign an issue to, who must be a user with an
+// active membership in its project. Agents can't be assignees. Jira's "-1",
+// automatic assignment, means the caller's user: an agent assigns its owner.
+func (s *Server) person(ctx context.Context, c *Caller, projectID int64, username string) (*store.Person, error) {
 	username = strings.TrimSpace(username)
-	if username == "" || username == "-1" {
+
+	switch username {
+	case "":
 		return nil, nil
+	case "-1":
+		username = c.User
 	}
 
 	membership, err := s.Store.ActiveMembership(ctx, db.ActiveMembershipParams{ProjectID: projectID, Username: username})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, badRequest("%q isn't a member of the project, so the issue can't be assigned to them.", username)
+		return nil, badRequest("%q isn't a user in the project, so the issue can't be assigned to them. Issues are assigned to users, not agents.", username)
 	}
 
 	if err != nil {

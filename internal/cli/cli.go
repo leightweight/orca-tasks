@@ -29,6 +29,10 @@ type Env struct {
 	Stdin  io.Reader
 }
 
+// assignToMe is Jira's automatic assignee, which the server takes as the
+// caller's user: the caller, or an agent's owner.
+const assignToMe = "-1"
+
 // Flags are the connection and output flags every command takes.
 type Flags struct {
 	URL    string `env:"ORCA_TASKS_URL" required:"" placeholder:"URL" help:"The server's URL."`
@@ -377,7 +381,8 @@ type TaskCreate struct {
 	Type        string   `help:"Task type. Defaults to Task."`
 	Status      string   `help:"Starting status. Defaults to To Do."`
 	Priority    string   `help:"Priority. Defaults to none."`
-	Assignee    string   `help:"Username to assign it to. Defaults to nobody."`
+	Assignee    string   `xor:"assignee" help:"Username of the person to assign it to. Agents can't be assignees. Defaults to nobody."`
+	AssignToMe  bool     `xor:"assignee" help:"Assign it to you, or, with an agent's key, to the agent's owner."`
 	Label       []string `help:"Label to add. Repeatable."`
 }
 
@@ -403,6 +408,10 @@ func (c *TaskCreate) Run(ctx context.Context, env *Env) error {
 		if strings.TrimSpace(value) != "" {
 			fields[field] = map[string]string{"name": value}
 		}
+	}
+
+	if c.AssignToMe {
+		fields["assignee"] = map[string]string{"name": assignToMe}
 	}
 
 	api := c.client()
@@ -433,7 +442,8 @@ type TaskEdit struct {
 	Description *string  `help:"New Markdown body, replacing the old one. - reads it from stdin."`
 	Type        *string  `help:"New task type."`
 	Priority    *string  `help:"New priority. Empty clears it."`
-	Assignee    *string  `help:"Username to assign it to. Empty unassigns it."`
+	Assignee    *string  `xor:"assignee" help:"Username of the person to assign it to. Empty unassigns it."`
+	AssignToMe  bool     `xor:"assignee" help:"Assign it to you, or, with an agent's key, to the agent's owner."`
 	AddLabel    []string `help:"Label to add. Repeatable."`
 	RemoveLabel []string `help:"Label to remove. Repeatable."`
 }
@@ -463,6 +473,10 @@ func (c *TaskEdit) Run(ctx context.Context, env *Env) error {
 		fields["issuetype"] = map[string]string{"name": *c.Type}
 	}
 
+	if c.AssignToMe {
+		fields["assignee"] = map[string]string{"name": assignToMe}
+	}
+
 	for field, value := range map[string]*string{"priority": c.Priority, "assignee": c.Assignee} {
 		if value == nil {
 			continue
@@ -488,9 +502,10 @@ func (c *TaskEdit) Run(ctx context.Context, env *Env) error {
 type TaskMove struct {
 	Flags
 
-	Key     string `arg:"" help:"Task key, such as OPS-1."`
-	Status  string `arg:"" help:"Status to move it to, such as \"In Progress\" or Done."`
-	Comment string `help:"Comment to add with the move. - reads it from stdin."`
+	Key        string `arg:"" help:"Task key, such as OPS-1."`
+	Status     string `arg:"" help:"Status to move it to, such as \"In Progress\" or Done."`
+	Comment    string `help:"Comment to add with the move. - reads it from stdin."`
+	AssignToMe bool   `help:"Also assign it to you, or, with an agent's key, to the agent's owner."`
 }
 
 // Run moves the task and prints it.
@@ -504,6 +519,12 @@ func (c *TaskMove) Run(ctx context.Context, env *Env) error {
 
 	if err := api.Move(ctx, c.Key, c.Status, comment); err != nil {
 		return check(err)
+	}
+
+	if c.AssignToMe {
+		if err := api.Assign(ctx, c.Key, assignToMe); err != nil {
+			return check(err)
+		}
 	}
 
 	return c.printIssue(ctx, env, api, c.Key)

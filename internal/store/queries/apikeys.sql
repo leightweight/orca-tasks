@@ -50,7 +50,8 @@ WHERE   k.id = @id
 
 -- name: AuthenticateAPIKey :one
 -- A key works while it's live and neither its principal nor, for an agent,
--- the owner is disabled or still enrolling.
+-- the owner is disabled or still enrolling. The user is the principal, or
+-- the agent's owner.
 SELECT   k.id
         ,k.read_only
         ,k.all_projects
@@ -58,6 +59,7 @@ SELECT   k.id
         ,p.username
         ,p.display_name
         ,p.email
+        ,u.username                                                                                                         AS  user_username
         ,COALESCE((SELECT ARRAY_AGG(kp.project_id) FROM api_key_projects kp WHERE kp.api_key_id = k.id), '{}')::BIGINT[]    AS  project_ids
 FROM    api_keys    k
 JOIN    principals  p   ON  p.id = k.principal_id

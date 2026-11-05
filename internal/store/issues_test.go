@@ -28,7 +28,7 @@ func newFixture(t *testing.T) *fixture {
 	f.bob = createUser(t, f.s, "bob")
 
 	var err error
-	if f.agent, err = f.s.CreateAgent(testutil.Context(t), f.alice.ID, "alice-claude", "Claude"); err != nil {
+	if f.agent, err = f.s.CreateAgent(testutil.Context(t), f.alice.ID, "claude", "Claude"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -128,7 +128,7 @@ func TestVisibility(t *testing.T) {
 	}
 
 	rows, err := f.s.VisibleIssues(testutil.Context(t), db.VisibleIssuesParams{PrincipalID: f.alice.ID, Key: new("ops"), Number: new(int32(1))})
-	if err != nil || len(rows) != 1 || rows[0].ReporterUsername != "alice-claude" {
+	if err != nil || len(rows) != 1 || rows[0].ReporterUsername != "alice/claude" {
 		t.Fatalf("OPS-1 = %+v, %v; want one issue reported by the agent", rows, err)
 	}
 }

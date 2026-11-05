@@ -36,6 +36,7 @@ SELECT   k.id
         ,p.username
         ,p.display_name
         ,p.email
+        ,u.username                                                                                                         AS  user_username
         ,COALESCE((SELECT ARRAY_AGG(kp.project_id) FROM api_key_projects kp WHERE kp.api_key_id = k.id), '{}')::BIGINT[]    AS  project_ids
 FROM    api_keys    k
 JOIN    principals  p   ON  p.id = k.principal_id
@@ -52,18 +53,20 @@ WHERE   k.key_hash = $1
 `
 
 type AuthenticateAPIKeyRow struct {
-	ID          int64
-	ReadOnly    bool
-	AllProjects bool
-	PrincipalID int64
-	Username    string
-	DisplayName string
-	Email       string
-	ProjectIds  []int64
+	ID           int64
+	ReadOnly     bool
+	AllProjects  bool
+	PrincipalID  int64
+	Username     string
+	DisplayName  string
+	Email        string
+	UserUsername string
+	ProjectIds   []int64
 }
 
 // A key works while it's live and neither its principal nor, for an agent,
-// the owner is disabled or still enrolling.
+// the owner is disabled or still enrolling. The user is the principal, or
+// the agent's owner.
 func (q *Queries) AuthenticateAPIKey(ctx context.Context, keyHash []byte) (AuthenticateAPIKeyRow, error) {
 	row := q.db.QueryRow(ctx, authenticateAPIKey, keyHash)
 	var i AuthenticateAPIKeyRow
@@ -75,6 +78,7 @@ func (q *Queries) AuthenticateAPIKey(ctx context.Context, keyHash []byte) (Authe
 		&i.Username,
 		&i.DisplayName,
 		&i.Email,
+		&i.UserUsername,
 		&i.ProjectIds,
 	)
 	return i, err

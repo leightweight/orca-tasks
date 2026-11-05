@@ -34,7 +34,7 @@ People work with tasks in Orca, and agents work with them through the CLI.
 
 ### Principals
 
-A principal is anything that can authenticate and appear on a task as a reporter, assignee, comment author, or attachment uploader.
+A principal is anything that can authenticate and act on tasks: report an issue, comment, or upload an attachment.
 There are two kinds.
 
 - A user is a person.
@@ -43,8 +43,10 @@ There are two kinds.
   Agents can't sign in to the web interface.
   They authenticate only with API keys.
 
-Usernames are unique across users and agents, because Jira user fields identify a principal by name alone.
 A username starts with a lowercase letter and holds only lowercase letters, digits, `.`, `_`, and `-`.
+An agent's name follows the same rule, but only has to be unique among its owner's agents.
+Its username is the owner's and its name joined by `/`, as in `jleight/claude`.
+Jira identifies people by name alone, so the API and JQL use that full username, and because usernames can't contain `/`, it never collides with a user's.
 Each principal also has a display name, and users have an optional email address.
 
 A user can be a site administrator.
@@ -68,6 +70,17 @@ Users are members of projects, with one of two roles.
 - A project administrator can also rename the project, add or remove members, and delete the project.
 
 Any user can create a project and becomes its first administrator.
+
+### Choosing people and recording actions
+
+People are chosen, and actions are recorded.
+
+- Wherever someone picks a person, the choice is a user: an issue's assignee, Orca's assignee picker, user search, and project members.
+  Agents never appear there, and the API refuses to assign one.
+- Wherever something records who acted, it may be a user or an agent: an issue's reporter, a comment's author, an attachment's uploader, and history entries.
+- An agent acts for its owner.
+  Assigning to `-1`, Jira's automatic assignee, assigns the caller's user, so an agent assigns its owner.
+  Wherever a permission depends on who did something, such as deleting an attachment, the owner and their agents count as one, and an agent has its owner's role.
 
 ### Memberships
 
@@ -157,7 +170,7 @@ A description embeds an attachment with Markdown such as `![diagram](https://tas
 - A principal sees a project, its issues, comments, and attachments only through an active membership.
 - A principal sees another principal, in user searches and on issues, only when they share a project.
   An issue can still show a reporter or comment author whose membership has since been removed.
-- A new assignee must have an active membership in the issue's project.
+- A new assignee must be a user with an active membership in the issue's project.
 - An API key can be limited further, as described in [API keys](#api-keys).
 - Site administrators manage users and see per-user counts.
   They read task contents only through their own memberships, like anyone else.
@@ -232,7 +245,7 @@ Only a user who signed in with TOTP can create one.
 ### Agents
 
 A user creates agents from their account page.
-An agent has a username, such as `jleight-claude`, and a display name, such as `Claude`.
+An agent has a name, such as `claude`, which makes its username `jleight/claude`, and a display name, such as `Claude`.
 The owner can rename, disable, and enable their agents.
 
 ### API keys
@@ -337,7 +350,8 @@ JQL supports these operators and functions.
 - `currentUser()` and relative dates such as `-7d`.
 - `ORDER BY`.
 
-`currentUser()` is the calling principal, and `project = OPS` means the project the caller sees as `OPS`.
+`currentUser()` is the calling principal, and for an agent, its owner too, so an agent's `assignee = currentUser()` finds its owner's issues.
+`project = OPS` means the project the caller sees as `OPS`.
 
 The server loads the issues the caller can see and evaluates the query in Go.
 `alecthomas/participle` parses the query.
@@ -376,6 +390,8 @@ orca-tasks task attach OPS-12 diagram.png
 `task show` prints the fields, the Markdown description, the comments, and the attachments.
 `task create` prints the new key.
 `task edit --priority ""` clears the priority, and `--assignee ""` unassigns.
+`--assignee` takes a user.
+`--assign-to-me` on `create`, `edit`, and `move` assigns the caller's user, which with an agent's key is the agent's owner.
 `task attach` uploads a file and prints the Markdown that embeds it, to paste into a description or comment.
 Names of projects, statuses, types, and priorities are case-insensitive.
 An unknown one exits with status 2 and lists the valid choices.
@@ -394,7 +410,7 @@ The server-side commands are `orca-tasks serve`, which also applies migrations, 
 Like `admin reset-link`, it connects to the database directly, so it runs inside the server's container.
 
 ```sh
-kubectl exec -i deploy/orca-tasks -- /orca-tasks admin import --owner jleight --user claude=jleight-claude - < export.json
+kubectl exec -i deploy/orca-tasks -- /orca-tasks admin import --owner jleight - < export.json
 ```
 
 The file is JSON, with `format` set to `orca-tasks-export` and `version` set to 1.
@@ -434,8 +450,10 @@ The file is JSON, with `format` set to `orca-tasks-export` and `version` set to 
 - `--owner` names the user who administers every imported project.
   An issue or comment with an empty reporter or author is theirs.
 - People in the file are usernames.
-  `--user OLD=NEW` maps one to a user or agent here, and a name it doesn't map is looked up as it is.
+  `--user OLD=NEW` maps one to a user or agent here.
+  A name it doesn't map is looked up as a user, then as one of the owner's agents, so an export's `claude` finds `jleight/claude` with no mapping.
 - Every user the file names joins the project as a member, and every agent joins with its owner.
+- An issue assigned to an agent goes to the agent's owner.
 - Issues keep their numbers and times, and comments keep their authors and times, so `OPS-12` is still `OPS-12` for the owner.
   `next_number` keeps the counter past numbers the old list used up.
 - Statuses, types, and priorities match the catalog by name, ignoring case.
@@ -451,7 +469,7 @@ Each project costs a fixed number of queries whatever its size: one COPY for its
 ## Claude Code skill
 
 The repository ships the skill as a Claude Code plugin, so `/plugin marketplace add leightweight/orca-tasks` installs it.
-The skill tells the agent to use the commands above, look before it writes, move tasks through their statuses with a comment, and leave other principals' tasks alone unless asked.
+The skill tells the agent to use the commands above, look before it writes, move tasks through their statuses with a comment, leave assigning to the user except to assign the user a task it starts, and leave other people's tasks alone unless asked.
 
 ## Storage
 

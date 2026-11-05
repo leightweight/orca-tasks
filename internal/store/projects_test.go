@@ -121,11 +121,22 @@ func TestValidation(t *testing.T) {
 		t.Errorf("key starting with a digit: %v", err)
 	}
 
-	if _, err := s.CreateAgent(testutil.Context(t), alice.ID, "Alice-Bot", ""); err != nil {
-		t.Errorf("a username in capitals should be lowercased, got %v", err)
+	agent, err := s.CreateAgent(testutil.Context(t), alice.ID, "Claude", "")
+	if err != nil || agent.Username != "alice/claude" || store.AgentName(agent) != "claude" {
+		t.Errorf("agent = %q, %v; want the name lowercased under alice", agent.Username, err)
 	}
 
-	if _, err := s.CreateAgent(testutil.Context(t), alice.ID, "alice", ""); !errors.Is(err, store.ErrUsernameTaken) {
-		t.Errorf("duplicate username: %v", err)
+	if _, err := s.CreateAgent(testutil.Context(t), alice.ID, "claude", ""); !errors.Is(err, store.ErrUsernameTaken) {
+		t.Errorf("a second agent named claude: %v", err)
+	}
+
+	// Another owner can use the same name.
+	bob := createUser(t, s, "bob")
+	if _, err := s.CreateAgent(testutil.Context(t), bob.ID, "claude", ""); err != nil {
+		t.Errorf("bob's agent named claude: %v", err)
+	}
+
+	if _, err := s.CreateAgent(testutil.Context(t), alice.ID, "a/b", ""); !errors.Is(err, store.ErrInvalidUsername) {
+		t.Errorf("an agent name with the separator: %v", err)
 	}
 }

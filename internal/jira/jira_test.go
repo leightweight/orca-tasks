@@ -254,7 +254,7 @@ func TestAuthentication(t *testing.T) {
 	}
 
 	a.mustCall(a.claude, "GET", "/rest/api/2/myself", "", &me)
-	if me.Name != "claude" || me.DisplayName != "Claude" {
+	if me.Name != "alice/claude" || me.DisplayName != "Claude" {
 		t.Errorf("myself = %+v", me)
 	}
 
@@ -389,7 +389,7 @@ func TestCreateUpdateAndTransition(t *testing.T) {
 	}
 
 	issue := result.Issues[0].Fields
-	if issue.Priority == nil || issue.Priority.Name != "High" || issue.Reporter.Name != "claude" || len(issue.Labels) != 1 {
+	if issue.Priority == nil || issue.Priority.Name != "High" || issue.Reporter.Name != "alice/claude" || len(issue.Labels) != 1 {
 		t.Errorf("issue = %+v", issue)
 	}
 
@@ -509,7 +509,7 @@ func TestAttachments(t *testing.T) {
 	key := a.create(a.alice, "OPS", "Draw the diagram")
 
 	png := "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
-	if status, body := upload(t, a, a.bob, key, "../diagram.png", png); status != http.StatusOK {
+	if status, body := upload(t, a, a.claude, key, "../diagram.png", png); status != http.StatusOK {
 		t.Fatalf("upload: status %d: %s", status, body)
 	}
 
@@ -556,14 +556,15 @@ func TestAttachments(t *testing.T) {
 		}
 	}
 
-	// Only the uploader or a project administrator can delete; bob uploaded
-	// these and alice administers OPS, but claude's owner, alice, isn't the
-	// uploader and claude is only a member.
-	if status := a.call(a.claude, "DELETE", "/rest/api/2/attachment/"+files[0].ID, "", nil); status != http.StatusForbidden {
-		t.Errorf("claude deleting: status %d, want 403", status)
+	// Only the uploader's account or a project administrator can delete. Claude
+	// uploaded the diagram for alice, so bob, a member, can't delete it, and
+	// claude, acting for alice, the administrator, can delete bob's page.
+	if status := a.call(a.bob, "DELETE", "/rest/api/2/attachment/"+files[0].ID, "", nil); status != http.StatusForbidden {
+		t.Errorf("bob deleting claude's upload: status %d, want 403", status)
 	}
 
-	a.mustCall(a.bob, "DELETE", "/rest/api/2/attachment/"+files[0].ID, "", nil)
+	a.mustCall(a.claude, "DELETE", "/rest/api/2/attachment/"+files[1].ID, "", nil)
+	a.mustCall(a.alice, "DELETE", "/rest/api/2/attachment/"+files[0].ID, "", nil)
 
 	if status := a.call(a.alice, "GET", "/rest/api/2/attachment/"+files[0].ID, "", nil); status != http.StatusNotFound {
 		t.Errorf("a deleted attachment: status %d, want 404", status)
@@ -613,8 +614,40 @@ func TestBoardsAndCreateMeta(t *testing.T) {
 	a.mustCall(a.bob, "GET", "/rest/api/2/issue/createmeta/OPS/issuetypes/10001", "", &meta)
 
 	for _, field := range meta.Values {
-		if field.FieldID == "assignee" && len(field.AllowedValues) != 3 {
-			t.Errorf("assignees = %+v, want alice, bob, and claude", field.AllowedValues)
+		if field.FieldID == "assignee" && len(field.AllowedValues) != 2 {
+			t.Errorf("assignees = %+v, want alice and bob, and no agents", field.AllowedValues)
+		}
+	}
+}
+
+func TestAgentsAreNotAssignees(t *testing.T) {
+	t.Parallel()
+
+	a := newAPI(t)
+	key := a.create(a.claude, "OPS", "Rotate the keys")
+
+	if status := a.call(a.alice, "PUT", "/rest/api/2/issue/"+key+"/assignee", `{"name":"alice/claude"}`, nil); status != http.StatusBadRequest {
+		t.Errorf("assigning an agent: status %d, want 400", status)
+	}
+
+	// An agent's automatic assignment goes to its owner, and its
+	// currentUser() matches what it reported and what its owner is assigned.
+	a.mustCall(a.claude, "PUT", "/rest/api/2/issue/"+key+"/assignee", `{"name":"-1"}`, nil)
+
+	result := a.search(a.claude, "assignee = currentUser() AND reporter = currentUser()")
+	if result.Total != 1 || result.Issues[0].Fields.Assignee == nil || result.Issues[0].Fields.Assignee.Name != "alice" {
+		t.Errorf("search = %+v, want OPS-1 assigned to alice", result)
+	}
+
+	var people []struct {
+		Name string `json:"name"`
+	}
+
+	a.mustCall(a.alice, "GET", "/rest/api/2/user/search?username=.", "", &people)
+
+	for _, p := range people {
+		if strings.Contains(p.Name, "/") {
+			t.Errorf("user search listed the agent %s", p.Name)
 		}
 	}
 }

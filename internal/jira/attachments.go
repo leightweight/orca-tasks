@@ -196,14 +196,16 @@ func (s *Server) attachment(w http.ResponseWriter, r *http.Request, c *Caller) e
 }
 
 // deleteAttachment lets the uploader or a project administrator delete an
-// attachment. The file goes now; the sweep catches it if that fails.
+// attachment. An agent acts for its owner, so an owner can delete what their
+// agents uploaded, and an agent has its owner's role. The file goes now; the
+// sweep catches it if that fails.
 func (s *Server) deleteAttachment(w http.ResponseWriter, r *http.Request, c *Caller) error {
 	row, err := s.visibleAttachment(r, c)
 	if err != nil {
 		return err
 	}
 
-	if row.Membership.ID != row.Attachment.UploaderID && row.Membership.Role != store.RoleAdmin {
+	if row.UploaderAccount != row.CallerAccount && row.AccountRole != store.RoleAdmin {
 		return forbidden("Only the uploader or a project administrator can delete an attachment.")
 	}
 

@@ -114,8 +114,10 @@ type Record interface {
 
 // Context is what JQL functions resolve against.
 type Context struct {
-	CurrentUser string
-	Now         time.Time
+	// CurrentUsers are the names currentUser() matches: the caller, and for an
+	// agent, its owner too.
+	CurrentUsers []string
+	Now          time.Time
 }
 
 // Match reports whether a record satisfies the query's WHERE clause.
@@ -252,35 +254,33 @@ func isEmpty(r Record, field string) bool {
 	return true
 }
 
-// resolve expands a function to its value. Functions we know nothing about,
-// such as openSprints(), resolve to nothing and so match nothing.
-func resolve(v *value, ctx Context) (string, bool) {
+// resolve expands a value to the strings it stands for. Functions we know
+// nothing about, such as openSprints(), resolve to nothing and so match
+// nothing.
+func resolve(v *value, ctx Context) []string {
 	if v.Function == nil {
-		return v.text(), true
+		return []string{v.text()}
 	}
 
 	switch strings.ToLower(v.Function.Name) {
 	case "currentuser":
-		return ctx.CurrentUser, true
+		return ctx.CurrentUsers
 	case "empty", "null":
-		return "", true
+		return []string{""}
 	}
 
-	return "", false
+	return nil
 }
 
 func matchesAny(r Record, field string, values []*value, ctx Context, match func(actual, expected string) bool) bool {
 	actual := r.Field(field)
 
 	for _, v := range values {
-		expected, ok := resolve(v, ctx)
-		if !ok {
-			continue
-		}
-
-		for _, candidate := range actual {
-			if match(candidate, expected) {
-				return true
+		for _, expected := range resolve(v, ctx) {
+			for _, candidate := range actual {
+				if match(candidate, expected) {
+					return true
+				}
 			}
 		}
 	}
@@ -306,10 +306,12 @@ func compare(r Record, field, op string, values []*value, ctx Context) bool {
 		return false
 	}
 
-	expectedText, ok := resolve(values[0], ctx)
-	if !ok {
+	expected := resolve(values[0], ctx)
+	if len(expected) == 0 {
 		return false
 	}
+
+	expectedText := expected[0]
 
 	ordered := func(cmp int) bool {
 		switch op {

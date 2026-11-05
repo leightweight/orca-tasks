@@ -136,7 +136,7 @@ func TestTaskLifecycle(t *testing.T) {
 		t.Fatalf("create printed %q", out)
 	}
 
-	mustRun(t, base, key, "", "task", "edit", "OPS-1", "--priority", "", "--assignee", "alice", "--add-label", "blocked")
+	mustRun(t, base, key, "", "task", "edit", "OPS-1", "--priority", "", "--assign-to-me", "--add-label", "blocked")
 	mustRun(t, base, key, "Started on staging.\n", "task", "move", "OPS-1", "in progress", "--comment", "-")
 	mustRun(t, base, key, "", "task", "comment", "OPS-1", "Staging is done.")
 
@@ -166,16 +166,16 @@ func TestTaskLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if detail.Status != "In Progress" || detail.Priority != "" || detail.Assignee != "alice" || detail.Reporter != "claude" ||
-		len(detail.Labels) != 2 || len(detail.Comments) != 2 || detail.Comments[0].Author != "claude" || len(detail.Attachments) != 1 {
+	if detail.Status != "In Progress" || detail.Priority != "" || detail.Assignee != "alice" || detail.Reporter != "alice/claude" ||
+		len(detail.Labels) != 2 || len(detail.Comments) != 2 || detail.Comments[0].Author != "alice/claude" || len(detail.Attachments) != 1 {
 		t.Errorf("show = %+v", detail)
 	}
 
-	if out := mustRun(t, base, key, "", "task", "list", "assignee = alice AND statusCategory != Done"); !strings.Contains(out, "OPS-1") {
+	if out := mustRun(t, base, key, "", "task", "list", "assignee = currentUser() AND statusCategory != Done"); !strings.Contains(out, "OPS-1") {
 		t.Errorf("list printed %q", out)
 	}
 
-	if out := mustRun(t, base, key, "", "catalog"); !strings.Contains(out, "claude") || !strings.Contains(out, "Operations") {
+	if out := mustRun(t, base, key, "", "catalog"); !strings.Contains(out, "alice") || strings.Contains(out, "claude") || !strings.Contains(out, "Operations") {
 		t.Errorf("catalog printed %q", out)
 	}
 }

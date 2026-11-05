@@ -5,7 +5,8 @@ A CLI calls the same API, so Claude Code agents can read and change the same tas
 
 - Several people share one server, and each sees only the projects they belong to.
 - Every account signs in with a password and TOTP.
-- Agents, such as Claude, get their own names and API keys, so their tasks and comments show as theirs.
+- Agents, such as Claude, get their own names and API keys, so the tasks they create and their comments show as theirs.
+  Tasks are assigned to people, not agents.
 - API keys can be limited to reading, or to some projects.
 - Attachments are stored as files, and Orca shows attached images inline.
 - Every change to an issue is recorded.
@@ -53,11 +54,11 @@ Open `https://tasks.example.com/setup`, enter the code, and create the first acc
 ## Import tasks
 
 `orca-tasks admin import` brings in projects, issues, and comments from a JSON export, keeping issue numbers, authors, and times.
-Create your account first, and any agents the export's comments came from:
+Create your account first, and any agents the export's issues and comments came from, under the names the export uses, such as `claude`:
 
 ```sh
-kubectl exec -i deploy/orca-tasks -- /orca-tasks admin import --owner you --user claude=you-claude --dry-run - < export.json
-kubectl exec -i deploy/orca-tasks -- /orca-tasks admin import --owner you --user claude=you-claude - < export.json
+kubectl exec -i deploy/orca-tasks -- /orca-tasks admin import --owner you --dry-run - < export.json
+kubectl exec -i deploy/orca-tasks -- /orca-tasks admin import --owner you - < export.json
 ```
 
 The [design doc](.claude/docs/design.md#importing) describes the file format.
@@ -74,7 +75,8 @@ In Orca, open Settings, then Integrations, then Jira, and enter:
 
 ## Set up Claude Code
 
-Create an agent on the Agents page, such as `you-claude`, and an API key for it.
+Create an agent named `claude` on the Agents page, and an API key for it.
+Its full username is yours and its name together, as in `you/claude`, so other people can name their agents `claude` too.
 Install the CLI with mise:
 
 ```sh

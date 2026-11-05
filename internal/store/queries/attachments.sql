@@ -36,13 +36,24 @@ ORDER BY t.issue_id
 
 -- name: VisibleAttachment :one
 -- An attachment, if the principal can see its issue, with the principal's
--- membership in the project and the issue's key under it.
+-- membership in the project. An agent acts for its owner, so the account of
+-- the uploader and of the caller, and the account's role, decide who can
+-- delete it.
 SELECT   sqlc.embed(t)
         ,sqlc.embed(m)
         ,i.number
-FROM    attachments t
-JOIN    issues      i   ON  i.id = t.issue_id
-JOIN    memberships m   ON  m.project_id = t.project_id
+        ,COALESCE(upp.owner_id, upp.id)::BIGINT AS  uploader_account
+        ,COALESCE(cp.owner_id, cp.id)::BIGINT   AS  caller_account
+        ,COALESCE(am.role, m.role)::TEXT        AS  account_role
+FROM        attachments t
+JOIN        issues      i   ON  i.id = t.issue_id
+JOIN        memberships m   ON  m.project_id = t.project_id
+JOIN        principals  cp  ON  cp.id = m.principal_id
+JOIN        memberships up  ON  up.id = t.uploader_id
+JOIN        principals  upp ON  upp.id = up.principal_id
+LEFT JOIN   memberships am  ON  am.project_id = t.project_id
+                            AND am.principal_id = COALESCE(cp.owner_id, cp.id)
+                            AND am.removed_at IS NULL
 WHERE   t.id = @id
         AND m.principal_id = @principal_id
         AND m.removed_at IS NULL

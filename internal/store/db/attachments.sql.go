@@ -166,9 +166,18 @@ const visibleAttachment = `-- name: VisibleAttachment :one
 SELECT   t.id, t.project_id, t.issue_id, t.uploader_id, t.filename, t.mime_type, t.size, t.sha256, t.created_at
         ,m.id, m.project_id, m.principal_id, m.role, m.key, m.created_at, m.removed_at
         ,i.number
-FROM    attachments t
-JOIN    issues      i   ON  i.id = t.issue_id
-JOIN    memberships m   ON  m.project_id = t.project_id
+        ,COALESCE(upp.owner_id, upp.id)::BIGINT AS  uploader_account
+        ,COALESCE(cp.owner_id, cp.id)::BIGINT   AS  caller_account
+        ,COALESCE(am.role, m.role)::TEXT        AS  account_role
+FROM        attachments t
+JOIN        issues      i   ON  i.id = t.issue_id
+JOIN        memberships m   ON  m.project_id = t.project_id
+JOIN        principals  cp  ON  cp.id = m.principal_id
+JOIN        memberships up  ON  up.id = t.uploader_id
+JOIN        principals  upp ON  upp.id = up.principal_id
+LEFT JOIN   memberships am  ON  am.project_id = t.project_id
+                            AND am.principal_id = COALESCE(cp.owner_id, cp.id)
+                            AND am.removed_at IS NULL
 WHERE   t.id = $1
         AND m.principal_id = $2
         AND m.removed_at IS NULL
@@ -185,13 +194,18 @@ type VisibleAttachmentParams struct {
 }
 
 type VisibleAttachmentRow struct {
-	Attachment Attachment
-	Membership Membership
-	Number     int32
+	Attachment      Attachment
+	Membership      Membership
+	Number          int32
+	UploaderAccount int64
+	CallerAccount   int64
+	AccountRole     string
 }
 
 // An attachment, if the principal can see its issue, with the principal's
-// membership in the project and the issue's key under it.
+// membership in the project. An agent acts for its owner, so the account of
+// the uploader and of the caller, and the account's role, decide who can
+// delete it.
 func (q *Queries) VisibleAttachment(ctx context.Context, arg VisibleAttachmentParams) (VisibleAttachmentRow, error) {
 	row := q.db.QueryRow(ctx, visibleAttachment, arg.ID, arg.PrincipalID, arg.ProjectIds)
 	var i VisibleAttachmentRow
@@ -213,6 +227,9 @@ func (q *Queries) VisibleAttachment(ctx context.Context, arg VisibleAttachmentPa
 		&i.Membership.CreatedAt,
 		&i.Membership.RemovedAt,
 		&i.Number,
+		&i.UploaderAccount,
+		&i.CallerAccount,
+		&i.AccountRole,
 	)
 	return i, err
 }

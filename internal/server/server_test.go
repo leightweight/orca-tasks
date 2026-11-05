@@ -225,9 +225,9 @@ func TestEverythingTogether(t *testing.T) {
 
 	// A project, an agent, and a key for the agent.
 	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"ops"}, "name": {"Operations"}}), "/projects/OPS")
-	alice.expectRedirect(alice.post("/account/agents", url.Values{"username": {"alice-claude"}, "display_name": {"Claude"}}), "/account/agents")
+	alice.expectRedirect(alice.post("/account/agents", url.Values{"username": {"claude"}, "display_name": {"Claude"}}), "/account/agents")
 
-	agentID := find(t, regexp.MustCompile(`<option value="(\d+)">alice-claude \(agent\)`), alice.get("/account/keys").body)
+	agentID := find(t, regexp.MustCompile(`<option value="(\d+)">alice/claude \(agent\)`), alice.get("/account/keys").body)
 	alice.expectRedirect(alice.post("/account/keys", url.Values{
 		"name": {"laptop"}, "principal": {agentID}, "access": {"write"}, "scope": {"all"}, "expires": {"0"}, "code": {alice.code(aliceSecret)},
 	}), "/account/keys")
@@ -379,9 +379,9 @@ func TestMemberActionsSkipAgents(t *testing.T) {
 	alice, _ := signUp(t, s)
 
 	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}}), "/projects/OPS")
-	alice.expectRedirect(alice.post("/account/agents", url.Values{"username": {"alice-claude"}}), "/account/agents")
+	alice.expectRedirect(alice.post("/account/agents", url.Values{"username": {"claude"}}), "/account/agents")
 
-	if r := alice.post("/projects/OPS/members/alice-claude/role", url.Values{"role": {"admin"}}); r.status != http.StatusNotFound {
+	if r := alice.post("/projects/OPS/members/alice%2Fclaude/role", url.Values{"role": {"admin"}}); r.status != http.StatusNotFound {
 		t.Errorf("changing an agent's role: status %d, want 404", r.status)
 	}
 }
