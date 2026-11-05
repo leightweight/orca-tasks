@@ -183,8 +183,9 @@ func (im *importer) resolve(ctx context.Context, name string) error {
 	return nil
 }
 
-// resolveAll checks every name in the file before anything is written, so a
-// failed import reports every unknown name at once.
+// resolveAll checks the whole file before anything is written, so a failed
+// import reports every problem at once: unknown names, duplicate keys and
+// numbers, empty summaries, and missing or backward times.
 func (im *importer) resolveAll(ctx context.Context, file ImportFile) error {
 	var problems []string
 
@@ -194,12 +195,41 @@ func (im *importer) resolveAll(ctx context.Context, file ImportFile) error {
 		}
 	}
 
+	keys := map[string]bool{}
+
 	for _, p := range file.Projects {
-		if _, err := NormalizeKey(p.Key); err != nil {
+		key, err := NormalizeKey(p.Key)
+		if err != nil {
 			check(fmt.Errorf("project key %q: %w", p.Key, err))
+		} else if keys[key] {
+			check(fmt.Errorf("the file has more than one project %s", key))
 		}
 
+		keys[key] = true
+		numbers := map[int32]bool{}
+
 		for _, i := range p.Issues {
+			issue := fmt.Sprintf("%s-%d", p.Key, i.Number)
+
+			switch {
+			case i.Number <= 0:
+				check(fmt.Errorf("%s: issue numbers start at 1", issue))
+			case numbers[i.Number]:
+				check(fmt.Errorf("%s appears more than once", issue))
+			}
+
+			numbers[i.Number] = true
+
+			if strings.TrimSpace(i.Summary) == "" {
+				check(fmt.Errorf("%s has no summary", issue))
+			}
+
+			check(checkTimes(issue, i.Created, i.Updated))
+
+			for n, c := range i.Comments {
+				check(checkTimes(fmt.Sprintf("comment %d on %s", n+1, issue), c.Created, c.Updated))
+			}
+
 			for _, name := range []string{i.Reporter, i.Assignee} {
 				if name != "" {
 					check(im.resolve(ctx, name))
@@ -228,6 +258,20 @@ func (im *importer) resolveAll(ctx context.Context, file ImportFile) error {
 	}
 
 	return nil
+}
+
+// checkTimes requires both times, and an update no earlier than the
+// creation. A missing time is refused rather than replaced, since a guess
+// would misdate the history.
+func checkTimes(what string, created, updated time.Time) error {
+	switch {
+	case created.IsZero() || updated.IsZero():
+		return fmt.Errorf("%s needs both created and updated times", what)
+	case updated.Before(created):
+		return fmt.Errorf("%s was updated before it was created", what)
+	default:
+		return nil
+	}
 }
 
 // project creates one project and copies its issues and comments in.

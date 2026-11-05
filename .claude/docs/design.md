@@ -463,7 +463,7 @@ The file is JSON, with `format` set to `orca-tasks-export` and `version` set to 
   `next_number` keeps the counter past numbers the old list used up.
 - Statuses, types, and priorities match the catalog by name, ignoring case.
 - The import runs in one transaction.
-  Before it writes anything, it checks every name in the file and reports all the problems together.
+  Before it writes anything, it checks the whole file and reports all the problems together: unknown names, statuses, types, and priorities, duplicate project keys, issue numbers that aren't positive or repeat within a project, empty summaries, and missing times or updates dated before their creation.
   It refuses a project whose key the owner already uses, so running it twice imports nothing the second time.
 - `--dry-run` runs the whole import and rolls it back.
 - Each imported issue gets an `imported` history entry.

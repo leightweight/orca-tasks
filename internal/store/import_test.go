@@ -138,3 +138,40 @@ func TestImportFindsTheOwnersAgents(t *testing.T) {
 		t.Errorf("OLD-3 = reporter %s, assignee %v; want alice/claude and alice", rows[0].ReporterUsername, rows[0].AssigneeUsername)
 	}
 }
+
+func TestImportReportsBadIssuesTogether(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	file := importFile()
+	file.Projects[0].Key = "OLD"
+
+	issues := file.Projects[0].Issues
+	issues[0].Summary = " "
+	issues[1].Number = issues[0].Number
+	issues[1].Created = time.Time{}
+	issues[1].Comments[0].Updated = issues[1].Comments[0].Created.Add(-time.Hour)
+	file.Projects = append(file.Projects, store.ImportProject{Key: "old", Issues: []store.ImportIssue{{Number: 0, Summary: "x"}}})
+
+	_, err := f.s.Import(testutil.Context(t), f.catalog, file, store.ImportOptions{Owner: "alice", Users: map[string]string{"ally": "alice"}})
+	if err == nil {
+		t.Fatal("the import succeeded")
+	}
+
+	for _, want := range []string{
+		"OLD-1 has no summary",
+		"OLD-1 appears more than once",
+		"OLD-1 needs both created and updated times",
+		"comment 1 on OLD-1 was updated before it was created",
+		"more than one project OLD",
+		"issue numbers start at 1",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error doesn't mention %q:\n%v", want, err)
+		}
+	}
+
+	if got := f.visible(t, f.alice, nil); len(got) != 0 {
+		t.Errorf("a failed import saved issues: %v", got)
+	}
+}
