@@ -71,8 +71,27 @@ checksum:
 snapshot:
   version_template: "{{ incpatch .Version }}-snapshot"
 
+# Commits go straight to main, so the notes come from commit subjects rather
+# than merged pull requests. Switch back to github-native once work goes
+# through pull requests.
 changelog:
-  use: github-native
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^(docs|test|ci|chore|refactor)(\\(.*\\))?!?:"
+  groups:
+    - title: Features
+      regexp: "^feat(\\(.*\\))?!?:"
+      order: 0
+    - title: Security
+      regexp: "^security(\\(.*\\))?!?:"
+      order: 1
+    - title: Fixes
+      regexp: "^(fix|perf)(\\(.*\\))?!?:"
+      order: 2
+    - title: Other
+      order: 999
 
 release:
   github:

@@ -43,9 +43,12 @@ Examples:
 - `fix(auth): expire sessions after a password change`
 - `chore(deps): bump jackc/pgx`
 
-## PR titles and descriptions are release notes
+## Commit subjects and PR titles are release notes
 
-Release notes come from PR titles and descriptions, so write them for a user who hasn't read the diff.
+While work goes straight to `main`, goreleaser builds the release notes from commit subjects, grouped by type: `feat` under Features, `security` under Security, and `fix` and `perf` under Fixes.
+It leaves out `docs`, `test`, `ci`, `chore`, and `refactor` commits.
+Once work goes through pull requests, switch `changelog.use` in `.goreleaser.yaml` back to `github-native`, and the notes come from PR titles and descriptions instead.
+Either way, write them for a user who hasn't read the diff.
 Lead with the user-visible problem and outcome.
 Show a concrete example, such as a CLI command and its output, when it helps.
 Keep the description in sync with the final diff.
