@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -34,6 +35,18 @@ func New(baseURL, token string) *Client {
 	}
 }
 
+// NewSocket returns a client for a local server's Unix socket, which needs no
+// API key: the server trusts it as the local agent.
+func NewSocket(path string) *Client {
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", path)
+		},
+	}
+
+	return &Client{BaseURL: "http://localhost", HTTP: &http.Client{Timeout: 30 * time.Second, Transport: transport}}
+}
+
 // Error is a response the server refused. Status 400 means the request was
 // wrong, such as an unknown status, and the message says what's valid.
 type Error struct {
@@ -55,7 +68,9 @@ func (c *Client) do(ctx context.Context, method, path, contentType string, body 
 		return err
 	}
 
-	request.Header.Set("Authorization", "Bearer "+c.Token)
+	if c.Token != "" {
+		request.Header.Set("Authorization", "Bearer "+c.Token)
+	}
 	request.Header.Set("Accept", "application/json")
 
 	if contentType != "" {

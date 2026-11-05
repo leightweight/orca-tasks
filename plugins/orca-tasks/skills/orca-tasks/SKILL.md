@@ -9,9 +9,10 @@ description: Track your own work items in the user's orca-tasks server, which Or
 Orca shows the same list on its Tasks page, so anything you change there is what the user sees.
 
 It reads the server's URL from `ORCA_TASKS_URL` and an API key from `ORCA_TASKS_TOKEN`.
-The key belongs to an agent the user made for you, so the tasks you create and your comments show under the agent's name.
+Without them, it uses a server the user runs on this machine with `orca-tasks serve --local`, which needs no key.
+Either way, you act as an agent the user made for you, so the tasks you create and your comments show under the agent's name.
 You act for that user: tasks are assigned to people, never to agents.
-If either variable is unset, or a command fails with a 403, stop and ask the user to set them up.
+If a command says there's no server to talk to, or fails with a 403, stop and ask the user to set it up.
 Don't ask for the key in the conversation, and never print it.
 
 ## Look before you write

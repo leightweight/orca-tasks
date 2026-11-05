@@ -15,6 +15,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 
 	"github.com/leightweight/orca-tasks/internal/client"
+	"github.com/leightweight/orca-tasks/internal/local"
 )
 
 // UsageError is a mistake in the command's input, which exits 2.
@@ -35,12 +36,40 @@ const assignToMe = "-1"
 
 // Flags are the connection and output flags every command takes.
 type Flags struct {
-	URL    string `env:"ORCA_TASKS_URL" required:"" placeholder:"URL" help:"The server's URL."`
-	Token  string `env:"ORCA_TASKS_TOKEN" required:"" placeholder:"KEY" help:"An API key from the server's API keys page."`
+	URL    string `env:"ORCA_TASKS_URL" placeholder:"URL" help:"The server's URL. Without it, the CLI uses a local server's socket."`
+	Token  string `env:"ORCA_TASKS_TOKEN" placeholder:"KEY" help:"An API key from the server's API keys page. Required with --url."`
+	Socket string `env:"ORCA_TASKS_SOCKET" type:"path" placeholder:"PATH" help:"A local server's socket. Defaults to agent.sock in the local directory."`
 	Format string `short:"f" default:"table" enum:"table,json" help:"Output format: table or json."`
 }
 
-func (f *Flags) client() *client.Client { return client.New(f.URL, f.Token) }
+// client connects to the server at --url with --token, or, without a URL, to
+// the socket of a server running with --local on this machine.
+func (f *Flags) client() (*client.Client, error) {
+	if f.URL != "" {
+		if f.Token == "" {
+			return nil, UsageError{errors.New("set ORCA_TASKS_TOKEN to an API key for the server at ORCA_TASKS_URL")}
+		}
+
+		return client.New(f.URL, f.Token), nil
+	}
+
+	socket := f.Socket
+	if socket == "" {
+		dir, err := local.Dir()
+		if err != nil {
+			return nil, err
+		}
+
+		socket = local.SocketPath(dir)
+	}
+
+	if _, err := os.Stat(socket); err != nil {
+		return nil, UsageError{fmt.Errorf(
+			"no server to talk to: set ORCA_TASKS_URL and ORCA_TASKS_TOKEN, or start one with `orca-tasks serve --local` (no socket at %s)", socket)}
+	}
+
+	return client.NewSocket(socket), nil
+}
 
 // check turns the server rejecting the input into a usage error.
 func check(err error) error {
@@ -94,7 +123,10 @@ type catalogEntry struct {
 // Run lists every project, status, type, priority, and user, so an agent can
 // look them up instead of guessing.
 func (c *Catalog) Run(ctx context.Context, env *Env) error {
-	api := c.client()
+	api, err := c.client()
+	if err != nil {
+		return err
+	}
 
 	projects, err := api.Projects(ctx)
 	if err != nil {
@@ -160,7 +192,12 @@ type ProjectList struct {
 
 // Run lists the projects.
 func (c *ProjectList) Run(ctx context.Context, env *Env) error {
-	projects, err := c.client().Projects(ctx)
+	api, err := c.client()
+	if err != nil {
+		return err
+	}
+
+	projects, err := api.Projects(ctx)
 	if err != nil {
 		return err
 	}
@@ -237,7 +274,12 @@ type TaskList struct {
 
 // Run lists the tasks matching the query.
 func (c *TaskList) Run(ctx context.Context, env *Env) error {
-	issues, err := c.client().Search(ctx, c.JQL)
+	api, err := c.client()
+	if err != nil {
+		return err
+	}
+
+	issues, err := api.Search(ctx, c.JQL)
 	if err != nil {
 		return check(err)
 	}
@@ -280,7 +322,10 @@ type attachmentDetail struct {
 
 // Run shows the task's fields, description, comments, and attachments.
 func (c *TaskShow) Run(ctx context.Context, env *Env) error {
-	api := c.client()
+	api, err := c.client()
+	if err != nil {
+		return err
+	}
 
 	issue, err := api.Issue(ctx, c.Key)
 	if err != nil {
@@ -414,7 +459,10 @@ func (c *TaskCreate) Run(ctx context.Context, env *Env) error {
 		fields["assignee"] = map[string]string{"name": assignToMe}
 	}
 
-	api := c.client()
+	api, err := c.client()
+	if err != nil {
+		return err
+	}
 
 	key, err := api.CreateIssue(ctx, fields)
 	if err != nil {
@@ -489,7 +537,10 @@ func (c *TaskEdit) Run(ctx context.Context, env *Env) error {
 		}
 	}
 
-	api := c.client()
+	api, err := c.client()
+	if err != nil {
+		return err
+	}
 
 	if err := api.UpdateIssue(ctx, c.Key, fields, c.AddLabel, c.RemoveLabel); err != nil {
 		return check(err)
@@ -515,7 +566,10 @@ func (c *TaskMove) Run(ctx context.Context, env *Env) error {
 		return err
 	}
 
-	api := c.client()
+	api, err := c.client()
+	if err != nil {
+		return err
+	}
 
 	if err := api.Move(ctx, c.Key, c.Status, comment); err != nil {
 		return check(err)
@@ -549,7 +603,12 @@ func (c *TaskComment) Run(ctx context.Context, env *Env) error {
 		return UsageError{errors.New("the comment can't be empty")}
 	}
 
-	comment, err := c.client().AddComment(ctx, c.Key, body)
+	api, err := c.client()
+	if err != nil {
+		return err
+	}
+
+	comment, err := api.AddComment(ctx, c.Key, body)
 	if err != nil {
 		return check(err)
 	}
@@ -578,7 +637,10 @@ type attached struct {
 
 // Run uploads each file and prints the Markdown that embeds it.
 func (c *TaskAttach) Run(ctx context.Context, env *Env) error {
-	api := c.client()
+	api, err := c.client()
+	if err != nil {
+		return err
+	}
 	results := make([]attached, 0, len(c.Files))
 
 	for _, path := range c.Files {

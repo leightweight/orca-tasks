@@ -14,6 +14,26 @@ A CLI calls the same API, so Claude Code agents can read and change the same tas
 The web interface manages accounts, projects, and access.
 It isn't a task board: people work with tasks in Orca, and agents work with them through the CLI.
 
+## Run it on your own machine
+
+If nobody hosts a server for you, run one in a terminal:
+
+```sh
+mise use -g packslip:github.com/leightweight/orca-tasks
+orca-tasks serve --local
+```
+
+It needs no Docker and no configuration.
+The first run downloads Postgres, and everything stays in `~/.local/share/orca-tasks`: the database, attachments, and a generated secret key.
+Open <http://127.0.0.1:8080/setup>, enter the setup code from the terminal, and create your account and its authenticator.
+Setup also creates an agent named `agent`.
+
+Connect Orca as below, with `http://127.0.0.1:8080` as the site and an API key from the API keys page.
+Claude Code needs no key at all: when `ORCA_TASKS_URL` isn't set, the CLI talks to the local server through a socket only you can open, as your `agent`.
+Install the skill as in [Set up Claude Code](#set-up-claude-code) and skip the environment variables.
+
+To back up, stop the server and copy the directory.
+
 ## Install
 
 orca-tasks needs Postgres 16 or later, which the chart doesn't run.
