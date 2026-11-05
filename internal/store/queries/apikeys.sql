@@ -56,6 +56,8 @@ SELECT   k.id
         ,k.all_projects
         ,p.id                                                                                                               AS  principal_id
         ,p.username
+        ,p.display_name
+        ,p.email
         ,COALESCE((SELECT ARRAY_AGG(kp.project_id) FROM api_key_projects kp WHERE kp.api_key_id = k.id), '{}')::BIGINT[]    AS  project_ids
 FROM    api_keys    k
 JOIN    principals  p   ON  p.id = k.principal_id
