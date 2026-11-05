@@ -13,6 +13,7 @@ func TestCommandLine(t *testing.T) {
 
 	for _, args := range [][]string{
 		{"serve", "--local"},
+		{"serve", "--local", "--addr", "127.0.0.1:9000"},
 		{"serve", "--database-url", "postgres://x", "--base-url", "http://x", "--secret-key", "k", "--log-format", "text"},
 		{"admin", "reset-link", "--database-url", "postgres://x", "--base-url", "http://x", "alice"},
 		{"admin", "import", "--database-url", "postgres://x", "--owner", "alice", "--user", "claude=alice/claude", "-"},
@@ -29,6 +30,24 @@ func TestCommandLine(t *testing.T) {
 
 		if _, err := parser.Parse(args); err != nil {
 			t.Errorf("parsing %q: %v", args, err)
+		}
+	}
+}
+
+func TestIsLoopback(t *testing.T) {
+	t.Parallel()
+
+	for addr, want := range map[string]bool{
+		"127.0.0.1:8080": true,
+		"localhost:8080": true,
+		"[::1]:8080":     true,
+		":8080":          false,
+		"0.0.0.0:8080":   false,
+		"192.168.1.5:80": false,
+		"127.0.0.1":      false,
+	} {
+		if got := isLoopback(addr); got != want {
+			t.Errorf("isLoopback(%q) = %v, want %v", addr, got, want)
 		}
 	}
 }

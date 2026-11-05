@@ -406,3 +406,38 @@ func TestLocalSetupCreatesTheAgent(t *testing.T) {
 		t.Errorf("setup in local mode didn't create alice/agent: %.500s", r.body)
 	}
 }
+
+func TestPasswordOnlySignIn(t *testing.T) {
+	t.Parallel()
+
+	s := newSiteWith(t, func(cfg *server.Config) { cfg.PasswordOnly = true })
+	alice := s.browser()
+
+	// Setup saves the password and signs in, with no authenticator step.
+	alice.expectRedirect(alice.post("/setup", url.Values{
+		"code": {s.setup}, "username": {"alice"}, "password": {"correct horse battery"}, "confirm": {"correct horse battery"},
+	}), "/projects")
+
+	account := alice.get("/account").body
+	if strings.Contains(account, "Authenticator code") || strings.Contains(account, "Recovery codes") {
+		t.Errorf("the account page asks for TOTP: %.500s", account)
+	}
+
+	// Creating a key needs no code.
+	alice.expectRedirect(alice.post("/account/keys", url.Values{
+		"name": {"orca"}, "principal": {find(t, regexp.MustCompile(`<option value="(\d+)">alice \(you\)`), alice.get("/account/keys").body)},
+		"access": {"write"}, "scope": {"all"}, "expires": {"0"},
+	}), "/account/keys")
+
+	if keyPattern.FindString(alice.get("/account/keys").body) == "" {
+		t.Error("no key was created")
+	}
+
+	// Signing in is the password alone.
+	b := s.browser()
+	b.expectRedirect(b.post("/login", url.Values{"username": {"alice"}, "password": {"correct horse battery"}}), "/projects")
+
+	if r := b.get("/account"); r.status != http.StatusOK {
+		t.Errorf("signed in with a password: status %d", r.status)
+	}
+}

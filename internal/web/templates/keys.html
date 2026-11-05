@@ -23,7 +23,7 @@ Enter <code>{{.BaseURL}}</code> as the site, choose Server / Data Center, leave 
     <label>Expires
       <select name="expires"><option value="0">Never</option><option value="30">In 30 days</option><option value="90">In 90 days</option><option value="365">In a year</option></select>
     </label>
-    <label>Authenticator code <input name="code" required inputmode="numeric" autocomplete="one-time-code"></label>
+    {{if not .PasswordOnly}}<label>Authenticator code <input name="code" required inputmode="numeric" autocomplete="one-time-code"></label>{{end}}
     <button>Create key</button>
   </form>
 </section>

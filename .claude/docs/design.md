@@ -223,8 +223,9 @@ The client IP comes from the [trusted proxies](#client-addresses), so the limit 
 
 ### Two-factor authentication
 
-Every user must use TOTP, including the first administrator.
+On a shared server, every user must use TOTP, including the first administrator.
 A user has no way to turn it off.
+[Local mode](#local-mode) is the one exception: it signs in with a password alone.
 
 - Enrollment shows a QR code and the secret, and finishes when the user enters a valid code.
   An account that hasn't finished enrollment can't sign in or use API keys.
@@ -514,9 +515,15 @@ orca-tasks serve --local
   It listens on 127.0.0.1, on a free port each run, with a password generated once and kept in the directory.
 - The secret key is generated the first time and kept in the directory, so there's nothing to configure.
 - The server listens on `127.0.0.1:8080`, and its base URL is `http://127.0.0.1:8080`, unless `--addr` or `--base-url` say otherwise.
+  `--addr` must be a loopback address: local mode refuses to listen where another machine could reach it.
   Logs are text rather than JSON.
-- Setup is the same as on a shared server, password and TOTP included.
-  Skipping sign-in on 127.0.0.1 would let any website the person visits make requests to their task list from inside their browser.
+- Setup and sign-in take a password alone, with no TOTP or recovery codes, and creating an API key asks for no code.
+  The password is what protects a local server.
+  Websites the person visits can send requests to 127.0.0.1, but can't sign in without the password or use the person's session, whose cookie belongs to 127.0.0.1.
+  Other accounts on the machine can reach the port, but not without the password.
+  Software running as the person could read the database files anyway.
+  TOTP would only matter if the password leaked to someone on another machine, and local mode never listens where another machine can reach it.
+  Skipping sign-in entirely would let any website make requests from inside the browser, so the password stays.
 - Setup also creates an agent named `agent`.
 
 ### The agent socket

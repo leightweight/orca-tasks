@@ -38,6 +38,10 @@ type Config struct {
 	// agent without an API key.
 	Socket string
 
+	// PasswordOnly signs people in with a password alone; see
+	// web.Web.PasswordOnly. Only local mode sets it.
+	PasswordOnly bool
+
 	// Now is the clock, for tests. Nil means time.Now.
 	Now func() time.Time
 }
@@ -121,17 +125,18 @@ func Build(ctx context.Context, s *store.Store, cfg Config, log *slog.Logger) (*
 	sessions := web.NewSessions(s, base.Scheme == "https")
 
 	w := &web.Web{
-		Store:      s,
-		Catalog:    catalog,
-		Box:        box,
-		BaseURL:    baseURL,
-		Limiter:    limiter,
-		ClientIP:   clientIPs.Of,
-		Log:        log,
-		Now:        now,
-		Sessions:   sessions,
-		Proxy:      clientIPs.describe,
-		LocalAgent: cfg.Socket != "",
+		Store:        s,
+		Catalog:      catalog,
+		Box:          box,
+		BaseURL:      baseURL,
+		Limiter:      limiter,
+		ClientIP:     clientIPs.Of,
+		Log:          log,
+		Now:          now,
+		Sessions:     sessions,
+		Proxy:        clientIPs.describe,
+		LocalAgent:   cfg.Socket != "",
+		PasswordOnly: cfg.PasswordOnly,
 	}
 
 	hasUsers, err := s.HasUsers(ctx)

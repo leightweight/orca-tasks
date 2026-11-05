@@ -170,3 +170,28 @@ func TestResetLinks(t *testing.T) {
 		t.Errorf("used link: %v, want no rows", err)
 	}
 }
+
+func TestPasswordOnlyUsersCanUseKeys(t *testing.T) {
+	t.Parallel()
+
+	s := testutil.Store(t)
+	hash := "unused"
+
+	passwordOnly, err := s.CreateUser(testutil.Context(t), db.CreateUserParams{Username: "local", DisplayName: "Local", PasswordHash: &hash})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	invited, err := s.CreateUser(testutil.Context(t), db.CreateUserParams{Username: "invited", DisplayName: "Invited"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.AuthenticateAPIKey(testutil.Context(t), createKey(t, s, passwordOnly.ID, db.CreateAPIKeyParams{Name: "a"})); err != nil {
+		t.Errorf("a key of a user with only a password: %v", err)
+	}
+
+	if _, err := s.AuthenticateAPIKey(testutil.Context(t), createKey(t, s, invited.ID, db.CreateAPIKeyParams{Name: "b"})); !errors.Is(err, pgx.ErrNoRows) {
+		t.Errorf("a key of a user who hasn't set a password: %v, want no rows", err)
+	}
+}

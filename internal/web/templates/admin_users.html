@@ -20,7 +20,7 @@
     <tbody>
     {{range .Data.Users}}
       <tr{{if .Principal.DisabledAt}} class="muted"{{end}}>
-        <td>{{.Principal.Username}}{{if .Principal.SiteAdmin}} (admin){{end}}{{if .Principal.DisabledAt}} (disabled){{end}}{{if not .Principal.TotpSecret}} (invited){{end}}</td>
+        <td>{{.Principal.Username}}{{if .Principal.SiteAdmin}} (admin){{end}}{{if .Principal.DisabledAt}} (disabled){{end}}{{if not .Principal.PasswordHash}} (invited){{end}}</td>
         <td>{{.Principal.DisplayName}}</td>
         <td>{{.Projects}}</td>
         <td>{{.Agents}}</td>

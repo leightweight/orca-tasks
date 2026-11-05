@@ -49,7 +49,7 @@ WHERE   k.key_hash = $1
         )
         AND p.disabled_at IS NULL
         AND u.disabled_at IS NULL
-        AND u.totp_secret IS NOT NULL
+        AND u.password_hash IS NOT NULL
 `
 
 type AuthenticateAPIKeyRow struct {
@@ -65,7 +65,9 @@ type AuthenticateAPIKeyRow struct {
 }
 
 // A key works while it's live and neither its principal nor, for an agent,
-// the owner is disabled or still enrolling. The user is the principal, or
+// the owner is disabled or still enrolling. A user has finished enrolling
+// once they have a password; a shared server also gives them TOTP at the same
+// time. The user is the principal, or
 // the agent's owner.
 func (q *Queries) AuthenticateAPIKey(ctx context.Context, keyHash []byte) (AuthenticateAPIKeyRow, error) {
 	row := q.db.QueryRow(ctx, authenticateAPIKey, keyHash)

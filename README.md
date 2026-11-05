@@ -25,7 +25,8 @@ orca-tasks serve --local
 
 It needs no Docker and no configuration.
 The first run downloads Postgres, and everything stays in `~/.local/share/orca-tasks`: the database, attachments, and a generated secret key.
-Open <http://127.0.0.1:8080/setup>, enter the setup code from the terminal, and create your account and its authenticator.
+Open <http://127.0.0.1:8080/setup>, enter the setup code from the terminal, and create your account with a password.
+Local mode only listens on this machine, so it signs in with a password alone, with no authenticator app.
 Setup also creates an agent named `agent`.
 
 Connect Orca as below, with `http://127.0.0.1:8080` as the site and an API key from the API keys page.

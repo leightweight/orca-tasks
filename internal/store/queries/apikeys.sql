@@ -50,7 +50,9 @@ WHERE   k.id = @id
 
 -- name: AuthenticateAPIKey :one
 -- A key works while it's live and neither its principal nor, for an agent,
--- the owner is disabled or still enrolling. The user is the principal, or
+-- the owner is disabled or still enrolling. A user has finished enrolling
+-- once they have a password; a shared server also gives them TOTP at the same
+-- time. The user is the principal, or
 -- the agent's owner.
 SELECT   k.id
         ,k.read_only
@@ -72,7 +74,7 @@ WHERE   k.key_hash = @key_hash
         )
         AND p.disabled_at IS NULL
         AND u.disabled_at IS NULL
-        AND u.totp_secret IS NOT NULL;
+        AND u.password_hash IS NOT NULL;
 
 -- name: TouchAPIKey :exec
 UPDATE  api_keys

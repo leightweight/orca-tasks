@@ -122,6 +122,13 @@ func (w *Web) setup(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (w *Web) startEnrollment(rw http.ResponseWriter, r *http.Request, e enrollment) {
+	// A password-only server saves the password now; there's no authenticator
+	// to set up.
+	if w.PasswordOnly {
+		w.saveCredentials(rw, r, e, nil)
+		return
+	}
+
 	key, err := auth.NewEnrollment(TOTPIssuer, e.Username)
 	if err != nil {
 		w.serverError(rw, r, err)
@@ -185,11 +192,34 @@ func (w *Web) enroll(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	codes, hashes := auth.NewRecoveryCodes()
-	sealed := w.Box.Seal([]byte(e.Secret))
+
+	w.saveCredentials(rw, r, e, &factor{sealed: w.Box.Seal([]byte(e.Secret)), step: step, codes: codes, hashes: hashes})
+}
+
+// factor is a confirmed authenticator to save along with a password.
+type factor struct {
+	sealed []byte
+	step   int64
+	codes  []string
+	hashes [][]byte
+}
+
+// saveCredentials finishes setup or a reset link: it saves the password, and
+// the authenticator and recovery codes when there is one, then signs the user
+// in. Without one, the user has only a password, as in local mode.
+func (w *Web) saveCredentials(rw http.ResponseWriter, r *http.Request, e enrollment, f *factor) {
+	ctx := r.Context()
+
+	var sealed []byte
+	if f != nil {
+		sealed = f.sealed
+	}
 
 	var user db.Principal
 
-	err = w.Store.InTx(ctx, func(q *db.Queries, _ pgx.Tx) error {
+	err := w.Store.InTx(ctx, func(q *db.Queries, _ pgx.Tx) error {
+		var err error
+
 		switch e.Purpose {
 		case purposeSetup:
 			if err := q.LockSetup(ctx); err != nil {
@@ -245,15 +275,19 @@ func (w *Web) enroll(rw http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if _, err := q.UseTOTPStep(ctx, db.UseTOTPStepParams{ID: user.ID, Step: step}); err != nil {
-			return err
-		}
-
 		if err := q.DeleteRecoveryCodes(ctx, user.ID); err != nil {
 			return err
 		}
 
-		return q.InsertRecoveryCodes(ctx, db.InsertRecoveryCodesParams{PrincipalID: user.ID, CodeHashes: hashes})
+		if f == nil {
+			return nil
+		}
+
+		if _, err := q.UseTOTPStep(ctx, db.UseTOTPStepParams{ID: user.ID, Step: f.step}); err != nil {
+			return err
+		}
+
+		return q.InsertRecoveryCodes(ctx, db.InsertRecoveryCodesParams{PrincipalID: user.ID, CodeHashes: f.hashes})
 	})
 
 	switch {
@@ -277,7 +311,12 @@ func (w *Web) enroll(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Sessions.Put(ctx, sessionReveal, recoveryReveal(codes))
+	if f == nil {
+		w.redirect(rw, r, "/projects", "You're signed in. Create a project to get started.")
+		return
+	}
+
+	w.Sessions.Put(ctx, sessionReveal, recoveryReveal(f.codes))
 	http.Redirect(rw, r, "/account", http.StatusSeeOther)
 }
 
@@ -378,9 +417,27 @@ func (w *Web) login(rw http.ResponseWriter, r *http.Request) {
 
 	valid := auth.CheckPassword(r.PostFormValue("password"), hash)
 
-	if err != nil || !valid || user.Kind != "user" || user.DisabledAt != nil || user.PasswordHash == nil || user.TotpSecret == nil {
+	if err != nil || !valid || user.Kind != "user" || user.DisabledAt != nil || user.PasswordHash == nil || (user.TotpSecret == nil && !w.PasswordOnly) {
 		w.Limiter.Failed(ctx, keys...)
 		w.fail(rw, r, "login", "Sign in", "The username or password is wrong, or the account is disabled.", nil)
+
+		return
+	}
+
+	// A password-only server signs the user in here; there's no second step.
+	if w.PasswordOnly {
+		next := w.Sessions.PopString(ctx, sessionNext)
+
+		if err := w.signIn(ctx, user); err != nil {
+			w.serverError(rw, r, err)
+			return
+		}
+
+		if !isLocalPath(next) {
+			next = "/projects"
+		}
+
+		http.Redirect(rw, r, next, http.StatusSeeOther)
 
 		return
 	}
@@ -447,6 +504,11 @@ func (w *Web) loginTOTP(rw http.ResponseWriter, r *http.Request) {
 // checkSecondFactor checks the "code" field against the user's authenticator,
 // or against their recovery codes when allowed, and uses it up.
 func (w *Web) checkSecondFactor(ctx context.Context, r *http.Request, user db.Principal, allowRecovery bool) error {
+	// A password-only server has no second factor to check.
+	if w.PasswordOnly {
+		return nil
+	}
+
 	keys := []string{"ip:" + w.ClientIP(r), "user:" + user.Username}
 
 	if !w.Limiter.Allowed(ctx, keys...) {

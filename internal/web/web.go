@@ -73,6 +73,11 @@ type Web struct {
 	// socket acts as.
 	LocalAgent bool
 
+	// PasswordOnly signs people in with a password alone, with no TOTP or
+	// recovery codes. Only local mode sets it, and local mode only listens on
+	// loopback, where a leaked password can't be used from another machine.
+	PasswordOnly bool
+
 	// Proxy describes how the server resolved a request's client address, for
 	// the administration page that checks it.
 	Proxy func(*http.Request) ProxyInfo
@@ -237,13 +242,17 @@ func (w *Web) parseTemplates() error {
 
 // view is what every page template gets.
 type view struct {
-	Title   string
-	User    *db.Principal
-	BaseURL string
-	Flash   string
-	Error   string
-	Reveal  *reveal
-	Data    any
+	Title string
+
+	// PasswordOnly hides the TOTP fields, which a password-only server doesn't
+	// ask for.
+	PasswordOnly bool
+	User         *db.Principal
+	BaseURL      string
+	Flash        string
+	Error        string
+	Reveal       *reveal
+	Data         any
 }
 
 // reveal is a secret shown once, after the redirect that follows creating it.
@@ -257,11 +266,12 @@ func (w *Web) render(rw http.ResponseWriter, r *http.Request, status int, name, 
 	ctx := r.Context()
 
 	v := view{
-		Title:   title,
-		User:    currentUser(ctx),
-		BaseURL: w.BaseURL,
-		Flash:   w.Sessions.PopString(ctx, sessionFlash),
-		Data:    data,
+		Title:        title,
+		PasswordOnly: w.PasswordOnly,
+		User:         currentUser(ctx),
+		BaseURL:      w.BaseURL,
+		Flash:        w.Sessions.PopString(ctx, sessionFlash),
+		Data:         data,
 	}
 
 	if shown, ok := w.Sessions.Pop(ctx, sessionReveal).(reveal); ok {
@@ -280,7 +290,7 @@ func (w *Web) render(rw http.ResponseWriter, r *http.Request, status int, name, 
 func (w *Web) fail(rw http.ResponseWriter, r *http.Request, name, title, message string, data any) {
 	ctx := r.Context()
 
-	v := view{Title: title, User: currentUser(ctx), BaseURL: w.BaseURL, Error: message, Data: data}
+	v := view{Title: title, User: currentUser(ctx), BaseURL: w.BaseURL, Error: message, Data: data, PasswordOnly: w.PasswordOnly}
 
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	rw.WriteHeader(http.StatusBadRequest)

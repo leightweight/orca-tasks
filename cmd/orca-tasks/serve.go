@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -111,6 +112,14 @@ func (c *serveCmd) local(ctx context.Context, cfg *server.Config, log *slog.Logg
 	}
 
 	cfg.Addr = cmpOr(c.Addr, "127.0.0.1:8080")
+
+	// Local mode signs in with a password alone, which is only safe where no
+	// other machine can reach the server.
+	if !isLoopback(cfg.Addr) {
+		return nil, usagef("--local only listens on this machine, so --addr must be a loopback address such as 127.0.0.1:8080, not %s", cfg.Addr)
+	}
+
+	cfg.PasswordOnly = true
 	cfg.BaseURL = cmpOr(c.BaseURL, "http://"+cfg.Addr)
 	cfg.DataDir = cmpOr(c.DataDir, local.AttachmentsDir(dir))
 	cfg.Socket = local.SocketPath(dir)
@@ -129,6 +138,22 @@ func (c *serveCmd) local(ctx context.Context, cfg *server.Config, log *slog.Logg
 			log.Error("stopping Postgres", "error", err)
 		}
 	}, nil
+}
+
+// isLoopback reports whether an address listens only on this machine.
+func isLoopback(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+
+	if host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+
+	return ip != nil && ip.IsLoopback()
 }
 
 func cmpOr(values ...string) string {

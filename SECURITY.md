@@ -13,6 +13,8 @@ Only the latest release gets security fixes.
 
 - Every user signs in with a password, hashed with Argon2id, and a TOTP code.
   Nobody can turn TOTP off.
+- `orca-tasks serve --local` is the exception: it signs in with a password alone, and refuses to listen anywhere but loopback, so the password can't be tried from another machine.
+  Its agent socket is mode 0600 and acts as the user's `agent` agent without a key.
 - TOTP secrets are encrypted with the server's secret key.
   API keys, recovery codes, and reset links are stored as SHA-256 hashes.
 - Each principal sees only the projects it's a member of.
