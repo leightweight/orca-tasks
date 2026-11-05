@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # Create the GitHub release.
+      contents: write
+      # Push the image and the chart to GHCR.
+      packages: write
+      # Sign the image and the chart with cosign's keyless signing.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # goreleaser needs the tags to find the previous release.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        with:
+          version: 2026.10.18
+          # Tag builds can read caches that runs on main wrote, so a poisoned cache could put files into a signed release.
+          cache: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Release the image and the CLI
+        run: goreleaser release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Release the Helm chart
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          set -o pipefail
+          version="${GITHUB_REF_NAME#v}"
+          chart=ghcr.io/leightweight/charts/orca-tasks
+          mkdir -p .cache/release
+          helm package charts/orca-tasks --version "$version" --app-version "$version" --destination .cache/release
+          echo "$GITHUB_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          helm push ".cache/release/orca-tasks-${version}.tgz" oci://ghcr.io/leightweight/charts 2>&1 | tee .cache/release/helm-push.log
+          digest="$(sed -n 's/^Digest: //p' .cache/release/helm-push.log)"
+          if [ -z "$digest" ]; then echo "::error::helm push printed no digest."; exit 1; fi
+          cosign sign --yes "${chart}@${digest}"

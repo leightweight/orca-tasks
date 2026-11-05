@@ -1,0 +1,54 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    // PR titles follow Conventional Commits, because release notes come from them.
+    ':semanticCommits',
+  ],
+  // Any time on Monday, UTC.
+  schedule: ['* * * * 1'],
+  // Wait for a release to settle before proposing it, in case it's pulled or compromised.
+  minimumReleaseAge: '3 days',
+  internalChecksFilter: 'strict',
+  postUpdateOptions: ['gomodTidy'],
+  customManagers: [
+    {
+      // The Postgres image the tests run against.
+      customType: 'regex',
+      managerFilePatterns: ['/^internal/testutil/postgres\\.go$/'],
+      matchStrings: ['PostgresImage = "(?<depName>[a-z0-9./-]+):(?<currentValue>[^"@]+)"'],
+      datasourceTemplate: 'docker',
+    },
+  ],
+  packageRules: [
+    // Later rules override earlier ones, so the broad groups come first.
+    {
+      // Development tools don't ship to users, so their minor and patch updates share one weekly pull request.
+      groupName: 'development tools',
+      matchFileNames: ['.config/mise/config.toml', '.github/workflows/**'],
+      matchUpdateTypes: ['minor', 'patch', 'digest'],
+    },
+    {
+      // Only tests use these, so their updates aren't fixes for users.
+      matchPackageNames: ['github.com/testcontainers/**', 'postgres'],
+      semanticCommitType: 'chore',
+    },
+    {
+      // The mise Go version and the Dockerfile builder image move together.
+      // goreleaser builds the release binaries with the mise Go, so its updates ship to users as fixes.
+      groupName: 'Go',
+      matchPackageNames: ['golang/go', 'golang'],
+      semanticCommitType: 'fix',
+    },
+    {
+      // Pin base images by digest so a moved tag shows up as a pull request.
+      matchManagers: ['dockerfile'],
+      pinDigests: true,
+    },
+    {
+      // The runtime image ships to users, so its updates belong in the release notes as fixes.
+      matchPackageNames: ['gcr.io/distroless/static'],
+      semanticCommitType: 'fix',
+    },
+  ],
+}
