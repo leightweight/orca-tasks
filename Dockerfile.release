@@ -1,0 +1,10 @@
+# The release image that goreleaser builds. goreleaser cross-compiles the
+# binary and puts each one in the build context under <os>/<arch>/, so this
+# only copies it and needs no emulation for other platforms.
+FROM gcr.io/distroless/static:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/orca-tasks /orca-tasks
+USER 65532:65532
+EXPOSE 8080
+ENTRYPOINT ["/orca-tasks"]
+CMD ["serve"]

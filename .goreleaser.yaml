@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: orca-tasks
+dist: .cache/dist
+
+builds:
+  - id: orca-tasks
+    main: ./cmd/orca-tasks
+    binary: orca-tasks
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+# The CLI ships as archives that `mise use github:leightweight/orca-tasks`
+# can install; the server ships as an image.
+archives:
+  - formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+dockers_v2:
+  - images:
+      - ghcr.io/leightweight/orca-tasks
+    tags:
+      - "{{ .Version }}"
+    dockerfile: Dockerfile.release
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.title: orca-tasks
+      org.opencontainers.image.description: A task tracker that serves a Jira-compatible API to Orca
+      org.opencontainers.image.source: https://github.com/leightweight/orca-tasks
+      org.opencontainers.image.licenses: MIT
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .CommitDate }}"
+    annotations:
+      org.opencontainers.image.source: https://github.com/leightweight/orca-tasks
+      org.opencontainers.image.licenses: MIT
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+
+# Keyless signing with the GitHub Actions OIDC identity.
+docker_signs:
+  - cmd: cosign
+    args:
+      - sign
+      - --yes
+      - ${artifact}@${digest}
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+changelog:
+  use: github-native
+
+release:
+  github:
+    owner: leightweight
+    name: orca-tasks
+  prerelease: auto
