@@ -1,0 +1,13 @@
+{
+  "name": "orca-tasks",
+  "owner": {
+    "name": "Jonathon Leight"
+  },
+  "plugins": [
+    {
+      "name": "orca-tasks",
+      "source": "./plugins/orca-tasks",
+      "description": "Lets Claude keep its work in an orca-tasks server, the task list Orca shows on its Tasks page."
+    }
+  ]
+}
