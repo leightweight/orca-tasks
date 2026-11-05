@@ -13,10 +13,11 @@ import (
 )
 
 type importCmd struct {
-	DatabaseURL string            `name:"database-url" env:"ORCA_TASKS_DATABASE_URL" required:"" placeholder:"URL" help:"Postgres connection URL."`
-	Owner       string            `required:"" help:"The user who administers the imported projects, and owns issues and comments with no reporter or author."`
-	User        map[string]string `placeholder:"OLD=NEW" help:"Map a username in the file to a user or agent here. Repeatable; others are used as they are."`
-	DryRun      bool              `help:"Check the file and the import, then roll it back."`
+	adminDatabase
+
+	Owner  string            `required:"" help:"The user who administers the imported projects, and owns issues and comments with no reporter or author."`
+	User   map[string]string `placeholder:"OLD=NEW" help:"Map a username in the file to a user or agent here. Repeatable; others are used as they are."`
+	DryRun bool              `help:"Check the file and the import, then roll it back."`
 
 	File string `arg:"" help:"The export file, or - for stdin."`
 }
@@ -39,15 +40,11 @@ func (c *importCmd) Run(ctx context.Context) error {
 		return usagef("reading the export: %w", err)
 	}
 
-	s, err := store.Open(ctx, c.DatabaseURL)
+	s, closeStore, err := c.open(ctx)
 	if err != nil {
 		return err
 	}
-	defer s.Close()
-
-	if err := s.Migrate(ctx); err != nil {
-		return err
-	}
+	defer closeStore()
 
 	catalog, err := s.LoadCatalog(ctx)
 	if err != nil {

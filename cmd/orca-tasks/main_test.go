@@ -16,6 +16,8 @@ func TestCommandLine(t *testing.T) {
 		{"serve", "--local", "--addr", "127.0.0.1:9000"},
 		{"serve", "--database-url", "postgres://x", "--base-url", "http://x", "--secret-key", "k", "--log-format", "text"},
 		{"admin", "reset-link", "--database-url", "postgres://x", "--base-url", "http://x", "alice"},
+		{"admin", "reset-link", "--local", "alice"},
+		{"admin", "import", "--local", "--owner", "alice", "-"},
 		{"admin", "import", "--database-url", "postgres://x", "--owner", "alice", "--user", "claude=alice/claude", "-"},
 		{"task", "list", "--url", "http://x", "--token", "otk_x"},
 		{"task", "move", "OPS-1", "Done", "--assign-to-me"},

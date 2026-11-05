@@ -11,7 +11,6 @@ import (
 
 	"github.com/leightweight/orca-tasks/internal/local"
 	"github.com/leightweight/orca-tasks/internal/server"
-	"github.com/leightweight/orca-tasks/internal/store"
 	"github.com/leightweight/orca-tasks/internal/web"
 )
 
@@ -159,30 +158,40 @@ func cmpOr(values ...string) string {
 }
 
 type adminCmd struct {
-	ResetLink resetLinkCmd `cmd:"" help:"Print a link that sets a user's password and authenticator, for an administrator who is locked out."`
+	ResetLink resetLinkCmd `cmd:"" help:"Print a link that sets a user's password and authenticator, for someone who is locked out."`
 	Import    importCmd    `cmd:"" help:"Import projects, issues, and comments from an export file."`
 }
 
 type resetLinkCmd struct {
-	DatabaseURL string `name:"database-url" env:"ORCA_TASKS_DATABASE_URL" required:"" placeholder:"URL" help:"Postgres connection URL."`
-	BaseURL     string `name:"base-url" env:"ORCA_TASKS_BASE_URL" required:"" placeholder:"URL" help:"The URL people reach the server at."`
+	adminDatabase
+
+	BaseURL string `name:"base-url" env:"ORCA_TASKS_BASE_URL" placeholder:"URL" help:"The URL people reach the server at. With --local, http://127.0.0.1:8080."`
 
 	Username string `arg:"" help:"The user to reset."`
 }
 
 func (c *resetLinkCmd) Run(ctx context.Context) error {
-	s, err := store.Open(ctx, c.DatabaseURL)
+	baseURL := c.BaseURL
+	if baseURL == "" && c.Local {
+		baseURL = "http://127.0.0.1:8080"
+	}
+
+	if baseURL == "" {
+		return usagef("--base-url is required, unless you use --local")
+	}
+
+	s, closeStore, err := c.open(ctx)
 	if err != nil {
 		return err
 	}
-	defer s.Close()
+	defer closeStore()
 
 	user, err := s.GetPrincipalByUsername(ctx, c.Username)
 	if err != nil || user.Kind != "user" {
 		return usagef("there's no user named %q", c.Username)
 	}
 
-	link, err := web.NewResetLink(ctx, s, c.BaseURL, user.ID)
+	link, err := web.NewResetLink(ctx, s, baseURL, user.ID)
 	if err != nil {
 		return err
 	}

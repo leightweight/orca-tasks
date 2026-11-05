@@ -560,6 +560,12 @@ If none answers, the error lists every path it tried.
   The next start stops that Postgres before starting its own, once it holds the lock, so it never stops a live server's database.
 - Ctrl-C stops Postgres and removes the socket.
 
+### Admin commands
+
+`orca-tasks admin reset-link --local USER` and `orca-tasks admin import --local` work on the local database, for someone who forgets their password or moves tasks in.
+They start the embedded Postgres themselves, so the server must be stopped; while it holds the data directory's lock, they say so.
+`reset-link --local` prints a link to `http://127.0.0.1:8080` unless `--base-url` says otherwise.
+
 Backing up is copying the data directory while the server is stopped.
 
 ## Configuration

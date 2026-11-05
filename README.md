@@ -34,6 +34,8 @@ Connect Orca as below, with `http://127.0.0.1:8080` as the site and an API key f
 Claude Code needs no key at all: when `ORCA_TASKS_URL` isn't set, the CLI talks to the local server through a socket only you can open, as your `agent`.
 Install the skill as in [Set up Claude Code](#set-up-claude-code) and skip the environment variables.
 
+If you forget your password, stop the server, run `orca-tasks admin reset-link --local YOUR-USERNAME`, start the server again, and open the link it printed.
+`orca-tasks admin import --local` imports tasks the same way, with the server stopped.
 To back up, stop the server and copy `~/.local/share/orca-tasks`.
 
 ## Install
