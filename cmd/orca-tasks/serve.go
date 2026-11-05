@@ -86,27 +86,27 @@ func (c *serveCmd) Run(ctx context.Context) error {
 }
 
 // local fills in a local mode configuration: its own Postgres, attachments,
-// secret key, and agent socket, all in the local directory.
+// secret key, and agent socket, in the XDG data, cache, and runtime directories.
 func (c *serveCmd) local(ctx context.Context, cfg *server.Config, log *slog.Logger) (func(), error) {
 	if c.DatabaseURL != "" {
 		return nil, usagef("--local runs its own database, so leave out --database-url and ORCA_TASKS_DATABASE_URL")
 	}
 
-	dir, err := local.Dir()
+	paths, err := local.Resolve()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := local.Prepare(dir); err != nil {
+	if err := paths.Prepare(); err != nil {
 		return nil, err
 	}
 
-	if err := local.CheckNotRunning(dir); err != nil {
+	if err := local.CheckNotRunning(paths); err != nil {
 		return nil, err
 	}
 
 	if cfg.SecretKey == "" {
-		if cfg.SecretKey, err = local.SecretKey(dir); err != nil {
+		if cfg.SecretKey, err = local.SecretKey(paths.Data); err != nil {
 			return nil, err
 		}
 	}
@@ -121,12 +121,12 @@ func (c *serveCmd) local(ctx context.Context, cfg *server.Config, log *slog.Logg
 
 	cfg.PasswordOnly = true
 	cfg.BaseURL = cmpOr(c.BaseURL, "http://"+cfg.Addr)
-	cfg.DataDir = cmpOr(c.DataDir, local.AttachmentsDir(dir))
-	cfg.Socket = local.SocketPath(dir)
+	cfg.DataDir = cmpOr(c.DataDir, paths.Attachments())
+	cfg.Socket = paths.Socket()
 
-	log.Info("starting Postgres; the first run downloads it", "dir", dir)
+	log.Info("starting Postgres; the first run downloads it", "data", paths.Data, "cache", paths.Cache, "runtime", paths.Runtime)
 
-	pg, err := local.StartPostgres(ctx, dir, log)
+	pg, err := local.StartPostgres(ctx, paths, log)
 	if err != nil {
 		return nil, err
 	}

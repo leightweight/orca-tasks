@@ -510,10 +510,18 @@ mise use -g packslip:github.com/leightweight/orca-tasks
 orca-tasks serve --local
 ```
 
-- Everything lives in one directory, mode 0700: `$ORCA_TASKS_LOCAL_DIR`, or `orca-tasks` under `$XDG_DATA_HOME`, which defaults to `~/.local/share`.
+- Files go where the XDG Base Directory specification says, each in an `orca-tasks` directory with mode 0700:
+  - Data worth keeping, which is the database, its password, attachments, and the secret key, goes in `$XDG_DATA_HOME`, which defaults to `~/.local/share`.
+  - The downloaded Postgres goes in `$XDG_CACHE_HOME`, which defaults to `~/.cache`.
+    Deleting it costs a download.
+  - The agent socket and Postgres's runtime files go in `$XDG_RUNTIME_DIR`.
+    macOS doesn't set it, so the fallback is `orca-tasks-<uid>` in the temporary directory, which is private to the user on macOS.
+    A runtime directory that already exists must belong to the user and be private, since another account could have made one in a shared temporary directory to read the socket.
+  - Relative values are ignored, as the specification says.
+  - `$ORCA_TASKS_LOCAL_DIR` puts everything under one directory instead, with the cache in `cache` and runtime files in `run`.
 - Postgres runs embedded, through `fergusstrange/embedded-postgres`, which downloads a Postgres 18 build the first time and runs it as a child process.
-  It listens on 127.0.0.1, on a free port each run, with a password generated once and kept in the directory.
-- The secret key is generated the first time and kept in the directory, so there's nothing to configure.
+  It listens on 127.0.0.1, on a free port each run, with a password generated once and kept in the data directory.
+- The secret key is generated the first time and kept in the data directory, so there's nothing to configure.
 - The server listens on `127.0.0.1:8080`, and its base URL is `http://127.0.0.1:8080`, unless `--addr` or `--base-url` say otherwise.
   `--addr` must be a loopback address: local mode refuses to listen where another machine could reach it.
   Logs are text rather than JSON.
@@ -528,7 +536,8 @@ orca-tasks serve --local
 
 ### The agent socket
 
-A local server also serves the API on a Unix socket, `agent.sock` in the local directory, with mode 0600.
+A local server also serves the API on a Unix socket, `agent.sock` in the runtime directory, with mode 0600.
+macOS limits socket paths to 104 bytes, so the server refuses a runtime directory whose socket path would be longer, and says to set `XDG_RUNTIME_DIR` or `ORCA_TASKS_LOCAL_DIR`.
 Requests through it act as the first user's `agent` agent, with no API key.
 The file mode limits it to the machine's owner, the same people who could read a key from their own environment.
 
@@ -546,7 +555,7 @@ Without them, it uses the local socket, so a Claude Code session on the same mac
   The next start stops that Postgres before starting its own, once it has checked that no server answers on the socket.
 - Ctrl-C stops Postgres and removes the socket.
 
-Backing up is copying the local directory while the server is stopped.
+Backing up is copying the data directory while the server is stopped.
 
 ## Configuration
 
@@ -557,13 +566,13 @@ The server reads its configuration from flags or environment variables.
 | `ORCA_TASKS_DATABASE_URL` | Required, except with `--local` | Postgres connection URL. |
 | `ORCA_TASKS_BASE_URL` | Required, except with `--local` | The URL users and Orca reach the server at, for links, TOTP labels, and secure cookies. |
 | `ORCA_TASKS_SECRET_KEY` | Required, except with `--local` | 32 random bytes in base64 that encrypt TOTP secrets. |
-| `ORCA_TASKS_DATA_DIR` | `/data`, or `attachments` in the local directory with `--local` | Directory holding attachment contents. |
+| `ORCA_TASKS_DATA_DIR` | `/data`, or `attachments` in the XDG data directory with `--local` | Directory holding attachment contents. |
 | `ORCA_TASKS_MAX_UPLOAD` | `25MiB` | Largest attachment accepted. |
 | `ORCA_TASKS_TRUSTED_PROXIES` | None | Proxies whose forwarding headers to trust, as comma-separated IPs and CIDRs, or `private` for the private, link-local, and unique local ranges. |
 | `ORCA_TASKS_ADDR` | `:8080`, or `127.0.0.1:8080` with `--local` | Address to listen on. |
 | `ORCA_TASKS_LOG_LEVEL` | `info` | Log level. |
 | `ORCA_TASKS_LOG_FORMAT` | `json`, or `text` with `--local` | Log format, `json` or `text`. |
-| `ORCA_TASKS_LOCAL_DIR` | `~/.local/share/orca-tasks` | The directory `--local` keeps everything in. |
+| `ORCA_TASKS_LOCAL_DIR` | The XDG directories | One directory for everything `--local` keeps, instead of the XDG data, cache, and runtime directories. |
 
 Losing the secret key makes every TOTP secret unreadable, so each user then needs a reset link.
 

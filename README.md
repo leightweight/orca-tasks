@@ -24,7 +24,8 @@ orca-tasks serve --local
 ```
 
 It needs no Docker and no configuration.
-The first run downloads Postgres, and everything stays in `~/.local/share/orca-tasks`: the database, attachments, and a generated secret key.
+The first run downloads Postgres.
+Files go in the XDG directories: your tasks, attachments, and a generated secret key in `~/.local/share/orca-tasks`, the Postgres download in `~/.cache/orca-tasks`, and the socket in `$XDG_RUNTIME_DIR`, or the temporary directory where that isn't set.
 Open <http://127.0.0.1:8080/setup>, enter the setup code from the terminal, and create your account with a password.
 Local mode only listens on this machine, so it signs in with a password alone, with no authenticator app.
 Setup also creates an agent named `agent`.
@@ -33,7 +34,7 @@ Connect Orca as below, with `http://127.0.0.1:8080` as the site and an API key f
 Claude Code needs no key at all: when `ORCA_TASKS_URL` isn't set, the CLI talks to the local server through a socket only you can open, as your `agent`.
 Install the skill as in [Set up Claude Code](#set-up-claude-code) and skip the environment variables.
 
-To back up, stop the server and copy the directory.
+To back up, stop the server and copy `~/.local/share/orca-tasks`.
 
 ## Install
 

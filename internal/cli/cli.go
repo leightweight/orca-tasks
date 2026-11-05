@@ -38,7 +38,7 @@ const assignToMe = "-1"
 type Flags struct {
 	URL    string `env:"ORCA_TASKS_URL" placeholder:"URL" help:"The server's URL. Without it, the CLI uses a local server's socket."`
 	Token  string `env:"ORCA_TASKS_TOKEN" placeholder:"KEY" help:"An API key from the server's API keys page. Required with --url."`
-	Socket string `env:"ORCA_TASKS_SOCKET" type:"path" placeholder:"PATH" help:"A local server's socket. Defaults to agent.sock in the local directory."`
+	Socket string `env:"ORCA_TASKS_SOCKET" type:"path" placeholder:"PATH" help:"A local server's socket. Defaults to agent.sock in the XDG runtime directory."`
 	Format string `short:"f" default:"table" enum:"table,json" help:"Output format: table or json."`
 }
 
@@ -55,12 +55,12 @@ func (f *Flags) client() (*client.Client, error) {
 
 	socket := f.Socket
 	if socket == "" {
-		dir, err := local.Dir()
+		paths, err := local.Resolve()
 		if err != nil {
 			return nil, err
 		}
 
-		socket = local.SocketPath(dir)
+		socket = paths.Socket()
 	}
 
 	if _, err := os.Stat(socket); err != nil {

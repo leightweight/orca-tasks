@@ -1,6 +1,6 @@
 // Package local runs orca-tasks on one person's machine: an embedded Postgres,
-// attachments, and a secret key in one directory, and a socket that lets the
-// person's own agents use the API without an API key.
+// attachments, and a secret key in the XDG data directory, and a socket that
+// lets the person's own agents use the API without an API key.
 package local
 
 import (
@@ -29,32 +29,8 @@ const (
 	postgresMajorVersion = "18"
 )
 
-// Dir is the local mode directory: $ORCA_TASKS_LOCAL_DIR, or orca-tasks under
-// $XDG_DATA_HOME, which defaults to ~/.local/share.
-func Dir() (string, error) {
-	if dir := os.Getenv("ORCA_TASKS_LOCAL_DIR"); dir != "" {
-		return dir, nil
-	}
-
-	if data := os.Getenv("XDG_DATA_HOME"); data != "" {
-		return filepath.Join(data, "orca-tasks"), nil
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(home, ".local", "share", "orca-tasks"), nil
-}
-
-// SocketPath is where the agent socket lives in a local mode directory.
-func SocketPath(dir string) string { return filepath.Join(dir, "agent.sock") }
-
-// AttachmentsDir is where attachments live in a local mode directory.
-func AttachmentsDir(dir string) string { return filepath.Join(dir, "attachments") }
-
-// SecretKey reads the directory's secret key, creating one the first time.
+// SecretKey reads the secret key in a data directory, creating one the first
+// time.
 func SecretKey(dir string) (string, error) {
 	path := filepath.Join(dir, "secret-key")
 
@@ -71,11 +47,6 @@ func SecretKey(dir string) (string, error) {
 	return encoded, writeNew(path, encoded+"\n")
 }
 
-// Prepare creates a local mode directory, readable only by its owner.
-func Prepare(dir string) error {
-	return os.MkdirAll(dir, 0o700)
-}
-
 // Postgres is the embedded database.
 type Postgres struct {
 	URL string
@@ -87,21 +58,22 @@ type Postgres struct {
 var ErrOtherVersion = errors.New("the database was created by another Postgres version")
 
 // StartPostgres starts Postgres on a free port on 127.0.0.1, with its data in
-// dir/postgres. It downloads the Postgres binaries the first time.
+// the data directory and its binaries in the cache, which it downloads the
+// first time.
 //
 // embedded-postgres deletes a data directory whose PG_VERSION doesn't match
 // the version it runs and starts over, so this checks first and refuses,
 // rather than lose someone's tasks to a version bump.
-func StartPostgres(ctx context.Context, dir string, log *slog.Logger) (*Postgres, error) {
-	data := filepath.Join(dir, "postgres")
+func StartPostgres(ctx context.Context, p Paths, log *slog.Logger) (*Postgres, error) {
+	data := filepath.Join(p.Data, "postgres")
 
 	if err := checkVersion(data); err != nil {
 		return nil, err
 	}
 
-	stopOrphan(ctx, dir, data, log)
+	stopOrphan(ctx, p, data, log)
 
-	password, err := postgresPassword(dir)
+	password, err := postgresPassword(p.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -120,9 +92,9 @@ func StartPostgres(ctx context.Context, dir string, log *slog.Logger) (*Postgres
 		DataPath(data).
 		// The runtime directory is emptied on every start, so it must not
 		// hold anything else.
-		RuntimePath(filepath.Join(dir, "postgres-runtime")).
-		BinariesPath(filepath.Join(dir, "postgres-bin")).
-		CachePath(filepath.Join(dir, "postgres-cache")).
+		RuntimePath(filepath.Join(p.Runtime, "postgres")).
+		BinariesPath(filepath.Join(p.Cache, "postgres-bin")).
+		CachePath(filepath.Join(p.Cache, "downloads")).
 		StartTimeout(time.Minute).
 		Logger(&logWriter{log: log}))
 
@@ -223,28 +195,28 @@ func (w *logWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// CheckNotRunning fails if another server answers on the directory's socket,
-// since two servers can't share one database.
-func CheckNotRunning(dir string) error {
-	conn, err := (&net.Dialer{Timeout: time.Second}).Dial("unix", SocketPath(dir))
+// CheckNotRunning fails if another server answers on the socket, since two
+// servers can't share one database.
+func CheckNotRunning(p Paths) error {
+	conn, err := (&net.Dialer{Timeout: time.Second}).Dial("unix", p.Socket())
 	if err != nil {
 		return nil
 	}
 
 	_ = conn.Close()
 
-	return fmt.Errorf("orca-tasks is already running from %s", dir)
+	return fmt.Errorf("orca-tasks is already running from %s", p.Data)
 }
 
 // stopOrphan stops a Postgres that a killed server left running on the data
 // directory, which would otherwise hold its lock. Call it only after
 // CheckNotRunning, so it never stops a live server's database.
-func stopOrphan(ctx context.Context, dir, data string, log *slog.Logger) {
+func stopOrphan(ctx context.Context, p Paths, data string, log *slog.Logger) {
 	if _, err := os.Stat(filepath.Join(data, "postmaster.pid")); err != nil {
 		return
 	}
 
-	if _, err := os.Stat(filepath.Join(dir, "postgres-bin", "bin", "pg_ctl")); err != nil {
+	if _, err := os.Stat(filepath.Join(p.Cache, "postgres-bin", "bin", "pg_ctl")); err != nil {
 		return
 	}
 
@@ -253,10 +225,11 @@ func stopOrphan(ctx context.Context, dir, data string, log *slog.Logger) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	// Relative to the local directory, which a relative command path is
-	// resolved against too.
-	cmd := exec.CommandContext(ctx, "postgres-bin/bin/pg_ctl", "stop", "-D", "postgres", "-m", "fast")
-	cmd.Dir = dir
+	// Relative to the cache, which a relative command path is resolved against
+	// too. pg_ctl reads the data directory from PGDATA.
+	cmd := exec.CommandContext(ctx, "postgres-bin/bin/pg_ctl", "stop", "-m", "fast")
+	cmd.Dir = p.Cache
+	cmd.Env = append(os.Environ(), "PGDATA="+data)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
