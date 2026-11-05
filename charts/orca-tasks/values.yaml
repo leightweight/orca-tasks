@@ -1,0 +1,89 @@
+image:
+  repository: ghcr.io/leightweight/orca-tasks
+  # Defaults to the chart's appVersion.
+  tag: ""
+  # Pins the image by digest when set, such as sha256:abc...
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# The URL people and Orca reach the server at, such as https://tasks.example.com.
+# Required.
+baseURL: ""
+
+database:
+  # A Secret holding the Postgres connection URL. A CloudNativePG cluster's
+  # generated app Secret works as it is. Required.
+  existingSecret: ""
+  key: uri
+
+secretKey:
+  # A Secret holding 32 random bytes in base64, which encrypt TOTP secrets.
+  # Create one with: openssl rand -base64 32. Keep a copy: losing it means
+  # every user needs a reset link. Required.
+  existingSecret: ""
+  key: secret-key
+
+# Proxies whose X-Forwarded-For to trust, as IPs and CIDRs separated by
+# commas, or "private". Set it to your ingress's addresses so sign-in limits
+# count per client; the server's /admin/proxy page shows whether it's right.
+trustedProxies: ""
+
+maxUpload: 25MiB
+logLevel: info
+
+# Extra environment variables for the container.
+extraEnv: []
+
+persistence:
+  # Attachment contents. Without it they live in an emptyDir and are lost
+  # when the pod goes.
+  enabled: true
+  existingClaim: ""
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: tasks.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

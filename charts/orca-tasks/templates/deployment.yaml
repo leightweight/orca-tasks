@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "orca-tasks.fullname" . }}
+  labels:
+    {{- include "orca-tasks.labels" . | nindent 4 }}
+spec:
+  # One replica: sign-in limits and an Orca workaround keep state in memory,
+  # and the attachment volume is ReadWriteOnce.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "orca-tasks.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "orca-tasks.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: orca-tasks
+          image: {{ include "orca-tasks.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["serve"]
+          env:
+            - name: ORCA_TASKS_BASE_URL
+              value: {{ required "baseURL is required" .Values.baseURL | quote }}
+            - name: ORCA_TASKS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "database.existingSecret is required" .Values.database.existingSecret }}
+                  key: {{ .Values.database.key }}
+            - name: ORCA_TASKS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "secretKey.existingSecret is required" .Values.secretKey.existingSecret }}
+                  key: {{ .Values.secretKey.key }}
+            - name: ORCA_TASKS_DATA_DIR
+              value: /data
+            - name: ORCA_TASKS_ADDR
+              value: ":8080"
+            - name: ORCA_TASKS_MAX_UPLOAD
+              value: {{ .Values.maxUpload | quote }}
+            - name: ORCA_TASKS_LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+            {{- with .Values.trustedProxies }}
+            - name: ORCA_TASKS_TRUSTED_PROXIES
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "orca-tasks.fullname" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

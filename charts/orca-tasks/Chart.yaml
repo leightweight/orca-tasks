@@ -1,0 +1,10 @@
+apiVersion: v2
+name: orca-tasks
+description: A task tracker that serves a Jira-compatible API to Orca.
+type: application
+# The release workflow sets both versions from the tag.
+version: 0.0.0
+appVersion: 0.0.0
+home: https://github.com/leightweight/orca-tasks
+sources:
+  - https://github.com/leightweight/orca-tasks

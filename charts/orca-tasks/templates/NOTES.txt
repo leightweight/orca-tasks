@@ -1,0 +1,11 @@
+orca-tasks is starting at {{ .Values.baseURL }}.
+
+On a new database, the server logs a setup code. Read it with:
+
+  kubectl logs -n {{ .Release.Namespace }} deploy/{{ include "orca-tasks.fullname" . }} | grep setup_code
+
+then open {{ .Values.baseURL }}/setup to create the first administrator.
+
+If the only administrator is locked out, print a reset link with:
+
+  kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "orca-tasks.fullname" . }} -- /orca-tasks admin reset-link USERNAME

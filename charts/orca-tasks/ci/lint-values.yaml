@@ -1,0 +1,9 @@
+# Values for linting the chart, which needs its required values set.
+baseURL: https://tasks.example.com
+database:
+  existingSecret: orca-tasks-db-app
+secretKey:
+  existingSecret: orca-tasks-secret-key
+trustedProxies: private
+ingress:
+  enabled: true
