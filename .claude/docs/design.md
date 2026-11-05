@@ -388,6 +388,66 @@ An agent's actions are attributed to it because the CLI uses one of its API keys
 
 The server-side commands are `orca-tasks serve`, which also applies migrations, and `orca-tasks admin reset-link`.
 
+## Importing
+
+`orca-tasks admin import` brings projects, issues, and comments in from another task list.
+Like `admin reset-link`, it connects to the database directly, so it runs inside the server's container.
+
+```sh
+kubectl exec -i deploy/orca-tasks -- /orca-tasks admin import --owner jleight --user claude=jleight-claude - < export.json
+```
+
+The file is JSON, with `format` set to `orca-tasks-export` and `version` set to 1.
+
+```json
+{
+  "format": "orca-tasks-export",
+  "version": 1,
+  "projects": [
+    {
+      "key": "OPS",
+      "name": "Operations",
+      "next_number": 13,
+      "issues": [
+        {
+          "number": 12,
+          "summary": "Rotate the API keys",
+          "description": "Markdown.",
+          "status": "In Progress",
+          "type": "Task",
+          "priority": "High",
+          "assignee": "",
+          "reporter": "claude",
+          "labels": ["security"],
+          "created": "2026-10-22T13:43:53Z",
+          "updated": "2026-10-23T09:12:00Z",
+          "comments": [
+            {"author": "claude", "body": "Started.", "created": "2026-10-22T14:00:00Z", "updated": "2026-10-22T14:00:00Z"}
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+- `--owner` names the user who administers every imported project.
+  An issue or comment with an empty reporter or author is theirs.
+- People in the file are usernames.
+  `--user OLD=NEW` maps one to a user or agent here, and a name it doesn't map is looked up as it is.
+- Every user the file names joins the project as a member, and every agent joins with its owner.
+- Issues keep their numbers and times, and comments keep their authors and times, so `OPS-12` is still `OPS-12` for the owner.
+  `next_number` keeps the counter past numbers the old list used up.
+- Statuses, types, and priorities match the catalog by name, ignoring case.
+- The import runs in one transaction.
+  Before it writes anything, it checks every name in the file and reports all the problems together.
+  It refuses a project whose key the owner already uses, so running it twice imports nothing the second time.
+- `--dry-run` runs the whole import and rolls it back.
+- Each imported issue gets an `imported` history entry.
+- Attachments and saved filters aren't part of the format.
+
+Each project costs a fixed number of queries whatever its size: one COPY for its issues, one query for their IDs, and one COPY for its comments.
+
 ## Claude Code skill
 
 The repository ships the skill as a Claude Code plugin, so `/plugin marketplace add leightweight/orca-tasks` installs it.

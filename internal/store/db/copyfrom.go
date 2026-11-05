@@ -9,6 +9,86 @@ import (
 	"context"
 )
 
+// iteratorForImportComments implements pgx.CopyFromSource.
+type iteratorForImportComments struct {
+	rows                 []ImportCommentsParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForImportComments) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForImportComments) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].ProjectID,
+		r.rows[0].IssueID,
+		r.rows[0].AuthorID,
+		r.rows[0].Body,
+		r.rows[0].CreatedAt,
+		r.rows[0].UpdatedAt,
+	}, nil
+}
+
+func (r iteratorForImportComments) Err() error {
+	return nil
+}
+
+func (q *Queries) ImportComments(ctx context.Context, arg []ImportCommentsParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"comments"}, []string{"project_id", "issue_id", "author_id", "body", "created_at", "updated_at"}, &iteratorForImportComments{rows: arg})
+}
+
+// iteratorForImportIssues implements pgx.CopyFromSource.
+type iteratorForImportIssues struct {
+	rows                 []ImportIssuesParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForImportIssues) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForImportIssues) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].ProjectID,
+		r.rows[0].Number,
+		r.rows[0].Summary,
+		r.rows[0].Description,
+		r.rows[0].StatusID,
+		r.rows[0].TypeID,
+		r.rows[0].PriorityID,
+		r.rows[0].ReporterID,
+		r.rows[0].AssigneeID,
+		r.rows[0].Labels,
+		r.rows[0].CreatedAt,
+		r.rows[0].UpdatedAt,
+	}, nil
+}
+
+func (r iteratorForImportIssues) Err() error {
+	return nil
+}
+
+func (q *Queries) ImportIssues(ctx context.Context, arg []ImportIssuesParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"issues"}, []string{"project_id", "number", "summary", "description", "status_id", "type_id", "priority_id", "reporter_id", "assignee_id", "labels", "created_at", "updated_at"}, &iteratorForImportIssues{rows: arg})
+}
+
 // iteratorForInsertHistory implements pgx.CopyFromSource.
 type iteratorForInsertHistory struct {
 	rows                 []InsertHistoryParams

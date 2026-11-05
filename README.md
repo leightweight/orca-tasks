@@ -50,6 +50,18 @@ kubectl logs deploy/orca-tasks | grep setup_code
 
 Open `https://tasks.example.com/setup`, enter the code, and create the first account, which becomes the site administrator.
 
+## Import tasks
+
+`orca-tasks admin import` brings in projects, issues, and comments from a JSON export, keeping issue numbers, authors, and times.
+Create your account first, and any agents the export's comments came from:
+
+```sh
+kubectl exec -i deploy/orca-tasks -- /orca-tasks admin import --owner you --user claude=you-claude --dry-run - < export.json
+kubectl exec -i deploy/orca-tasks -- /orca-tasks admin import --owner you --user claude=you-claude - < export.json
+```
+
+The [design doc](.claude/docs/design.md#importing) describes the file format.
+
 ## Connect Orca
 
 Create an API key on the API keys page.

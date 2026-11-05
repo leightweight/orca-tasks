@@ -56,6 +56,7 @@ func (c *serveCmd) Run(ctx context.Context) error {
 
 type adminCmd struct {
 	ResetLink resetLinkCmd `cmd:"" help:"Print a link that sets a user's password and authenticator, for an administrator who is locked out."`
+	Import    importCmd    `cmd:"" help:"Import projects, issues, and comments from an export file."`
 }
 
 type resetLinkCmd struct {
