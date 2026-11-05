@@ -27,6 +27,7 @@ If a task you need doesn't exist, add it to `.config/mise/config.toml` and list 
   mise installs `docker-compose`, so the tasks don't depend on a Compose plugin.
 - `mise run release:snapshot`: build the release binaries and images locally without publishing them.
   The output goes in `.cache/dist/`.
+  Before building, goreleaser runs go-licenses to collect the notices of the modules the binary bundles into `.cache/release/licenses`, which the archives and the image ship.
 - Pushing a `v*` tag publishes a release through `.github/workflows/release.yml`.
   The version in `plugins/orca-tasks/.claude-plugin/plugin.json` must match the tag without any prerelease suffix, or the release stops before publishing, so bump it in the commit you tag.
   Only push release tags when the user asks.

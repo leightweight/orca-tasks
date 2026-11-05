@@ -4,6 +4,14 @@ version: 2
 project_name: orca-tasks
 dist: .cache/dist
 
+# The binary bundles modules whose licenses ask for their notices to go with
+# it, so each release collects them into .cache/release/licenses for the
+# archives and the image. github.com/xi2/xz is public domain, which needs no
+# notice and which go-licenses can't classify.
+before:
+  hooks:
+    - go-licenses save ./cmd/orca-tasks --save_path .cache/release/licenses --force --ignore github.com/xi2/xz --ignore github.com/leightweight/orca-tasks
+
 builds:
   - id: orca-tasks
     main: ./cmd/orca-tasks
@@ -31,6 +39,10 @@ archives:
     files:
       - LICENSE
       - README.md
+      - src: .cache/release/licenses/**/*
+        dst: licenses
+        info:
+          mode: 0o644
 
 dockers_v2:
   - images:
@@ -40,6 +52,8 @@ dockers_v2:
     dockerfile: Dockerfile.release
     extra_files:
       - .config/docker
+      - .cache/release/licenses
+      - LICENSE
     platforms:
       - linux/amd64
       - linux/arm64
