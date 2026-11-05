@@ -344,6 +344,8 @@ func TestFailedSignInsAreLimited(t *testing.T) {
 	t.Parallel()
 
 	s := newSite(t)
+	signUp(t, s)
+
 	b := s.browser()
 
 	var last response
@@ -452,6 +454,7 @@ func TestConcurrentSignInsAreLimited(t *testing.T) {
 	t.Parallel()
 
 	s := newSite(t)
+	signUp(t, s)
 
 	results := make(chan string, 30)
 
@@ -481,6 +484,8 @@ func TestRequestsWithoutKeysDontLockOut(t *testing.T) {
 	t.Parallel()
 
 	s := newSite(t)
+	signUp(t, s)
+
 	b := s.browser()
 
 	for range 15 {
@@ -556,4 +561,14 @@ func TestSessionsDontHoldSecretsInPlainText(t *testing.T) {
 	if keyPattern.FindString(alice.get("/account/keys").body) == "" {
 		t.Error("the new key wasn't shown")
 	}
+}
+
+func TestLoginSendsAFreshInstallToSetup(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	b := s.browser()
+
+	b.expectRedirect(b.get("/login"), "/setup")
+	b.expectRedirect(b.post("/login", url.Values{"username": {"alice"}, "password": {"x"}}), "/setup")
 }

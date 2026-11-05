@@ -775,3 +775,31 @@ func TestMaxResultsIsClampedToTheCap(t *testing.T) {
 		t.Errorf("maxResults = %d, want the cap, %d", page.MaxResults, maxPageSize)
 	}
 }
+
+func TestUnknownProjectListsTheValidOnes(t *testing.T) {
+	t.Parallel()
+
+	a := newAPI(t)
+
+	request, err := http.NewRequestWithContext(testutil.Context(t), "POST", a.server.URL+"/rest/api/2/issue",
+		strings.NewReader(`{"fields":{"project":{"key":"NOPE"},"summary":"x"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	request.Header.Set("Authorization", "Bearer "+a.bob)
+	request.Header.Set("Content-Type", "application/json")
+
+	response, err := testutil.Client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+
+	body, _ := io.ReadAll(response.Body)
+
+	// bob is only in OPS, so PRIVATE isn't offered.
+	if response.StatusCode != http.StatusBadRequest || !strings.Contains(string(body), `\"OPS\"`) || strings.Contains(string(body), "PRIVATE") {
+		t.Errorf("status %d: %s", response.StatusCode, body)
+	}
+}

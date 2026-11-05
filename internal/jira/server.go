@@ -382,7 +382,26 @@ func (s *Server) project(ctx context.Context, c *Caller, keyOrID string) (db.Mem
 		}
 	}
 
-	return db.Membership{}, db.Project{}, badRequest("Unknown project %q.", keyOrID)
+	return db.Membership{}, db.Project{}, s.unknownProject(ctx, c, keyOrID)
+}
+
+// unknownProject is a 400 that lists the projects the caller can use, as an
+// unknown status or type lists the valid ones.
+func (s *Server) unknownProject(ctx context.Context, c *Caller, keyOrID string) error {
+	rows, err := s.Store.ListMyProjects(ctx, c.PrincipalID)
+	if err != nil {
+		return err
+	}
+
+	valid := make([]string, 0, len(rows))
+
+	for _, row := range rows {
+		if c.canSee(row.Project.ID) {
+			valid = append(valid, row.Membership.Key)
+		}
+	}
+
+	return &store.UnknownError{Kind: "project", Name: keyOrID, Valid: valid}
 }
 
 // actor is the caller's membership in an issue's project, which changes are

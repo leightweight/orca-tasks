@@ -386,7 +386,28 @@ func (w *Web) loginForm(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if w.toSetup(rw, r) {
+		return
+	}
+
 	w.render(rw, r, http.StatusOK, "login", "Sign in", nil)
+}
+
+// toSetup sends the browser to setup while there are no users yet, as every
+// page does, and reports whether it did.
+func (w *Web) toSetup(rw http.ResponseWriter, r *http.Request) bool {
+	hasUsers, err := w.Store.HasUsers(r.Context())
+	if err != nil {
+		w.serverError(rw, r, err)
+		return true
+	}
+
+	if !hasUsers {
+		http.Redirect(rw, r, "/setup", http.StatusSeeOther)
+		return true
+	}
+
+	return false
 }
 
 // dummyHash is checked against when a username doesn't exist, so a failed
@@ -395,6 +416,11 @@ var dummyHash, _ = auth.HashPassword("not anyone's password at all")
 
 func (w *Web) login(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
+	if w.toSetup(rw, r) {
+		return
+	}
+
 	username := strings.ToLower(strings.TrimSpace(r.PostFormValue("username")))
 	keys := []string{"ip:" + w.ClientIP(r), "user:" + username}
 
