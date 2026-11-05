@@ -176,7 +176,12 @@ func find(t *testing.T, pattern *regexp.Regexp, body string) string {
 func (b *browser) enroll() string {
 	b.site.t.Helper()
 
-	secret := find(b.site.t, secretPattern, b.get("/enroll").body)
+	page := b.get("/enroll").body
+	if !strings.Contains(page, `src="data:image/png;base64,`) {
+		b.site.t.Errorf("the enrollment page has no QR code: %.500s", page)
+	}
+
+	secret := find(b.site.t, secretPattern, page)
 	b.expectRedirect(b.post("/enroll", url.Values{"code": {auth.TOTPCode(secret, b.site.clock.step())}}), "/account")
 
 	return secret

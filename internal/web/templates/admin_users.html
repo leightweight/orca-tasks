@@ -32,13 +32,13 @@
         <td>{{bytes .Bytes}}</td>
         <td>{{if .Principal.LastSignInAt}}{{ago .Principal.LastSignInAt}}{{else}}Never{{end}}</td>
         <td>{{if eq .LastKeyUse.Unix 0}}Never{{else}}{{ago .LastKeyUse}}{{end}}</td>
-        <td class="actions">
+        <td><div class="actions">
           {{if ne .Principal.ID $.User.ID}}
           <form method="post" action="/admin/users/{{.Principal.ID}}/{{if .Principal.DisabledAt}}enable{{else}}disable{{end}}"><button>{{if .Principal.DisabledAt}}Enable{{else}}Disable{{end}}</button></form>
           <form method="post" action="/admin/users/{{.Principal.ID}}/{{if .Principal.SiteAdmin}}unadmin{{else}}admin{{end}}"><button>{{if .Principal.SiteAdmin}}Remove admin{{else}}Make admin{{end}}</button></form>
           {{end}}
           <form method="post" action="/admin/users/{{.Principal.ID}}/reset"><button>Reset link</button></form>
-        </td>
+        </div></td>
       </tr>
     {{end}}
     </tbody>

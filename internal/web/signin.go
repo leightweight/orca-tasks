@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"errors"
+	"html/template"
 	"net/http"
 	"strings"
 
@@ -129,6 +130,17 @@ func (w *Web) startEnrollment(rw http.ResponseWriter, r *http.Request, e enrollm
 	http.Redirect(rw, r, "/enroll", http.StatusSeeOther)
 }
 
+// enrollQR is what the enrollment page shows. The QR code is a data URL, which
+// html/template only puts in an img src when it's typed as a URL.
+type enrollQR struct {
+	Secret string
+	QRCode template.URL
+}
+
+func enrollPage(e *auth.Enrollment) enrollQR {
+	return enrollQR{Secret: e.Secret, QRCode: template.URL(e.QRCode)}
+}
+
 func (w *Web) enrollForm(rw http.ResponseWriter, r *http.Request) {
 	e, ok := w.Sessions.Get(r.Context(), sessionEnroll).(enrollment)
 	if !ok {
@@ -142,7 +154,7 @@ func (w *Web) enrollForm(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.render(rw, r, http.StatusOK, "enroll", "Set up your authenticator", key)
+	w.render(rw, r, http.StatusOK, "enroll", "Set up your authenticator", enrollPage(key))
 }
 
 // enroll confirms a code from the new authenticator, then saves the password
@@ -164,7 +176,7 @@ func (w *Web) enroll(rw http.ResponseWriter, r *http.Request) {
 
 	step, valid := auth.CheckTOTP(e.Secret, r.PostFormValue("code"), w.Now(), 0)
 	if !valid {
-		w.fail(rw, r, "enroll", "Set up your authenticator", "That code doesn't match. Check the time on your phone and try the next code.", key)
+		w.fail(rw, r, "enroll", "Set up your authenticator", "That code doesn't match. Check the time on your phone and try the next code.", enrollPage(key))
 		return
 	}
 
