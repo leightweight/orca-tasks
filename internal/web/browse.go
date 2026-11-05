@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/v2/parser"
+	"github.com/yuin/goldmark/v2/renderer/html"
 
 	"github.com/leightweight/orca-tasks/internal/store/db"
 )
@@ -43,12 +44,14 @@ type commentView struct {
 // markdown renders Markdown to HTML. goldmark drops raw HTML unless told
 // otherwise, so the result is safe to put in a page.
 func markdown(text string) template.HTML {
-	var html bytes.Buffer
-	if err := goldmark.Convert([]byte(text), &html); err != nil {
+	source := []byte(text)
+
+	var out bytes.Buffer
+	if err := html.New().Render(&out, source, parser.New().Parse(source)); err != nil {
 		return template.HTML(template.HTMLEscapeString(text))
 	}
 
-	return template.HTML(html.String())
+	return template.HTML(out.String())
 }
 
 // browse shows an issue read-only. Orca links each issue here.

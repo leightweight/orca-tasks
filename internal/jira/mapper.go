@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/v2/parser"
+	"github.com/yuin/goldmark/v2/renderer/html"
 
 	"github.com/leightweight/orca-tasks/internal/jql"
 	"github.com/leightweight/orca-tasks/internal/store"
@@ -138,12 +139,14 @@ func (s *Server) mapIssue(row db.VisibleIssuesRow, withDescription bool, attachm
 // renderMarkdown converts a description to HTML. goldmark drops raw HTML
 // unless told otherwise, so the result is safe to show.
 func renderMarkdown(text string) string {
-	var html bytes.Buffer
-	if err := goldmark.Convert([]byte(text), &html); err != nil {
+	source := []byte(text)
+
+	var out bytes.Buffer
+	if err := html.New().Render(&out, source, parser.New().Parse(source)); err != nil {
 		return ""
 	}
 
-	return html.String()
+	return out.String()
 }
 
 func (s *Server) mapComment(c db.ListCommentsRow) commentPayload {
