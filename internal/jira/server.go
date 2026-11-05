@@ -74,6 +74,10 @@ type Server struct {
 	Limiter   Limiter
 	ClientIP  func(*http.Request) string
 
+	// LocalCaller, when set, is who requests through the local socket act as.
+	// Only the socket's connections are marked local; see WithLocal.
+	LocalCaller func(ctx context.Context) (*Caller, error)
+
 	// SessionCaller returns the signed-in user of a web session, or nil. Only
 	// attachment downloads accept a session, so /browse can show images.
 	SessionCaller func(*http.Request) *Caller
@@ -88,6 +92,15 @@ type Server struct {
 // suppression.go.
 func (s *Server) SuppressCreatedDetail(window time.Duration) {
 	s.created = newCreatedIssueSuppression(window)
+}
+
+type localKey struct{}
+
+// WithLocal marks a connection's context as coming through the local socket,
+// whose file permissions already limit it to the machine's owner, so its
+// requests need no API key.
+func WithLocal(ctx context.Context) context.Context {
+	return context.WithValue(ctx, localKey{}, true)
 }
 
 // handler is a route with its caller authenticated.
@@ -112,6 +125,9 @@ func notFound(format string, args ...any) error {
 func forbidden(format string, args ...any) error {
 	return &httpError{status: http.StatusForbidden, message: fmt.Sprintf(format, args...)}
 }
+
+// Forbidden is a 403 with a message, for a LocalCaller to refuse with.
+func Forbidden(format string, args ...any) error { return forbidden(format, args...) }
 
 // Register adds the API's routes to a mux.
 func (s *Server) Register(mux *http.ServeMux) {
@@ -193,6 +209,11 @@ var errTooManyFailures = &httpError{status: http.StatusTooManyRequests, message:
 // the principal's username.
 func (s *Server) authenticate(r *http.Request) (*Caller, error) {
 	ctx := r.Context()
+
+	if local, _ := ctx.Value(localKey{}).(bool); local && s.LocalCaller != nil {
+		return s.LocalCaller(ctx)
+	}
+
 	ip := "ip:" + s.ClientIP(r)
 
 	if s.Limiter != nil && !s.Limiter.Allowed(ctx, ip) {

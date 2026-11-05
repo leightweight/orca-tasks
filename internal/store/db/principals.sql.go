@@ -469,6 +469,49 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 	return items, nil
 }
 
+const localAgent = `-- name: LocalAgent :one
+SELECT   a.id, a.kind, a.username, a.display_name, a.email, a.owner_id, a.site_admin, a.password_hash, a.totp_secret, a.totp_last_step, a.session_version, a.disabled_at, a.created_at, a.last_sign_in_at
+        ,u.username AS  owner_username
+FROM    principals  a
+JOIN    principals  u   ON  u.id = a.owner_id
+WHERE   a.username = u.username || '/agent'
+        AND a.disabled_at IS NULL
+        AND u.disabled_at IS NULL
+        AND u.kind = 'user'
+ORDER BY u.id
+LIMIT   1
+`
+
+type LocalAgentRow struct {
+	Principal     Principal
+	OwnerUsername string
+}
+
+// The agent requests through the local socket act as: the one named "agent"
+// that belongs to the first user, while both are enabled.
+func (q *Queries) LocalAgent(ctx context.Context) (LocalAgentRow, error) {
+	row := q.db.QueryRow(ctx, localAgent)
+	var i LocalAgentRow
+	err := row.Scan(
+		&i.Principal.ID,
+		&i.Principal.Kind,
+		&i.Principal.Username,
+		&i.Principal.DisplayName,
+		&i.Principal.Email,
+		&i.Principal.OwnerID,
+		&i.Principal.SiteAdmin,
+		&i.Principal.PasswordHash,
+		&i.Principal.TotpSecret,
+		&i.Principal.TotpLastStep,
+		&i.Principal.SessionVersion,
+		&i.Principal.DisabledAt,
+		&i.Principal.CreatedAt,
+		&i.Principal.LastSignInAt,
+		&i.OwnerUsername,
+	)
+	return i, err
+}
+
 const lockSetup = `-- name: LockSetup :exec
 SELECT  pg_advisory_xact_lock(7262797)
 `

@@ -215,6 +215,17 @@ func (w *Web) enroll(rw http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return err
 			}
+
+			if w.LocalAgent {
+				_, err := q.CreateAgent(ctx, db.CreateAgentParams{
+					Username:    user.Username + store.AgentSeparator + "agent",
+					DisplayName: "Agent",
+					OwnerID:     &user.ID,
+				})
+				if err != nil {
+					return err
+				}
+			}
 		case purposeReset:
 			// The link may have expired, or been used, since the form.
 			if _, err := q.GetResetLink(ctx, e.TokenHash); err != nil {

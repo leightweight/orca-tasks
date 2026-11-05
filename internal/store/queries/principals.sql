@@ -255,3 +255,17 @@ WHERE   principal_id = @principal_id
 -- Serializes first-run setup, so two requests at once create one
 -- administrator. The lock ends with the transaction.
 SELECT  pg_advisory_xact_lock(7262797);
+
+-- name: LocalAgent :one
+-- The agent requests through the local socket act as: the one named "agent"
+-- that belongs to the first user, while both are enabled.
+SELECT   sqlc.embed(a)
+        ,u.username AS  owner_username
+FROM    principals  a
+JOIN    principals  u   ON  u.id = a.owner_id
+WHERE   a.username = u.username || '/agent'
+        AND a.disabled_at IS NULL
+        AND u.disabled_at IS NULL
+        AND u.kind = 'user'
+ORDER BY u.id
+LIMIT   1;

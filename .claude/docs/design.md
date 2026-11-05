@@ -499,21 +499,64 @@ Creating an issue increments the project's `next_number` with `UPDATE ... RETURN
 
 Attachment contents live in the data directory, so backups must cover both the database and that directory.
 
+## Local mode
+
+`orca-tasks serve --local` runs the server on one person's machine, for someone who uses Orca alone and has no server to host it on.
+It needs no Docker and no configuration.
+
+```sh
+mise use -g packslip:github.com/leightweight/orca-tasks
+orca-tasks serve --local
+```
+
+- Everything lives in one directory, mode 0700: `$ORCA_TASKS_LOCAL_DIR`, or `orca-tasks` under `$XDG_DATA_HOME`, which defaults to `~/.local/share`.
+- Postgres runs embedded, through `fergusstrange/embedded-postgres`, which downloads a Postgres 18 build the first time and runs it as a child process.
+  It listens on 127.0.0.1, on a free port each run, with a password generated once and kept in the directory.
+- The secret key is generated the first time and kept in the directory, so there's nothing to configure.
+- The server listens on `127.0.0.1:8080`, and its base URL is `http://127.0.0.1:8080`, unless `--addr` or `--base-url` say otherwise.
+  Logs are text rather than JSON.
+- Setup is the same as on a shared server, password and TOTP included.
+  Skipping sign-in on 127.0.0.1 would let any website the person visits make requests to their task list from inside their browser.
+- Setup also creates an agent named `agent`.
+
+### The agent socket
+
+A local server also serves the API on a Unix socket, `agent.sock` in the local directory, with mode 0600.
+Requests through it act as the first user's `agent` agent, with no API key.
+The file mode limits it to the machine's owner, the same people who could read a key from their own environment.
+
+The CLI uses `ORCA_TASKS_URL` and `ORCA_TASKS_TOKEN` when they're set.
+Without them, it uses the local socket, so a Claude Code session on the same machine works with no credentials at all.
+`ORCA_TASKS_SOCKET` or `--socket` names another socket.
+
+### Keeping the data safe
+
+- embedded-postgres deletes a data directory whose `PG_VERSION` doesn't match the version it runs.
+  The server checks `PG_VERSION` first and refuses to start against a directory made by another Postgres version, so a version bump can never wipe someone's tasks.
+  Moving to a new Postgres version would need its own migration of the data directory.
+- A second `serve --local` refuses to start while one answers on the socket, since two servers can't share one database.
+- A server killed with `kill -9` leaves Postgres running and holding the data directory.
+  The next start stops that Postgres before starting its own, once it has checked that no server answers on the socket.
+- Ctrl-C stops Postgres and removes the socket.
+
+Backing up is copying the local directory while the server is stopped.
+
 ## Configuration
 
 The server reads its configuration from flags or environment variables.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `ORCA_TASKS_DATABASE_URL` | Required | Postgres connection URL. |
-| `ORCA_TASKS_BASE_URL` | Required | The URL users and Orca reach the server at, for links, TOTP labels, and secure cookies. |
-| `ORCA_TASKS_SECRET_KEY` | Required | 32 random bytes in base64 that encrypt TOTP secrets. |
-| `ORCA_TASKS_DATA_DIR` | `/data` | Directory holding attachment contents. |
+| `ORCA_TASKS_DATABASE_URL` | Required, except with `--local` | Postgres connection URL. |
+| `ORCA_TASKS_BASE_URL` | Required, except with `--local` | The URL users and Orca reach the server at, for links, TOTP labels, and secure cookies. |
+| `ORCA_TASKS_SECRET_KEY` | Required, except with `--local` | 32 random bytes in base64 that encrypt TOTP secrets. |
+| `ORCA_TASKS_DATA_DIR` | `/data`, or `attachments` in the local directory with `--local` | Directory holding attachment contents. |
 | `ORCA_TASKS_MAX_UPLOAD` | `25MiB` | Largest attachment accepted. |
 | `ORCA_TASKS_TRUSTED_PROXIES` | None | Proxies whose forwarding headers to trust, as comma-separated IPs and CIDRs, or `private` for the private, link-local, and unique local ranges. |
-| `ORCA_TASKS_ADDR` | `:8080` | Address to listen on. |
+| `ORCA_TASKS_ADDR` | `:8080`, or `127.0.0.1:8080` with `--local` | Address to listen on. |
 | `ORCA_TASKS_LOG_LEVEL` | `info` | Log level. |
-| `ORCA_TASKS_LOG_FORMAT` | `json` | Log format, `json` or `text`. |
+| `ORCA_TASKS_LOG_FORMAT` | `json`, or `text` with `--local` | Log format, `json` or `text`. |
+| `ORCA_TASKS_LOCAL_DIR` | `~/.local/share/orca-tasks` | The directory `--local` keeps everything in. |
 
 Losing the secret key makes every TOTP secret unreadable, so each user then needs a reset link.
 
@@ -552,6 +595,7 @@ The server builds links and decides whether cookies are `Secure` from `ORCA_TASK
 | Human-readable sizes and times | `github.com/dustin/go-humanize` |
 | SQL formatting | steveql-fmt |
 | Tests against Postgres | `github.com/testcontainers/testcontainers-go` |
+| Postgres in local mode | `github.com/fergusstrange/embedded-postgres` |
 
 ## Distribution
 

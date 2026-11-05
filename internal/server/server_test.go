@@ -60,18 +60,28 @@ type site struct {
 func newSite(t *testing.T) *site {
 	t.Helper()
 
+	return newSiteWith(t, func(*server.Config) {})
+}
+
+// newSiteWith is newSite with a change to the configuration.
+func newSiteWith(t *testing.T, configure func(*server.Config)) *site {
+	t.Helper()
+
 	listener := httptest.NewUnstartedServer(nil)
 	base := "http://" + listener.Listener.Addr().String()
 	c := &clock{now: time.Now()}
 
-	app, err := server.Build(testutil.Context(t), testutil.Store(t), server.Config{
+	cfg := server.Config{
 		BaseURL:               base,
 		SecretKey:             "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
 		DataDir:               t.TempDir(),
 		MaxUpload:             1 << 20,
 		SuppressCreatedDetail: 0,
 		Now:                   c.Now,
-	}, slog.New(slog.DiscardHandler))
+	}
+	configure(&cfg)
+
+	app, err := server.Build(testutil.Context(t), testutil.Store(t), cfg, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,5 +393,16 @@ func TestMemberActionsSkipAgents(t *testing.T) {
 
 	if r := alice.post("/projects/OPS/members/alice%2Fclaude/role", url.Values{"role": {"admin"}}); r.status != http.StatusNotFound {
 		t.Errorf("changing an agent's role: status %d, want 404", r.status)
+	}
+}
+
+func TestLocalSetupCreatesTheAgent(t *testing.T) {
+	t.Parallel()
+
+	s := newSiteWith(t, func(cfg *server.Config) { cfg.Socket = "/nonexistent/agent.sock" })
+	alice, _ := signUp(t, s)
+
+	if r := alice.get("/account/agents"); !strings.Contains(r.body, "alice/agent") {
+		t.Errorf("setup in local mode didn't create alice/agent: %.500s", r.body)
 	}
 }

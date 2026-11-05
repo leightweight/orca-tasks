@@ -69,6 +69,10 @@ type Web struct {
 	Sessions  *scs.SessionManager
 	SetupCode string
 
+	// LocalAgent makes setup also create an agent named "agent", which the local
+	// socket acts as.
+	LocalAgent bool
+
 	// Proxy describes how the server resolved a request's client address, for
 	// the administration page that checks it.
 	Proxy func(*http.Request) ProxyInfo

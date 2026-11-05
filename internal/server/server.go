@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -32,6 +33,11 @@ type Config struct {
 	TrustedProxies        string
 	SuppressCreatedDetail time.Duration
 
+	// Socket, when set, is local mode: setup also creates an agent named
+	// "agent", and Run serves the API on this Unix socket too, acting as that
+	// agent without an API key.
+	Socket string
+
 	// Now is the clock, for tests. Nil means time.Now.
 	Now func() time.Time
 }
@@ -46,6 +52,9 @@ type App struct {
 	Store *store.Store
 	Files *attachments.Dir
 	Log   *slog.Logger
+
+	// Socket is the local mode socket, or empty.
+	Socket string
 
 	limiter *Limiter
 }
@@ -112,16 +121,17 @@ func Build(ctx context.Context, s *store.Store, cfg Config, log *slog.Logger) (*
 	sessions := web.NewSessions(s, base.Scheme == "https")
 
 	w := &web.Web{
-		Store:    s,
-		Catalog:  catalog,
-		Box:      box,
-		BaseURL:  baseURL,
-		Limiter:  limiter,
-		ClientIP: clientIPs.Of,
-		Log:      log,
-		Now:      now,
-		Sessions: sessions,
-		Proxy:    clientIPs.describe,
+		Store:      s,
+		Catalog:    catalog,
+		Box:        box,
+		BaseURL:    baseURL,
+		Limiter:    limiter,
+		ClientIP:   clientIPs.Of,
+		Log:        log,
+		Now:        now,
+		Sessions:   sessions,
+		Proxy:      clientIPs.describe,
+		LocalAgent: cfg.Socket != "",
 	}
 
 	hasUsers, err := s.HasUsers(ctx)
@@ -149,6 +159,10 @@ func Build(ctx context.Context, s *store.Store, cfg Config, log *slog.Logger) (*
 		Now:           now,
 	}
 	api.SuppressCreatedDetail(cfg.SuppressCreatedDetail)
+
+	if cfg.Socket != "" {
+		api.LocalCaller = localCaller(s, baseURL)
+	}
 
 	mux := http.NewServeMux()
 	api.Register(mux)
@@ -178,6 +192,7 @@ func Build(ctx context.Context, s *store.Store, cfg Config, log *slog.Logger) (*
 	return &App{
 		Handler:   logRequests(log, clientIPs.Of, mux),
 		SetupCode: w.SetupCode,
+		Socket:    cfg.Socket,
 		Store:     s,
 		Files:     files,
 		Log:       log,
@@ -198,13 +213,32 @@ func (a *App) Run(ctx context.Context, addr string) error {
 		IdleTimeout:       2 * time.Minute,
 	}
 
-	failed := make(chan error, 1)
+	failed := make(chan error, 2)
 
 	go func() {
 		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			failed <- err
 		}
 	}()
+
+	var socket *http.Server
+
+	if a.Socket != "" {
+		listener, s, err := a.ListenSocket(ctx, a.Socket)
+		if err != nil {
+			return err
+		}
+
+		socket = s
+
+		go func() {
+			if err := socket.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
+				failed <- err
+			}
+		}()
+
+		a.Log.Info("agents on this machine can use the CLI without an API key", "socket", a.Socket)
+	}
 
 	a.Log.Info("serving", "addr", addr)
 
@@ -219,6 +253,11 @@ func (a *App) Run(ctx context.Context, addr string) error {
 	defer cancel()
 
 	_ = a.limiter.Close(shutdown)
+
+	if socket != nil {
+		_ = socket.Shutdown(shutdown)
+		_ = os.Remove(a.Socket)
+	}
 
 	return server.Shutdown(shutdown)
 }

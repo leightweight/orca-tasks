@@ -56,12 +56,7 @@ func usagef(format string, args ...any) error {
 func main() {
 	var cmd command
 
-	parser, err := kong.New(&cmd,
-		kong.Name("orca-tasks"),
-		kong.Description("A task tracker that serves a Jira-compatible API to Orca, and the CLI for it."),
-		kong.Vars{"version": version},
-		kong.UsageOnError(),
-	)
+	parser, err := newParser(&cmd)
 	if err != nil {
 		panic(err)
 	}
@@ -90,6 +85,17 @@ func main() {
 		fmt.Fprintln(os.Stderr, "orca-tasks:", err)
 		os.Exit(1)
 	}
+}
+
+// newParser builds the command line parser. Its tags are checked here, so a test
+// that builds it catches a bad tag before any command runs.
+func newParser(cmd *command, options ...kong.Option) (*kong.Kong, error) {
+	return kong.New(cmd, append([]kong.Option{
+		kong.Name("orca-tasks"),
+		kong.Description("A task tracker that serves a Jira-compatible API to Orca, and the CLI for it."),
+		kong.Vars{"version": version},
+		kong.UsageOnError(),
+	}, options...)...)
 }
 
 func newLogger(level, format string) (*slog.Logger, error) {

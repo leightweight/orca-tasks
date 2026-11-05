@@ -3,31 +3,40 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/dustin/go-humanize"
 
+	"github.com/leightweight/orca-tasks/internal/local"
 	"github.com/leightweight/orca-tasks/internal/server"
 	"github.com/leightweight/orca-tasks/internal/store"
 	"github.com/leightweight/orca-tasks/internal/web"
 )
 
 type serveCmd struct {
-	DatabaseURL    string `name:"database-url" env:"ORCA_TASKS_DATABASE_URL" required:"" placeholder:"URL" help:"Postgres connection URL."`
-	BaseURL        string `name:"base-url" env:"ORCA_TASKS_BASE_URL" required:"" placeholder:"URL" help:"The URL people and Orca reach the server at."`
-	SecretKey      string `env:"ORCA_TASKS_SECRET_KEY" required:"" placeholder:"BASE64" help:"32 random bytes in base64 that encrypt TOTP secrets. Keep a copy."`
-	DataDir        string `env:"ORCA_TASKS_DATA_DIR" default:"/data" type:"path" help:"Directory for attachment contents."`
+	Local bool `help:"Run on this machine for one person, with an embedded Postgres, and let your agents use the CLI without a key."`
+
+	DatabaseURL    string `name:"database-url" env:"ORCA_TASKS_DATABASE_URL" placeholder:"URL" help:"Postgres connection URL. Required without --local."`
+	BaseURL        string `name:"base-url" env:"ORCA_TASKS_BASE_URL" placeholder:"URL" help:"The URL people and Orca reach the server at. Needed without --local."`
+	SecretKey      string `env:"ORCA_TASKS_SECRET_KEY" placeholder:"BASE64" help:"32 random bytes in base64 that encrypt TOTP secrets. Required without --local."`
+	DataDir        string `env:"ORCA_TASKS_DATA_DIR" type:"path" help:"Directory for attachment contents. Defaults to /data."`
 	MaxUpload      string `env:"ORCA_TASKS_MAX_UPLOAD" default:"25MiB" help:"Largest attachment accepted."`
-	Addr           string `env:"ORCA_TASKS_ADDR" default:":8080" help:"Address to listen on."`
+	Addr           string `env:"ORCA_TASKS_ADDR" help:"Address to listen on. Defaults to :8080, or 127.0.0.1:8080 with --local."`
 	TrustedProxies string `env:"ORCA_TASKS_TRUSTED_PROXIES" placeholder:"LIST" help:"Proxies to trust X-Forwarded-For from: IPs and CIDRs, or \"private\"."`
 	LogLevel       string `env:"ORCA_TASKS_LOG_LEVEL" default:"info" enum:"debug,info,warn,error" help:"Log level."`
-	LogFormat      string `env:"ORCA_TASKS_LOG_FORMAT" default:"json" enum:"json,text" help:"Log format."`
+	LogFormat      string `env:"ORCA_TASKS_LOG_FORMAT" help:"Log format, json or text. Defaults to json, or text with --local."`
 
 	SuppressCreatedDetail time.Duration `default:"5s" help:"Fail Orca's detail read of a new issue for this long, to keep its Tasks pane closable. 0 is off."`
 }
 
 func (c *serveCmd) Run(ctx context.Context) error {
-	log, err := newLogger(c.LogLevel, c.LogFormat)
+	format := cmpOr(c.LogFormat, "json")
+	if c.Local {
+		format = cmpOr(c.LogFormat, "text")
+	}
+
+	log, err := newLogger(c.LogLevel, format)
 	if err != nil {
 		return err
 	}
@@ -37,21 +46,99 @@ func (c *serveCmd) Run(ctx context.Context) error {
 		return usagef("reading the upload limit: %w", err)
 	}
 
-	app, err := server.New(ctx, server.Config{
+	cfg := server.Config{
 		DatabaseURL:           c.DatabaseURL,
 		BaseURL:               c.BaseURL,
 		SecretKey:             c.SecretKey,
-		DataDir:               c.DataDir,
+		DataDir:               cmpOr(c.DataDir, "/data"),
 		MaxUpload:             int64(min(maxUpload, 1<<40)),
-		Addr:                  c.Addr,
+		Addr:                  cmpOr(c.Addr, ":8080"),
 		TrustedProxies:        c.TrustedProxies,
 		SuppressCreatedDetail: c.SuppressCreatedDetail,
-	}, log)
+	}
+
+	if c.Local {
+		stop, err := c.local(ctx, &cfg, log)
+		if err != nil {
+			return err
+		}
+		defer stop()
+	}
+
+	for flag, value := range map[string]string{"--database-url": cfg.DatabaseURL, "--base-url": cfg.BaseURL, "--secret-key": cfg.SecretKey} {
+		if value == "" {
+			return usagef("%s is required, unless you run with --local", flag)
+		}
+	}
+
+	app, err := server.New(ctx, cfg, log)
 	if err != nil {
 		return err
 	}
 
-	return app.Run(ctx, c.Addr)
+	if c.Local {
+		log.Info("connect Orca in Settings, then Integrations, then Jira, with an API key from the API keys page",
+			"site", cfg.BaseURL, "deployment", "Server / Data Center", "username", "(leave it empty)")
+	}
+
+	return app.Run(ctx, cfg.Addr)
+}
+
+// local fills in a local mode configuration: its own Postgres, attachments,
+// secret key, and agent socket, all in the local directory.
+func (c *serveCmd) local(ctx context.Context, cfg *server.Config, log *slog.Logger) (func(), error) {
+	if c.DatabaseURL != "" {
+		return nil, usagef("--local runs its own database, so leave out --database-url and ORCA_TASKS_DATABASE_URL")
+	}
+
+	dir, err := local.Dir()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := local.Prepare(dir); err != nil {
+		return nil, err
+	}
+
+	if err := local.CheckNotRunning(dir); err != nil {
+		return nil, err
+	}
+
+	if cfg.SecretKey == "" {
+		if cfg.SecretKey, err = local.SecretKey(dir); err != nil {
+			return nil, err
+		}
+	}
+
+	cfg.Addr = cmpOr(c.Addr, "127.0.0.1:8080")
+	cfg.BaseURL = cmpOr(c.BaseURL, "http://"+cfg.Addr)
+	cfg.DataDir = cmpOr(c.DataDir, local.AttachmentsDir(dir))
+	cfg.Socket = local.SocketPath(dir)
+
+	log.Info("starting Postgres; the first run downloads it", "dir", dir)
+
+	pg, err := local.StartPostgres(ctx, dir, log)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.DatabaseURL = pg.URL
+
+	return func() {
+		if err := pg.Stop(); err != nil {
+			log.Error("stopping Postgres", "error", err)
+		}
+	}, nil
+}
+
+func cmpOr(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+
+	return ""
 }
 
 type adminCmd struct {
