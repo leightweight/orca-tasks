@@ -56,6 +56,9 @@ func (s *Server) uploadAttachments(w http.ResponseWriter, r *http.Request, c *Ca
 		return err
 	}
 
+	// One request holds at most one file's worth, plus room for the form.
+	r.Body = http.MaxBytesReader(w, r.Body, s.MaxUpload+1<<20)
+
 	parts, err := r.MultipartReader()
 	if err != nil {
 		return badRequest("Uploads must be multipart/form-data: %s", err)
