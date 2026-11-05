@@ -54,3 +54,52 @@ jobs:
           digest="$(sed -n 's/^Digest: //p' .cache/release/helm-push.log)"
           if [ -z "$digest" ]; then echo "::error::helm push printed no digest."; exit 1; fi
           cosign sign --yes "${chart}@${digest}"
+
+  # Signs a packslip manifest of the CLI archives, so mise can install and
+  # verify them with packslip:github.com/leightweight/orca-tasks. This job
+  # can't change the release; the next one uploads the signed bundle.
+  packslip:
+    name: Sign the packslip
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Download the release's archives.
+      contents: read
+      # Sign with the workflow's identity.
+      id-token: write
+      # Attest the archives' build provenance.
+      attestations: write
+    steps:
+      - uses: jdx/packslip@44e50e5f64551234b4a382d991bd7f7f7d021d06 # v1.11.3
+        id: packslip
+        with:
+          download: orca-tasks_*.tar.gz
+          bin: orca-tasks
+          upload: false
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: packslip-bundle
+          path: ${{ steps.packslip.outputs.bundle }}
+          if-no-files-found: error
+
+  publish-packslip:
+    name: Publish the packslip
+    needs: packslip
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      # Upload the bundle to the release.
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: packslip-bundle
+          path: packslip
+      - name: Upload the signed bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -f packslip/packslip.sigstore.json
+          gh release upload "$GITHUB_REF_NAME" packslip/packslip.sigstore.json --repo "$GITHUB_REPOSITORY" --clobber

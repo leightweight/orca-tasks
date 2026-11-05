@@ -63,11 +63,16 @@ In Orca, open Settings, then Integrations, then Jira, and enter:
 ## Set up Claude Code
 
 Create an agent on the Agents page, such as `you-claude`, and an API key for it.
-Install the CLI with mise, or download it from the [releases](https://github.com/leightweight/orca-tasks/releases):
+Install the CLI with mise:
 
 ```sh
-mise use -g github:leightweight/orca-tasks
+mise use -g packslip:github.com/leightweight/orca-tasks
 ```
+
+Each release publishes a [packslip](https://packslip.dev), a signed list of its archives and their digests.
+mise checks that the release was signed by this repository's release workflow and that each download matches before it installs anything.
+mise skips releases less than a day old when it resolves `latest`, so name the version, as in `@0.1.0`, to install one sooner.
+The archives are also on the [releases](https://github.com/leightweight/orca-tasks/releases) page.
 
 Give it the server and the agent's key:
 

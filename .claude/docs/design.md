@@ -483,7 +483,9 @@ goreleaser builds releases from `v*` tags.
 A release publishes the following.
 
 - A multi-platform image for linux/amd64 and linux/arm64 on a distroless nonroot base, signed with cosign.
-- CLI archives for macOS and Linux on amd64 and arm64, so `mise use github:leightweight/orca-tasks` installs the CLI.
+- CLI archives for macOS and Linux on amd64 and arm64.
+- A [packslip](https://packslip.dev) for the archives, signed with the workflow's identity, so `mise use packslip:github.com/leightweight/orca-tasks` installs the CLI and verifies it.
+  A job that can't change the release signs it, and a separate job uploads it.
 - The Helm chart, signed with cosign.
 
 ### Helm chart
