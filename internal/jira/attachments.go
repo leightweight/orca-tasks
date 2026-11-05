@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 
@@ -133,10 +134,13 @@ func (s *Server) saveAttachment(r *http.Request, actor int64, issue db.Issue, pa
 	return attachment, nil
 }
 
+// maxFilename is the longest filename kept, in bytes.
+const maxFilename = 255
+
 // cleanFilename keeps the last path element and drops control characters, so
 // a filename is safe to show and to put in a header.
 func cleanFilename(name string) string {
-	name = path.Base(strings.ReplaceAll(name, `\`, "/"))
+	name = path.Base(strings.ReplaceAll(strings.ToValidUTF8(name, ""), `\`, "/"))
 	name = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || r == '"' {
 			return -1
@@ -149,8 +153,15 @@ func cleanFilename(name string) string {
 		name = "attachment"
 	}
 
-	if len(name) > 255 {
-		name = name[len(name)-255:]
+	// Keep the last 255 bytes, which hold the extension, starting on a
+	// character so a multibyte one isn't split.
+	if len(name) > maxFilename {
+		start := len(name) - maxFilename
+		for start < len(name) && !utf8.RuneStart(name[start]) {
+			start++
+		}
+
+		name = name[start:]
 	}
 
 	return name
