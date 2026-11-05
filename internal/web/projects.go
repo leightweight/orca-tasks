@@ -208,8 +208,9 @@ func (w *Web) changeMember(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Agents follow their owner's membership, so they aren't changed here.
 	user, err := w.Store.GetPrincipalByUsername(ctx, r.PathValue("username"))
-	if err != nil {
+	if err != nil || user.Kind != "user" {
 		w.notFound(rw, r)
 		return
 	}

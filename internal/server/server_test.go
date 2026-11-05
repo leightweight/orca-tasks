@@ -339,3 +339,49 @@ func TestFailedSignInsAreLimited(t *testing.T) {
 		t.Errorf("the twelfth failure wasn't limited: %.300s", last.body)
 	}
 }
+
+// signUp runs first-run setup for alice and returns her browser and secret.
+func signUp(t *testing.T, s *site) (*browser, string) {
+	t.Helper()
+
+	b := s.browser()
+	b.expectRedirect(b.post("/setup", url.Values{
+		"code": {s.setup}, "username": {"alice"}, "password": {"correct horse battery"}, "confirm": {"correct horse battery"},
+	}), "/enroll")
+
+	return b, b.enroll()
+}
+
+func TestPasswordStepExpires(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	_, secret := signUp(t, s)
+
+	b := s.browser()
+	b.expectRedirect(b.post("/login", url.Values{"username": {"alice"}, "password": {"correct horse battery"}}), "/login/totp")
+
+	s.clock.mu.Lock()
+	s.clock.now = s.clock.now.Add(11 * time.Minute)
+	s.clock.mu.Unlock()
+
+	b.expectRedirect(b.post("/login/totp", url.Values{"code": {b.code(secret)}}), "/login")
+
+	if r := b.get("/account"); r.status != http.StatusSeeOther {
+		t.Errorf("signed in after the password step expired: status %d", r.status)
+	}
+}
+
+func TestMemberActionsSkipAgents(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}}), "/projects/OPS")
+	alice.expectRedirect(alice.post("/account/agents", url.Values{"username": {"alice-claude"}}), "/account/agents")
+
+	if r := alice.post("/projects/OPS/members/alice-claude/role", url.Values{"role": {"admin"}}); r.status != http.StatusNotFound {
+		t.Errorf("changing an agent's role: status %d, want 404", r.status)
+	}
+}

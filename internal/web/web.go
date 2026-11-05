@@ -39,10 +39,13 @@ const (
 	sessionUser    = "user"
 	sessionVersion = "version"
 	sessionPending = "pending"
-	sessionEnroll  = "enroll"
-	sessionFlash   = "flash"
-	sessionReveal  = "reveal"
-	sessionNext    = "next"
+
+	sessionPendingVersion = "pending_version"
+	sessionPendingUntil   = "pending_until"
+	sessionEnroll         = "enroll"
+	sessionFlash          = "flash"
+	sessionReveal         = "reveal"
+	sessionNext           = "next"
 )
 
 func init() {
@@ -440,6 +443,8 @@ func (w *Web) signIn(ctx context.Context, user db.Principal) error {
 	}
 
 	w.Sessions.Remove(ctx, sessionPending)
+	w.Sessions.Remove(ctx, sessionPendingVersion)
+	w.Sessions.Remove(ctx, sessionPendingUntil)
 	w.Sessions.Remove(ctx, sessionEnroll)
 	w.Sessions.Put(ctx, sessionUser, user.ID)
 	w.Sessions.Put(ctx, sessionVersion, int64(user.SessionVersion))

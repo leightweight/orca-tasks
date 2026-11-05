@@ -56,8 +56,14 @@ func (w *Web) changePassword(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := currentUser(ctx)
 
+	keys := []string{"ip:" + w.ClientIP(r), "user:" + user.Username}
+	if !w.Limiter.Allowed(ctx, keys...) {
+		w.redirect(rw, r, "/account", capitalize(errTooManyAttempts.Error())+".")
+		return
+	}
+
 	if user.PasswordHash == nil || !auth.CheckPassword(r.PostFormValue("current"), *user.PasswordHash) {
-		w.Limiter.Failed(ctx, "ip:"+w.ClientIP(r), "user:"+user.Username)
+		w.Limiter.Failed(ctx, keys...)
 		w.redirect(rw, r, "/account", "Your current password is wrong.")
 
 		return

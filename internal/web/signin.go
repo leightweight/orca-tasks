@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -17,6 +18,9 @@ import (
 
 // TOTPIssuer names the account in authenticator apps.
 const TOTPIssuer = "orca-tasks"
+
+// pendingLifetime is how long a correct password waits for its TOTP code.
+const pendingLifetime = 10 * time.Minute
 
 // Enrollment purposes.
 const (
@@ -371,6 +375,8 @@ func (w *Web) login(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Sessions.Put(ctx, sessionPending, user.ID)
+	w.Sessions.Put(ctx, sessionPendingVersion, int64(user.SessionVersion))
+	w.Sessions.Put(ctx, sessionPendingUntil, w.Now().Add(pendingLifetime).Unix())
 	http.Redirect(rw, r, "/login/totp", http.StatusSeeOther)
 }
 
@@ -395,6 +401,16 @@ func (w *Web) loginTOTP(rw http.ResponseWriter, r *http.Request) {
 	user, err := w.Store.GetPrincipal(ctx, id)
 	if err != nil {
 		w.serverError(rw, r, err)
+		return
+	}
+
+	// The password step expires, and a password change or a disabled account
+	// since then sends the user back to it.
+	if w.Now().Unix() > w.Sessions.GetInt64(ctx, sessionPendingUntil) || user.DisabledAt != nil ||
+		int64(user.SessionVersion) != w.Sessions.GetInt64(ctx, sessionPendingVersion) {
+		w.Sessions.Remove(ctx, sessionPending)
+		w.redirect(rw, r, "/login", "Sign in again: the password step expired.")
+
 		return
 	}
 
