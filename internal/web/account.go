@@ -77,6 +77,11 @@ func (w *Web) changePassword(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := w.checkSecondFactor(ctx, r, *user, false); err != nil {
+		if !codeProblem(err) {
+			w.serverError(rw, r, err)
+			return
+		}
+
 		w.redirect(rw, r, "/account", "The password wasn't changed: "+err.Error()+".")
 		return
 	}
@@ -107,6 +112,11 @@ func (w *Web) newRecoveryCodes(rw http.ResponseWriter, r *http.Request) {
 	user := currentUser(ctx)
 
 	if err := w.checkSecondFactor(ctx, r, *user, false); err != nil {
+		if !codeProblem(err) {
+			w.serverError(rw, r, err)
+			return
+		}
+
 		w.redirect(rw, r, "/account", "No new codes: "+err.Error()+".")
 		return
 	}
@@ -229,6 +239,11 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 
 	// The code comes last, so a mistake elsewhere in the form doesn't use it up.
 	if err := w.checkSecondFactor(ctx, r, *user, false); err != nil {
+		if !codeProblem(err) {
+			w.serverError(rw, r, err)
+			return
+		}
+
 		w.redirect(rw, r, "/account/keys", "No key was created: "+err.Error()+".")
 		return
 	}

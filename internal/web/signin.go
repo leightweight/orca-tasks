@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"errors"
+	"fmt"
 	"html/template"
 	"net/http"
 	"strings"
@@ -483,6 +484,11 @@ func (w *Web) loginTOTP(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := w.checkSecondFactor(ctx, r, user, true); err != nil {
+		if !codeProblem(err) {
+			w.serverError(rw, r, err)
+			return
+		}
+
 		w.fail(rw, r, "login_totp", "Two-factor authentication", err.Error(), nil)
 		return
 	}
@@ -515,26 +521,39 @@ func (w *Web) checkSecondFactor(ctx context.Context, r *http.Request, user db.Pr
 		return errTooManyAttempts
 	}
 
+	passed, err := w.useSecondFactor(ctx, r, user, allowRecovery)
+	if err != nil || passed {
+		// Only a wrong code counts; a server error gives the attempt back too.
+		w.Limiter.Succeeded(ctx, keys...)
+		return err
+	}
+
+	return errWrongCode
+}
+
+// errWrongCode is a TOTP or recovery code that doesn't match.
+var errWrongCode = errors.New("that code doesn't match")
+
+// codeProblem reports whether a second factor failed by the person's mistake,
+// which they should see, rather than the server's, which goes to the log.
+func codeProblem(err error) bool {
+	return errors.Is(err, errWrongCode) || errors.Is(err, errTooManyAttempts)
+}
+
+// useSecondFactor checks a code and uses it up, reporting whether it passed.
+// An error is the server's, not a wrong code.
+func (w *Web) useSecondFactor(ctx context.Context, r *http.Request, user db.Principal, allowRecovery bool) (bool, error) {
 	code := strings.TrimSpace(r.PostFormValue("code"))
-	wrong := errors.New("that code doesn't match")
 
 	if allowRecovery && len(strings.ReplaceAll(code, " ", "")) > 6 {
 		n, err := w.Store.UseRecoveryCode(ctx, db.UseRecoveryCodeParams{PrincipalID: user.ID, CodeHash: auth.HashRecoveryCode(user.ID, code)})
-		if err != nil {
-			return err
-		}
 
-		if n == 1 {
-			w.Limiter.Succeeded(ctx, keys...)
-			return nil
-		}
-
-		return wrong
+		return n == 1, err
 	}
 
 	secret, err := w.Box.Open(user.TotpSecret)
 	if err != nil {
-		return err
+		return false, fmt.Errorf("reading %s's TOTP secret: %w", user.Username, err)
 	}
 
 	step, valid := auth.CheckTOTP(string(secret), code, w.Now(), user.TotpLastStep)
@@ -542,17 +561,11 @@ func (w *Web) checkSecondFactor(ctx context.Context, r *http.Request, user db.Pr
 		// The update only matches when the step is newer than the last one
 		// used, so two requests racing with the same code can't both pass.
 		n, err := w.Store.UseTOTPStep(ctx, db.UseTOTPStepParams{ID: user.ID, Step: step})
-		if err != nil {
-			return err
-		}
 
-		if n == 1 {
-			w.Limiter.Succeeded(ctx, keys...)
-			return nil
-		}
+		return n == 1, err
 	}
 
-	return wrong
+	return false, nil
 }
 
 func (w *Web) logout(rw http.ResponseWriter, r *http.Request) {
