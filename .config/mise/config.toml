@@ -4,6 +4,7 @@ experimental = true
 
 [tools]
 cosign = "3.1.4"
+docker-compose = "5.7.0"
 go = "1.27.3"
 golangci-lint = "2.15.0"
 goreleaser = "2.19.0"
@@ -51,3 +52,12 @@ run = 'docker build -t "${usage_image}" .'
 [tasks."release:snapshot"]
 description = "Build the release binaries and images locally without publishing them"
 run = "goreleaser release --snapshot --clean"
+
+[tasks.up]
+description = "Build the image and run it with Postgres on http://localhost:8090"
+run = "docker-compose up --build"
+
+[tasks.down]
+description = "Stop the local server and Postgres, keeping their data"
+usage = 'flag "--wipe" help="Also delete the database and attachments"'
+run = 'if [ "${usage_wipe:-false}" = true ]; then docker-compose down --volumes; else docker-compose down; fi'

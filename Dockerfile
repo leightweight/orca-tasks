@@ -15,6 +15,9 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -trimpat
 
 FROM gcr.io/distroless/static:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
 COPY --from=builder /workspace/orca-tasks /orca-tasks
+# The attachment directory, owned by the nonroot user so a Docker volume mounted
+# there starts out writable.
+COPY --chown=65532:65532 .config/docker/data /data
 USER 65532:65532
 EXPOSE 8080
 ENTRYPOINT ["/orca-tasks"]

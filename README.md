@@ -98,6 +98,19 @@ If the only administrator loses their password and recovery codes, print a reset
 kubectl exec deploy/orca-tasks -- /orca-tasks admin reset-link USERNAME
 ```
 
+## Try it locally
+
+[`compose.yml`](compose.yml) runs the server and Postgres on this machine:
+
+```sh
+mise run up            # build the image and start both
+mise run down          # stop them, keeping the data
+mise run down --wipe   # stop them and delete the data
+```
+
+Open <http://localhost:8090/setup> and enter the setup code from the log.
+The compose file uses a public secret key, so don't keep real tasks there.
+
 ## Development
 
 The toolchain and tasks live in mise.

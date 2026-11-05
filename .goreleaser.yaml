@@ -38,6 +38,8 @@ dockers_v2:
     tags:
       - "{{ .Version }}"
     dockerfile: Dockerfile.release
+    extra_files:
+      - .config/docker
     platforms:
       - linux/amd64
       - linux/arm64

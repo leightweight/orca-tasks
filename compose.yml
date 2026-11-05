@@ -1,0 +1,44 @@
+# Runs orca-tasks and Postgres on this machine, for trying it out:
+#
+#   mise run up
+#
+# then open http://localhost:8090/setup with the setup code from the log.
+# It uses port 8090, so it can run beside anything already on 8080.
+# The secret key below is public, so don't use this setup for real data.
+name: orca-tasks
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: orca
+      POSTGRES_PASSWORD: orca
+      POSTGRES_DB: orca
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "orca", "-d", "orca"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  orca-tasks:
+    build: .
+    image: orca-tasks:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8090:8080"
+    environment:
+      ORCA_TASKS_DATABASE_URL: postgres://orca:orca@postgres:5432/orca?sslmode=disable
+      ORCA_TASKS_BASE_URL: http://localhost:8090
+      ORCA_TASKS_SECRET_KEY: bG9jYWwtb25seS1rZXktZm9yLWNvbXBvc2UtdGVzdHM=
+      ORCA_TASKS_LOG_FORMAT: text
+    volumes:
+      - data:/data
+    read_only: true
+
+volumes:
+  postgres:
+  data:

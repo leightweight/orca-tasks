@@ -22,6 +22,9 @@ If a task you need doesn't exist, add it to `.config/mise/config.toml` and list 
 - `mise run lint`: run all linters.
 - `mise run lint-fix` (alias `fix`): run all linters and apply fixes.
 - `mise run docker-build [image]`: build the image from source.
+- `mise run up`: build the image and run it with Postgres through `compose.yml`, on <http://localhost:8090>.
+  `mise run down` stops them, and `mise run down --wipe` also deletes their data.
+  mise installs `docker-compose`, so the tasks don't depend on a Compose plugin.
 - `mise run release:snapshot`: build the release binaries and images locally without publishing them.
   The output goes in `.cache/dist/`.
 - Pushing a `v*` tag publishes a release through `.github/workflows/release.yml`.
