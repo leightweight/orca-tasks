@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · orca-tasks</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="/">orca-tasks</a>
+  {{with .User}}
+  <nav>
+    <a href="/projects">Projects</a>
+    <a href="/account">Account</a>
+    <a href="/account/keys">API keys</a>
+    <a href="/account/agents">Agents</a>
+    {{if .SiteAdmin}}<a href="/admin/users">Users</a><a href="/admin/projects">All projects</a>{{end}}
+    <form method="post" action="/logout"><button class="link">Sign out {{.Username}}</button></form>
+  </nav>
+  {{end}}
+</header>
+<main>
+  <h1>{{.Title}}</h1>
+  {{with .Flash}}<p class="flash">{{.}}</p>{{end}}
+  {{with .Error}}<p class="error">{{.}}</p>{{end}}
+  {{with .Reveal}}
+  <section class="reveal">
+    <h2>{{.Title}}</h2>
+    <p>{{.Note}}</p>
+    {{range .Lines}}<pre>{{.}}</pre>{{end}}
+  </section>
+  {{end}}
+  {{template "content" .}}
+</main>
+</body>
+</html>

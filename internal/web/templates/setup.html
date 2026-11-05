@@ -1,0 +1,15 @@
+{{define "content"}}
+<p>Create the first account. It becomes the site administrator.</p>
+<p>The setup code is in the server's log, on the line that says to open this page.</p>
+<form method="post" class="stack">
+  <label>Setup code <input name="code" required autocomplete="off"></label>
+  {{template "credentials" .}}
+  <button>Continue</button>
+</form>
+{{end}}
+{{define "credentials"}}
+  <label>Username <input name="username" required value="{{.Data.Username}}" autocomplete="username"></label>
+  <label>Display name <input name="display_name" value="{{.Data.DisplayName}}"></label>
+  <label>Password <input name="password" type="password" required minlength="12" autocomplete="new-password"></label>
+  <label>Password again <input name="confirm" type="password" required minlength="12" autocomplete="new-password"></label>
+{{end}}

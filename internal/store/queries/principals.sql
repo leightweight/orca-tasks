@@ -250,3 +250,8 @@ UPDATE  reset_links
 SET     used_at = NOW()
 WHERE   principal_id = @principal_id
         AND used_at IS NULL;
+
+-- name: LockSetup :exec
+-- Serializes first-run setup, so two requests at once create one
+-- administrator. The lock ends with the transaction.
+SELECT  pg_advisory_xact_lock(7262797);

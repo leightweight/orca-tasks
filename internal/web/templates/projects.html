@@ -1,0 +1,35 @@
+{{define "content"}}
+<section>
+  <h2>Create a project</h2>
+  <form method="post" class="inline">
+    <label>Key <input name="key" required placeholder="OPS" pattern="[A-Za-z][A-Za-z0-9_]*" maxlength="20"></label>
+    <label>Name <input name="name" placeholder="Operations"></label>
+    <button>Create</button>
+  </form>
+</section>
+<section>
+  <h2>Your projects</h2>
+  <p class="note">Each key is yours: other members can see the same project under a different key. Issue keys follow yours, such as <code>OPS-12</code>.</p>
+  <table>
+    <thead><tr><th>Your key</th><th>Name</th><th>Role</th><th>Issues</th><th>Members</th><th>Change your key</th></tr></thead>
+    <tbody>
+    {{range .Data.Projects}}
+      <tr>
+        <td><a href="/projects/{{.Membership.Key}}">{{.Membership.Key}}</a></td>
+        <td>{{.Project.Name}}</td>
+        <td>{{.Membership.Role}}</td>
+        <td>{{.Issues}}</td>
+        <td>{{.Members}}</td>
+        <td>
+          <form method="post" action="/projects/{{.Membership.Key}}/key" class="inline">
+            <input name="key" value="{{.Membership.Key}}" required maxlength="20" size="8"><button>Change</button>
+          </form>
+        </td>
+      </tr>
+    {{else}}
+      <tr><td colspan="6">You aren't in any projects yet.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</section>
+{{end}}

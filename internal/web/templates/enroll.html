@@ -1,0 +1,9 @@
+{{define "content"}}
+<p>Scan this code with an authenticator app, such as 1Password or Google Authenticator, then enter the six-digit code it shows.</p>
+<img class="qr" src="{{.Data.QRCode}}" alt="TOTP QR code" width="200" height="200">
+<p>Or enter this secret by hand: <code>{{.Data.Secret}}</code></p>
+<form method="post" class="stack">
+  <label>Code <input name="code" required inputmode="numeric" autocomplete="one-time-code" autofocus></label>
+  <button>Finish</button>
+</form>
+{{end}}

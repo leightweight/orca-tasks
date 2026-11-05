@@ -1,0 +1,48 @@
+{{define "content"}}
+<section>
+  <h2>Create a user</h2>
+  <p class="note">You'll get a link to give them. It lets them choose a password and set up their authenticator, and lasts 24 hours.</p>
+  <form method="post" class="inline">
+    <label>Username <input name="username" required></label>
+    <label>Display name <input name="display_name"></label>
+    <label>Email <input name="email" type="email"></label>
+    <label class="check"><input type="checkbox" name="admin" value="1"> Site administrator</label>
+    <button>Create</button>
+  </form>
+</section>
+<section>
+  <h2>Users</h2>
+  <table>
+    <thead><tr>
+      <th>Username</th><th>Name</th><th>Projects</th><th>Agents</th><th>Keys</th><th>Reported</th><th>Assigned</th>
+      <th>Comments</th><th>Attachments</th><th>Data</th><th>Last sign-in</th><th>Last key use</th><th></th>
+    </tr></thead>
+    <tbody>
+    {{range .Data.Users}}
+      <tr{{if .Principal.DisabledAt}} class="muted"{{end}}>
+        <td>{{.Principal.Username}}{{if .Principal.SiteAdmin}} (admin){{end}}{{if .Principal.DisabledAt}} (disabled){{end}}{{if not .Principal.TotpSecret}} (invited){{end}}</td>
+        <td>{{.Principal.DisplayName}}</td>
+        <td>{{.Projects}}</td>
+        <td>{{.Agents}}</td>
+        <td>{{.ActiveKeys}}</td>
+        <td>{{.IssuesReported}}</td>
+        <td>{{.IssuesAssigned}}</td>
+        <td>{{.Comments}}</td>
+        <td>{{.Attachments}}</td>
+        <td>{{bytes .Bytes}}</td>
+        <td>{{if .Principal.LastSignInAt}}{{ago .Principal.LastSignInAt}}{{else}}Never{{end}}</td>
+        <td>{{if eq .LastKeyUse.Unix 0}}Never{{else}}{{ago .LastKeyUse}}{{end}}</td>
+        <td class="actions">
+          {{if ne .Principal.ID $.User.ID}}
+          <form method="post" action="/admin/users/{{.Principal.ID}}/{{if .Principal.DisabledAt}}enable{{else}}disable{{end}}"><button>{{if .Principal.DisabledAt}}Enable{{else}}Disable{{end}}</button></form>
+          <form method="post" action="/admin/users/{{.Principal.ID}}/{{if .Principal.SiteAdmin}}unadmin{{else}}admin{{end}}"><button>{{if .Principal.SiteAdmin}}Remove admin{{else}}Make admin{{end}}</button></form>
+          {{end}}
+          <form method="post" action="/admin/users/{{.Principal.ID}}/reset"><button>Reset link</button></form>
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  <p class="note">Data is the size of the descriptions, comments, and attachments from each user and their agents.</p>
+</section>
+{{end}}

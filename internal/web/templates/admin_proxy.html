@@ -1,0 +1,12 @@
+{{define "content"}}
+<p>Check that the server sees your own address, not your ingress's. Sign-in limits count per client address, so a wrong setting makes every client share one count.</p>
+<table>
+  <tbody>
+    <tr><th>Connecting address</th><td><code>{{.Data.Peer}}</code>{{if .Data.PeerTrusted}} (trusted){{else}} (not trusted){{end}}</td></tr>
+    <tr><th>Resolved client address</th><td><code>{{.Data.Client}}</code></td></tr>
+    <tr><th>Trusted ranges</th><td>{{range .Data.Trusted}}<code>{{.}}</code> {{end}}</td></tr>
+    {{range .Data.Headers}}<tr><th>{{.Name}}</th><td><code>{{.Value}}</code></td></tr>{{end}}
+  </tbody>
+</table>
+<p class="note">Set <code>ORCA_TASKS_TRUSTED_PROXIES</code> to your ingress's addresses, or <code>private</code>, if the resolved address is the ingress's.</p>
+{{end}}

@@ -1,0 +1,38 @@
+{{define "content"}}
+<p>An agent, such as Claude, works for you under its own name, so its tasks and comments show as its own.
+It can reach exactly the projects you can. Create API keys for it on the <a href="/account/keys">API keys</a> page.</p>
+<section>
+  <h2>Create an agent</h2>
+  <form method="post" class="inline">
+    <label>Username <input name="username" required placeholder="{{.User.Username}}-claude"></label>
+    <label>Display name <input name="display_name" placeholder="Claude"></label>
+    <button>Create</button>
+  </form>
+</section>
+<section>
+  <h2>Agents</h2>
+  <table>
+    <thead><tr><th>Username</th><th>Display name</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {{range .Data.Agents}}
+      <tr>
+        <td>{{.Username}}</td>
+        <td>
+          <form method="post" action="/account/agents/{{.ID}}/rename" class="inline">
+            <input name="display_name" value="{{.DisplayName}}" required><button>Rename</button>
+          </form>
+        </td>
+        <td>{{if .DisabledAt}}Disabled{{else}}Active{{end}}</td>
+        <td>
+          <form method="post" action="/account/agents/{{.ID}}/{{if .DisabledAt}}enable{{else}}disable{{end}}">
+            <button>{{if .DisabledAt}}Enable{{else}}Disable{{end}}</button>
+          </form>
+        </td>
+      </tr>
+    {{else}}
+      <tr><td colspan="4">No agents yet.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</section>
+{{end}}

@@ -1,0 +1,52 @@
+{{define "content"}}
+<p>Orca and the CLI sign in with an API key. In Orca, open Settings, then Integrations, then Jira.
+Enter <code>{{.BaseURL}}</code> as the site, choose Server / Data Center, leave the username empty, and paste a key as the token.</p>
+<section>
+  <h2>Create a key</h2>
+  <form method="post" class="stack">
+    <label>Name <input name="name" required placeholder="laptop"></label>
+    <label>For
+      <select name="principal">
+        <option value="{{.User.ID}}">{{.User.Username}} (you)</option>
+        {{range .Data.Agents}}{{if not .DisabledAt}}<option value="{{.ID}}">{{.Username}} (agent)</option>{{end}}{{end}}
+      </select>
+    </label>
+    <label>Access
+      <select name="access"><option value="write">Read and write</option><option value="read">Read only</option></select>
+    </label>
+    <fieldset>
+      <legend>Projects</legend>
+      <label class="check"><input type="radio" name="scope" value="all" checked> All of them, including ones joined later</label>
+      <label class="check"><input type="radio" name="scope" value="some"> Only these:</label>
+      {{range .Data.Projects}}<label class="check indent"><input type="checkbox" name="project" value="{{.Project.ID}}"> {{.Membership.Key}}: {{.Project.Name}}</label>{{end}}
+    </fieldset>
+    <label>Expires
+      <select name="expires"><option value="0">Never</option><option value="30">In 30 days</option><option value="90">In 90 days</option><option value="365">In a year</option></select>
+    </label>
+    <label>Authenticator code <input name="code" required inputmode="numeric" autocomplete="one-time-code"></label>
+    <button>Create key</button>
+  </form>
+</section>
+<section>
+  <h2>Keys</h2>
+  <table>
+    <thead><tr><th>Name</th><th>For</th><th>Access</th><th>Projects</th><th>Created</th><th>Last used</th><th>Expires</th><th></th></tr></thead>
+    <tbody>
+    {{range .Data.Keys}}
+      <tr{{if .ApiKey.RevokedAt}} class="muted"{{end}}>
+        <td>{{.ApiKey.Name}}</td>
+        <td>{{.Username}}</td>
+        <td>{{if .ApiKey.ReadOnly}}Read only{{else}}Read and write{{end}}</td>
+        <td>{{if .ApiKey.AllProjects}}All{{else}}{{join .ProjectKeys ", "}}{{end}}</td>
+        <td>{{ago .ApiKey.CreatedAt}}</td>
+        <td>{{if .ApiKey.LastUsedAt}}{{ago .ApiKey.LastUsedAt}}{{else}}Never{{end}}</td>
+        <td>{{if .ApiKey.RevokedAt}}Revoked{{else if .ApiKey.ExpiresAt}}{{ago .ApiKey.ExpiresAt}}{{else}}Never{{end}}</td>
+        <td>{{if not .ApiKey.RevokedAt}}<form method="post" action="/account/keys/{{.ApiKey.ID}}/revoke"><button class="danger">Revoke</button></form>{{end}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="8">No keys yet.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</section>
+{{end}}

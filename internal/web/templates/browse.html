@@ -1,0 +1,24 @@
+{{define "content"}}
+<dl class="fields">
+  <dt>Status</dt><dd>{{.Data.Status}}</dd>
+  <dt>Type</dt><dd>{{.Data.Type}}</dd>
+  <dt>Priority</dt><dd>{{or .Data.Priority "None"}}</dd>
+  <dt>Assignee</dt><dd>{{or .Data.Assignee "Unassigned"}}</dd>
+  <dt>Reporter</dt><dd>{{.Data.Reporter}}</dd>
+  {{with .Data.Labels}}<dt>Labels</dt><dd>{{join . ", "}}</dd>{{end}}
+  <dt>Updated</dt><dd>{{ago .Data.Updated}}</dd>
+</dl>
+{{with .Data.Description}}<section class="markdown">{{.}}</section>{{end}}
+{{with .Data.Attachments}}
+<section>
+  <h2>Attachments</h2>
+  <ul>{{range .}}<li><a href="{{.URL}}">{{.Name}}</a> ({{bytes .Size}})</li>{{end}}</ul>
+</section>
+{{end}}
+{{with .Data.Comments}}
+<section>
+  <h2>Comments</h2>
+  {{range .}}<article class="comment"><header>{{.Author}}, {{ago .Created}}</header><div class="markdown">{{.Body}}</div></article>{{end}}
+</section>
+{{end}}
+{{end}}

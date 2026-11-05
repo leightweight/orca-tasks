@@ -1,0 +1,60 @@
+{{define "content"}}
+{{$admin := eq .Data.Membership.Role "admin"}}
+<p>Project key <code>{{.Data.Project.Key}}</code>, which you see as <code>{{.Data.Membership.Key}}</code>. {{.Data.Issues}} issues.</p>
+{{if $admin}}
+<section>
+  <h2>Rename</h2>
+  <form method="post" action="/projects/{{.Data.Membership.Key}}/rename" class="inline">
+    <input name="name" value="{{.Data.Project.Name}}" required><button>Rename</button>
+  </form>
+</section>
+{{end}}
+<section>
+  <h2>Members</h2>
+  <table>
+    <thead><tr><th>Username</th><th>Display name</th><th>Role</th><th></th></tr></thead>
+    <tbody>
+    {{range .Data.Members}}
+      <tr>
+        <td>{{.Principal.Username}}</td>
+        <td>{{.Principal.DisplayName}}</td>
+        <td>
+          {{if $admin}}
+          <form method="post" action="/projects/{{$.Data.Membership.Key}}/members/{{.Principal.Username}}/role" class="inline">
+            <select name="role">
+              <option value="member"{{if eq .Membership.Role "member"}} selected{{end}}>member</option>
+              <option value="admin"{{if eq .Membership.Role "admin"}} selected{{end}}>admin</option>
+            </select><button>Change</button>
+          </form>
+          {{else}}{{.Membership.Role}}{{end}}
+        </td>
+        <td>
+          {{if or $admin (eq .Principal.ID $.User.ID)}}
+          <form method="post" action="/projects/{{$.Data.Membership.Key}}/members/{{.Principal.Username}}/remove">
+            <button class="danger">{{if eq .Principal.ID $.User.ID}}Leave{{else}}Remove{{end}}</button>
+          </form>
+          {{end}}
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{if $admin}}
+  <form method="post" action="/projects/{{.Data.Membership.Key}}/members" class="inline">
+    <label>Username <input name="username" required></label>
+    <select name="role"><option value="member">member</option><option value="admin">admin</option></select>
+    <button>Add member</button>
+  </form>
+  {{end}}
+</section>
+{{if $admin}}
+<section>
+  <h2>Delete</h2>
+  <p>Deleting the project deletes its issues, comments, history, and attachments. There is no undo.</p>
+  <form method="post" action="/projects/{{.Data.Membership.Key}}/delete" class="inline">
+    <label>Type <code>{{.Data.Membership.Key}}</code> to confirm <input name="confirm" required></label>
+    <button class="danger">Delete project</button>
+  </form>
+</section>
+{{end}}
+{{end}}

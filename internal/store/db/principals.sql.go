@@ -469,6 +469,17 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 	return items, nil
 }
 
+const lockSetup = `-- name: LockSetup :exec
+SELECT  pg_advisory_xact_lock(7262797)
+`
+
+// Serializes first-run setup, so two requests at once create one
+// administrator. The lock ends with the transaction.
+func (q *Queries) LockSetup(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockSetup)
+	return err
+}
+
 const recordSignIn = `-- name: RecordSignIn :exec
 UPDATE  principals
 SET     last_sign_in_at = NOW()

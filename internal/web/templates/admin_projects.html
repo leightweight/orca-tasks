@@ -1,0 +1,32 @@
+{{define "content"}}
+<p class="note">Administrators see every project's members and counts, but read its issues only as a member. Add yourself to reach one whose administrators have left.</p>
+<table>
+  <thead><tr><th>ID</th><th>Key</th><th>Name</th><th>Issues</th><th>Members</th><th>Add a member</th><th>Delete</th></tr></thead>
+  <tbody>
+  {{range .Data.Projects}}
+    <tr>
+      <td>{{.Project.ID}}</td>
+      <td>{{.Project.Key}}</td>
+      <td>{{.Project.Name}}</td>
+      <td>{{.Issues}}</td>
+      <td>{{join .Members ", "}}</td>
+      <td>
+        <form method="post" action="/admin/projects/{{.Project.ID}}/members" class="inline">
+          <input name="username" required size="10" placeholder="username">
+          <select name="role"><option value="admin">admin</option><option value="member">member</option></select>
+          <button>Add</button>
+        </form>
+      </td>
+      <td>
+        <form method="post" action="/admin/projects/{{.Project.ID}}/delete" class="inline">
+          <input name="confirm" required size="8" placeholder="{{.Project.Key}}" aria-label="Type {{.Project.Key}} to confirm">
+          <button class="danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+  {{else}}
+    <tr><td colspan="7">No projects yet.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
