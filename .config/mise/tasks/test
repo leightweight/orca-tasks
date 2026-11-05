@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#MISE description="Run the tests"
+set -euo pipefail
+
+# testcontainers only reads DOCKER_HOST, so point it at the current Docker
+# context, such as Colima's, when it isn't set.
+if [[ -z "${DOCKER_HOST:-}" ]] && command -v docker >/dev/null; then
+  DOCKER_HOST="$(docker context inspect --format '{{.Endpoints.docker.Host}}')"
+  export DOCKER_HOST
+fi
+
+# The reaper container mounts the socket as the Docker VM sees it, which is the
+# same path on Colima, Docker Desktop, and Linux.
+export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="${TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE:-/var/run/docker.sock}"
+
+exec go test -timeout 2m "$@" ./...

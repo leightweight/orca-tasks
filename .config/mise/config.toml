@@ -8,6 +8,9 @@ golangci-lint = "2.15.0"
 hk = "2.8.1"
 pkl = "0.32.2"
 rumdl = "0.3.0"
+rust = "1.99.1"
+sqlc = "1.31.1"
+"cargo:https://github.com/jleight/steveql-fmt" = "rev:30abd0302ac82aae45d81bb85afc9c9ee886418e"
 
 [env]
 _.path = ["{{config_root}}/bin"]
@@ -33,6 +36,6 @@ run = "hk fix --all"
 description = "Build orca-tasks into bin/orca-tasks"
 run = "go build -ldflags '-X main.version=dev' -o bin/orca-tasks ./cmd/orca-tasks"
 
-[tasks.test]
-description = "Run the tests"
-run = "go test -timeout 2m ./..."
+[tasks.generate]
+description = "Generate the query code in internal/store/db from the SQL"
+run = "sqlc generate -f .config/sqlc.yaml"

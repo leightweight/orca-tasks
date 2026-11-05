@@ -4,6 +4,17 @@ import "package://github.com/jdx/hk/releases/download/v2.5.0/hk@2.5.0#/Builtins.
 local linters = new Mapping<String, Step> {
     ["golangci-lint"] = Builtins.golangci_lint
     ["rumdl"] = Builtins.rumdl
+    ["steveql-fmt"] {
+        glob = "**/*.sql"
+        check = "steveql-fmt -c {{files}}"
+        fix = "steveql-fmt -w {{files}}"
+    }
+    // The generated query code must match the queries and migrations.
+    ["sqlc"] {
+        glob = List("**/*.sql", ".config/sqlc.yaml")
+        check = "sqlc diff -f .config/sqlc.yaml"
+        fix = "sqlc generate -f .config/sqlc.yaml"
+    }
 }
 
 hooks {
