@@ -28,6 +28,7 @@ If a task you need doesn't exist, add it to `.config/mise/config.toml` and list 
 - `mise run release:snapshot`: build the release binaries and images locally without publishing them.
   The output goes in `.cache/dist/`.
 - Pushing a `v*` tag publishes a release through `.github/workflows/release.yml`.
+  The version in `plugins/orca-tasks/.claude-plugin/plugin.json` must match the tag without any prerelease suffix, or the release stops before publishing, so bump it in the commit you tag.
   Only push release tags when the user asks.
 - `mise tasks ls`: list all available tasks.
 

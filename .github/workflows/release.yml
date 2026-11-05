@@ -24,6 +24,18 @@ jobs:
           version: 2026.10.18
           cache: false
       - run: mise run lint
+      - name: Check the plugin version matches the tag
+        # Claude Code only updates a plugin when its version changes, so each
+        # release must carry the version it's tagged with. A prerelease such as
+        # v0.1.0-rc.2 expects 0.1.0.
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          want="${want%%-*}"
+          got="$(jq -r .version plugins/orca-tasks/.claude-plugin/plugin.json)"
+          if [ "$got" != "$want" ]; then
+            echo "::error::plugin.json says $got, but the tag $GITHUB_REF_NAME needs $want."
+            exit 1
+          fi
 
   test:
     name: Test
