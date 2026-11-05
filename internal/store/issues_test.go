@@ -149,7 +149,7 @@ func TestUpdateRecordsHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = f.s.UpdateIssue(testutil.Context(t), f.catalog, f.membership(t, f.ops, f.bob), rows[0], store.IssueChange{
+	err = f.s.UpdateIssue(testutil.Context(t), f.catalog, f.membership(t, f.ops, f.bob), rows[0].Issue.ID, store.IssueChange{
 		Summary:     new("Rotate the keys"),
 		StatusID:    &done.ID,
 		SetAssignee: true,
@@ -222,5 +222,47 @@ func TestUserCounts(t *testing.T) {
 		if u.Principal.Username == "alice" && (u.IssuesReported != 2 || u.Agents != 1 || u.Projects != 2) {
 			t.Errorf("alice = %d issues, %d agents, %d projects; want 2, 1, 2", u.IssuesReported, u.Agents, u.Projects)
 		}
+	}
+}
+
+func TestConcurrentEditsBothLand(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	issue := f.createIssue(t, f.ops, f.alice, "Rotate the keys")
+	actor := f.membership(t, f.ops, f.alice)
+
+	done, err := f.catalog.Status("done")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	changes := []store.IssueChange{
+		{Summary: new("Rotate every key")},
+		{StatusID: &done.ID},
+		{AddLabels: []string{"security"}},
+		{AddLabels: []string{"urgent"}},
+	}
+
+	errs := make(chan error, len(changes))
+
+	for _, change := range changes {
+		go func() { errs <- f.s.UpdateIssue(testutil.Context(t), f.catalog, actor, issue.ID, change) }()
+	}
+
+	for range changes {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	rows, err := f.s.VisibleIssues(testutil.Context(t), db.VisibleIssuesParams{PrincipalID: f.alice.ID, IssueID: &issue.ID})
+	if err != nil || len(rows) != 1 {
+		t.Fatal(rows, err)
+	}
+
+	got := rows[0].Issue
+	if got.Summary != "Rotate every key" || got.StatusID != done.ID || len(got.Labels) != 3 {
+		t.Errorf("issue = %q, status %d, labels %q; want every edit applied", got.Summary, got.StatusID, got.Labels)
 	}
 }

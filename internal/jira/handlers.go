@@ -408,19 +408,14 @@ func (s *Server) updateIssue(w http.ResponseWriter, r *http.Request, c *Caller) 
 		change.Description = new(decodeString(raw))
 	}
 
-	labels := row.Issue.Labels
-	labelsChanged := false
-
 	if raw, ok := request.Fields["labels"]; ok {
-		labels, labelsChanged = decodeStrings(raw), true
+		change.Labels = new(decodeStrings(raw))
 	}
 
+	// The store applies these to the labels as they are when it locks the issue.
 	for _, op := range request.Update.Labels {
-		labels, labelsChanged = editLabels(labels, []string{op.Add}, []string{op.Remove}), true
-	}
-
-	if labelsChanged {
-		change.Labels = &labels
+		change.AddLabels = append(change.AddLabels, op.Add)
+		change.RemoveLabels = append(change.RemoveLabels, op.Remove)
 	}
 
 	if raw, ok := request.Fields["priority"]; ok {
@@ -468,16 +463,7 @@ func (s *Server) apply(r *http.Request, c *Caller, row db.VisibleIssuesRow, chan
 		return err
 	}
 
-	return s.Store.UpdateIssue(r.Context(), s.Catalog, actor, row, change)
-}
-
-// editLabels adds the labels not already there, then removes the others.
-func editLabels(labels, add, remove []string) []string {
-	labels = store.CleanLabels(append(slices.Clone(labels), add...))
-
-	return slices.DeleteFunc(labels, func(label string) bool {
-		return slices.Contains(remove, label)
-	})
+	return s.Store.UpdateIssue(r.Context(), s.Catalog, actor, row.Issue.ID, change)
 }
 
 func (s *Server) assign(w http.ResponseWriter, r *http.Request, c *Caller) error {

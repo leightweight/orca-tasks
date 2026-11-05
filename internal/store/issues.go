@@ -86,83 +86,101 @@ type IssueChange struct {
 	SetAssignee bool
 	Assignee    *Person
 
-	Labels *[]string
+	// Labels replaces the labels. AddLabels and RemoveLabels then edit them.
+	Labels       *[]string
+	AddLabels    []string
+	RemoveLabels []string
 
 	// Comment, if not empty, is added along with the change.
 	Comment string
 }
 
-// UpdateIssue applies a change and records each field it changed.
-func (s *Store) UpdateIssue(ctx context.Context, catalog *Catalog, actor int64, current db.VisibleIssuesRow, change IssueChange) error {
-	i := current.Issue
-	history := []db.InsertHistoryParams{}
-
-	record := func(field string, oldValue, newValue *string) {
-		if deref(oldValue) == deref(newValue) {
-			return
-		}
-
-		history = append(history, db.InsertHistoryParams{
-			ProjectID: i.ProjectID, IssueID: i.ID, ActorID: actor, Field: field, OldValue: oldValue, NewValue: newValue,
-		})
-	}
-
-	next := db.UpdateIssueParams{
-		ID:          i.ID,
-		Summary:     i.Summary,
-		Description: i.Description,
-		StatusID:    i.StatusID,
-		TypeID:      i.TypeID,
-		PriorityID:  i.PriorityID,
-		AssigneeID:  i.AssigneeID,
-		Labels:      i.Labels,
-	}
-
-	if change.Summary != nil {
-		record("summary", &i.Summary, change.Summary)
-		next.Summary = *change.Summary
-	}
-
-	if change.Description != nil {
-		record("description", &i.Description, change.Description)
-		next.Description = *change.Description
-	}
-
-	if change.StatusID != nil {
-		record("status", new(catalog.StatusByID(i.StatusID).Name), new(catalog.StatusByID(*change.StatusID).Name))
-		next.StatusID = *change.StatusID
-	}
-
-	if change.TypeID != nil {
-		record("type", new(catalog.IssueTypeByID(i.TypeID).Name), new(catalog.IssueTypeByID(*change.TypeID).Name))
-		next.TypeID = *change.TypeID
-	}
-
-	if change.SetPriority {
-		record("priority", priorityName(catalog, i.PriorityID), priorityName(catalog, change.PriorityID))
-		next.PriorityID = change.PriorityID
-	}
-
-	if change.SetAssignee {
-		var username *string
-
-		next.AssigneeID = nil
-
-		if change.Assignee != nil {
-			username = &change.Assignee.Username
-			next.AssigneeID = &change.Assignee.MembershipID
-		}
-
-		record("assignee", current.AssigneeUsername, username)
-	}
-
-	if change.Labels != nil {
-		next.Labels = CleanLabels(*change.Labels)
-		oldLabels, newLabels := strings.Join(i.Labels, " "), strings.Join(next.Labels, " ")
-		record("labels", &oldLabels, &newLabels)
-	}
-
+// UpdateIssue applies a change and records each field it changed. It locks
+// the issue and applies the change to the row as it is then, so two edits at
+// once both land instead of the later one undoing the earlier.
+func (s *Store) UpdateIssue(ctx context.Context, catalog *Catalog, actor, issueID int64, change IssueChange) error {
 	return s.InTx(ctx, func(q *db.Queries, _ pgx.Tx) error {
+		locked, err := q.LockIssue(ctx, issueID)
+		if err != nil {
+			return err
+		}
+
+		i := locked.Issue
+		history := []db.InsertHistoryParams{}
+
+		record := func(field string, oldValue, newValue *string) {
+			if deref(oldValue) == deref(newValue) {
+				return
+			}
+
+			history = append(history, db.InsertHistoryParams{
+				ProjectID: i.ProjectID, IssueID: i.ID, ActorID: actor, Field: field, OldValue: oldValue, NewValue: newValue,
+			})
+		}
+
+		next := db.UpdateIssueParams{
+			ID:          i.ID,
+			Summary:     i.Summary,
+			Description: i.Description,
+			StatusID:    i.StatusID,
+			TypeID:      i.TypeID,
+			PriorityID:  i.PriorityID,
+			AssigneeID:  i.AssigneeID,
+			Labels:      i.Labels,
+		}
+
+		if change.Summary != nil {
+			record("summary", &i.Summary, change.Summary)
+			next.Summary = *change.Summary
+		}
+
+		if change.Description != nil {
+			record("description", &i.Description, change.Description)
+			next.Description = *change.Description
+		}
+
+		if change.StatusID != nil {
+			record("status", new(catalog.StatusByID(i.StatusID).Name), new(catalog.StatusByID(*change.StatusID).Name))
+			next.StatusID = *change.StatusID
+		}
+
+		if change.TypeID != nil {
+			record("type", new(catalog.IssueTypeByID(i.TypeID).Name), new(catalog.IssueTypeByID(*change.TypeID).Name))
+			next.TypeID = *change.TypeID
+		}
+
+		if change.SetPriority {
+			record("priority", priorityName(catalog, i.PriorityID), priorityName(catalog, change.PriorityID))
+			next.PriorityID = change.PriorityID
+		}
+
+		if change.SetAssignee {
+			var username *string
+
+			next.AssigneeID = nil
+
+			if change.Assignee != nil {
+				username = &change.Assignee.Username
+				next.AssigneeID = &change.Assignee.MembershipID
+			}
+
+			record("assignee", locked.AssigneeUsername, username)
+		}
+
+		if change.Labels != nil || len(change.AddLabels) > 0 || len(change.RemoveLabels) > 0 {
+			labels := i.Labels
+			if change.Labels != nil {
+				labels = *change.Labels
+			}
+
+			next.Labels = slices.DeleteFunc(CleanLabels(append(slices.Clone(labels), change.AddLabels...)), func(label string) bool {
+				return slices.Contains(change.RemoveLabels, label)
+			})
+
+			oldLabels, newLabels := strings.Join(i.Labels, " "), strings.Join(next.Labels, " ")
+			record("labels", &oldLabels, &newLabels)
+		}
+
 		if len(history) > 0 {
 			if err := q.UpdateIssue(ctx, next); err != nil {
 				return err

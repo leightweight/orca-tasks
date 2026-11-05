@@ -152,3 +152,15 @@ WHERE   mine.principal_id = @principal_id
         )
 ORDER BY u.username
 LIMIT   @max_results;
+
+-- name: LockIssue :one
+-- An issue and its assignee's username, locked until the transaction ends, so
+-- concurrent edits apply one after the other instead of overwriting each
+-- other.
+SELECT   sqlc.embed(i)
+        ,a.username AS  assignee_username
+FROM        issues      i
+LEFT JOIN   memberships am  ON  am.id = i.assignee_id
+LEFT JOIN   principals  a   ON  a.id = am.principal_id
+WHERE   i.id = @id
+FOR UPDATE OF i;

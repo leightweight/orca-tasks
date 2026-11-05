@@ -151,6 +151,46 @@ func (q *Queries) ListHistory(ctx context.Context, issueID int64) ([]IssueHistor
 	return items, nil
 }
 
+const lockIssue = `-- name: LockIssue :one
+SELECT   i.id, i.project_id, i.number, i.summary, i.description, i.status_id, i.type_id, i.priority_id, i.reporter_id, i.assignee_id, i.labels, i.created_at, i.updated_at
+        ,a.username AS  assignee_username
+FROM        issues      i
+LEFT JOIN   memberships am  ON  am.id = i.assignee_id
+LEFT JOIN   principals  a   ON  a.id = am.principal_id
+WHERE   i.id = $1
+FOR UPDATE OF i
+`
+
+type LockIssueRow struct {
+	Issue            Issue
+	AssigneeUsername *string
+}
+
+// An issue and its assignee's username, locked until the transaction ends, so
+// concurrent edits apply one after the other instead of overwriting each
+// other.
+func (q *Queries) LockIssue(ctx context.Context, id int64) (LockIssueRow, error) {
+	row := q.db.QueryRow(ctx, lockIssue, id)
+	var i LockIssueRow
+	err := row.Scan(
+		&i.Issue.ID,
+		&i.Issue.ProjectID,
+		&i.Issue.Number,
+		&i.Issue.Summary,
+		&i.Issue.Description,
+		&i.Issue.StatusID,
+		&i.Issue.TypeID,
+		&i.Issue.PriorityID,
+		&i.Issue.ReporterID,
+		&i.Issue.AssigneeID,
+		&i.Issue.Labels,
+		&i.Issue.CreatedAt,
+		&i.Issue.UpdatedAt,
+		&i.AssigneeUsername,
+	)
+	return i, err
+}
+
 const nextIssueNumber = `-- name: NextIssueNumber :one
 UPDATE  projects
 SET     next_number = next_number + 1
