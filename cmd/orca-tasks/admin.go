@@ -30,7 +30,7 @@ func (a *adminDatabase) open(ctx context.Context) (*store.Store, func(), error) 
 			return nil, nil, err
 		}
 
-		db, err := local.OpenDatabase(ctx, log)
+		db, err := local.OpenDatabase(log)
 		if errors.Is(err, local.ErrInUse) {
 			return nil, nil, usagef("stop orca-tasks serve --local first, since its database can only have one user at a time: %w", err)
 		}

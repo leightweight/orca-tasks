@@ -58,7 +58,7 @@ func (c *serveCmd) Run(ctx context.Context) error {
 	}
 
 	if c.Local {
-		stop, err := c.local(ctx, &cfg, log)
+		stop, err := c.local(&cfg, log)
 		if err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ func (c *serveCmd) Run(ctx context.Context) error {
 
 // local fills in a local mode configuration: its own Postgres, attachments,
 // secret key, and agent socket, in the XDG data, cache, and runtime directories.
-func (c *serveCmd) local(ctx context.Context, cfg *server.Config, log *slog.Logger) (func(), error) {
+func (c *serveCmd) local(cfg *server.Config, log *slog.Logger) (func(), error) {
 	if c.DatabaseURL != "" {
 		return nil, usagef("--local runs its own database, so leave out --database-url and ORCA_TASKS_DATABASE_URL")
 	}
@@ -99,7 +99,7 @@ func (c *serveCmd) local(ctx context.Context, cfg *server.Config, log *slog.Logg
 		return nil, usagef("--local only listens on this machine, so --addr must be a loopback address such as 127.0.0.1:8080, not %s", cfg.Addr)
 	}
 
-	db, err := local.OpenDatabase(ctx, log)
+	db, err := local.OpenDatabase(log)
 	if err != nil {
 		return nil, err
 	}

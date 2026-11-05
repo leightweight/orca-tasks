@@ -4,31 +4,26 @@
 package local
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
+	embeddedpostgres "github.com/fergusstrange/embedded-postgres/v2"
 	"github.com/gofrs/flock"
 	"github.com/google/renameio/v2"
 )
 
-// PostgresVersion is the Postgres the local database runs. Changing it needs
-// a migration of existing data directories; see Start.
-const (
-	PostgresVersion      = embeddedpostgres.V18
-	postgresMajorVersion = "18"
-)
+// PostgresVersion is the Postgres the local database runs. embedded-postgres
+// refuses a data directory made by another major version rather than upgrade
+// or erase it, so changing this needs a migration of existing data.
+const PostgresVersion = embeddedpostgres.V18
 
 // SecretKey reads the secret key in a data directory, creating one the first
 // time.
@@ -47,85 +42,46 @@ type Postgres struct {
 	db  *embeddedpostgres.EmbeddedPostgres
 }
 
-// ErrOtherVersion means the data directory belongs to another Postgres major
-// version, which this build won't open.
-var ErrOtherVersion = errors.New("the database was created by another Postgres version")
-
 // StartPostgres starts Postgres on a free port on 127.0.0.1, with its data in
 // the data directory and its binaries in the cache, which it downloads the
-// first time.
-//
-// embedded-postgres deletes a data directory whose PG_VERSION doesn't match
-// the version it runs and starts over, so this checks first and refuses,
-// rather than lose someone's tasks to a version bump.
-func StartPostgres(ctx context.Context, p Paths, log *slog.Logger) (*Postgres, error) {
-	data := filepath.Join(p.Data, "postgres")
-
-	if err := checkVersion(data); err != nil {
-		return nil, err
-	}
-
-	stopOrphan(ctx, p, data, log)
-
+// first time. A supervisor process stops Postgres if this one dies, even from
+// kill -9, so a killed server never leaves its database running.
+func StartPostgres(p Paths, log *slog.Logger) (*Postgres, error) {
 	password, err := postgresPassword(p.Data)
 	if err != nil {
 		return nil, err
 	}
 
-	port, err := freePort(ctx)
-	if err != nil {
-		return nil, err
-	}
+	data := filepath.Join(p.Data, "postgres")
 
 	db := embeddedpostgres.NewDatabase(embeddedpostgres.DefaultConfig().
 		Version(PostgresVersion).
-		Port(port).
+		Port(0).
 		Username("orca").
 		Password(password).
 		Database("orca").
 		DataPath(data).
-		// The runtime directory is emptied on every start, so it must not
-		// hold anything else.
+		// Each start works in a new directory under this one.
 		RuntimePath(filepath.Join(p.Runtime, "postgres")).
-		BinariesPath(filepath.Join(p.Cache, "postgres-bin")).
-		CachePath(filepath.Join(p.Cache, "downloads")).
+		CachePath(filepath.Join(p.Cache, "postgres")).
 		StartTimeout(time.Minute).
 		Logger(&logWriter{log: log}))
 
+	// Start rather than StartContext, which would stop Postgres as soon as the
+	// server's context ends, before the server has finished with it.
 	if err := db.Start(); err != nil {
+		if errors.Is(err, embeddedpostgres.ErrDataVersion) {
+			return nil, fmt.Errorf("%s holds a database from another Postgres version, which this build won't open: %w", data, err)
+		}
+
 		return nil, fmt.Errorf("starting Postgres: %w", err)
 	}
 
-	return &Postgres{
-		URL: fmt.Sprintf("postgres://orca:%s@127.0.0.1:%d/orca?sslmode=disable", password, port),
-		db:  db,
-	}, nil
+	return &Postgres{URL: db.ConnectionURL(), db: db}, nil
 }
 
 // Stop stops Postgres.
-func (p *Postgres) Stop() error { return p.db.Stop() }
-
-func checkVersion(data string) error {
-	entries, err := os.ReadDir(data)
-	if errors.Is(err, os.ErrNotExist) || (err == nil && len(entries) == 0) {
-		return nil
-	}
-
-	if err != nil {
-		return err
-	}
-
-	version, err := os.ReadFile(filepath.Clean(filepath.Join(data, "PG_VERSION")))
-	if err != nil {
-		return fmt.Errorf("%s isn't empty but has no PG_VERSION, so it isn't a database this can open; move it aside to start over: %w", data, err)
-	}
-
-	if got := strings.TrimSpace(string(version)); got != postgresMajorVersion {
-		return fmt.Errorf("%w: %s holds a Postgres %s database, and this build runs Postgres %s", ErrOtherVersion, data, got, postgresMajorVersion)
-	}
-
-	return nil
-}
+func (p *Postgres) Stop() error { return p.db.Close() }
 
 func postgresPassword(dir string) (string, error) {
 	return readOrCreate(filepath.Join(dir, "postgres-password"), func() string {
@@ -134,24 +90,6 @@ func postgresPassword(dir string) (string, error) {
 
 		return hex.EncodeToString(b)
 	})
-}
-
-func freePort(ctx context.Context) (uint32, error) {
-	l, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, err
-	}
-
-	port := l.Addr().(*net.TCPAddr).Port
-	if err := l.Close(); err != nil {
-		return 0, err
-	}
-
-	if port <= 0 || port > 65535 {
-		return 0, fmt.Errorf("the system gave port %d", port)
-	}
-
-	return uint32(port), nil
 }
 
 // readOrCreate reads a generated secret, or generates and saves one the first
@@ -222,35 +160,6 @@ func LockData(p Paths) (*Lock, error) {
 // Release gives the lock up.
 func (l *Lock) Release() error { return l.file.Unlock() }
 
-// stopOrphan stops a Postgres that a killed server left running on the data
-// directory, which would otherwise hold its lock. Call it only while holding
-// the data directory's lock, so it never stops a live server's database.
-func stopOrphan(ctx context.Context, p Paths, data string, log *slog.Logger) {
-	if _, err := os.Stat(filepath.Join(data, "postmaster.pid")); err != nil {
-		return
-	}
-
-	if _, err := os.Stat(filepath.Join(p.Cache, "postgres-bin", "bin", "pg_ctl")); err != nil {
-		return
-	}
-
-	log.Info("stopping a Postgres left running by an earlier server", "data", data)
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	// Relative to the cache, which a relative command path is resolved against
-	// too. pg_ctl reads the data directory from PGDATA.
-	cmd := exec.CommandContext(ctx, "postgres-bin/bin/pg_ctl", "stop", "-m", "fast")
-	cmd.Dir = p.Cache
-	cmd.Env = append(os.Environ(), "PGDATA="+data)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Debug("pg_ctl stop", "error", err, "output", strings.TrimSpace(string(output)))
-	}
-}
-
 // Database is the local mode database, running and locked until Close.
 type Database struct {
 	Paths Paths
@@ -262,7 +171,7 @@ type Database struct {
 
 // OpenDatabase resolves the local directories, takes the data directory's
 // lock, and starts Postgres. The server and the admin commands both use it.
-func OpenDatabase(ctx context.Context, log *slog.Logger) (*Database, error) {
+func OpenDatabase(log *slog.Logger) (*Database, error) {
 	paths, err := Resolve()
 	if err != nil {
 		return nil, err
@@ -279,7 +188,7 @@ func OpenDatabase(ctx context.Context, log *slog.Logger) (*Database, error) {
 
 	log.Info("starting Postgres; the first run downloads it", "data", paths.Data, "cache", paths.Cache, "runtime", paths.Runtime)
 
-	pg, err := StartPostgres(ctx, paths, log)
+	pg, err := StartPostgres(paths, log)
 	if err != nil {
 		_ = lock.Release()
 		return nil, err

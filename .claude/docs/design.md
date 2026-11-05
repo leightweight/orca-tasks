@@ -555,13 +555,11 @@ If none answers, the error lists every path it tried.
 
 ### Keeping the data safe
 
-- embedded-postgres deletes a data directory whose `PG_VERSION` doesn't match the version it runs.
-  The server checks `PG_VERSION` first and refuses to start against a directory made by another Postgres version, so a version bump can never wipe someone's tasks.
+- embedded-postgres never erases or upgrades a data directory, and refuses to start against one made by another Postgres major version, so a version bump can never wipe someone's tasks.
   Moving to a new Postgres version would need its own migration of the data directory.
 - A server holds an exclusive lock on `lock` in the data directory for as long as it runs, and a second `serve --local` with the same data directory refuses to start.
   The lock belongs to the data directory, not the socket, so it holds even when the two were started with different runtime directories.
-- A server killed with `kill -9` leaves Postgres running and holding the data directory.
-  The next start stops that Postgres before starting its own, once it holds the lock, so it never stops a live server's database.
+- embedded-postgres runs Postgres under a supervisor process that stops it when the server exits, even from `kill -9`, so a killed server doesn't leave its database running.
 - Ctrl-C stops Postgres and removes the socket.
 
 ### Admin commands
