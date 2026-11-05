@@ -23,7 +23,8 @@ A removed rule leaves a gap.
    Replace with plain words.
 8. **Fancy ways to say "is".** "serves as", "stands as", "boasts", "features".
    Just say "is" or "has".
-9. **"Not just X, but Y."** State the point directly instead.
+9. **"Not just X, but Y."**
+   State the point directly instead.
 10. **Rule of three.**
     Forcing ideas into groups of three.
     Use the natural number.
