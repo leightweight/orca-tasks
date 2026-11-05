@@ -271,8 +271,11 @@ func TestEverythingTogether(t *testing.T) {
 	}
 
 	image := find(t, regexp.MustCompile(`href="(/secure/attachment/\d+/diagram.png)"`), page.body)
-	if r := alice.get(image); r.status != http.StatusOK {
-		t.Errorf("downloading with a session: status %d", r.status)
+	// Enough image loads to pass the failure limit, which they mustn't count toward.
+	for range 12 {
+		if r := alice.get(image); r.status != http.StatusOK {
+			t.Fatalf("downloading with a session: status %d", r.status)
+		}
 	}
 
 	if r := s.browser().get(image); r.status != http.StatusForbidden {

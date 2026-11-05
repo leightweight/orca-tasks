@@ -222,15 +222,18 @@ func (s *Server) deleteAttachment(w http.ResponseWriter, r *http.Request, c *Cal
 
 // download serves an attachment's contents to an API key or a web session.
 func (s *Server) download(w http.ResponseWriter, r *http.Request) error {
-	c, err := s.authenticate(r)
-	if err != nil && s.SessionCaller != nil {
-		if session := s.SessionCaller(r); session != nil {
-			c, err = session, nil
-		}
+	// A browser sends only its session cookie. Trying it first keeps image
+	// loads from counting as failed API key checks against the address.
+	var c *Caller
+	if r.Header.Get("Authorization") == "" && s.SessionCaller != nil {
+		c = s.SessionCaller(r)
 	}
 
-	if err != nil {
-		return err
+	if c == nil {
+		var err error
+		if c, err = s.authenticate(r); err != nil {
+			return err
+		}
 	}
 
 	row, err := s.visibleAttachment(r, c)
