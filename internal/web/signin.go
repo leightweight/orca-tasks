@@ -88,18 +88,19 @@ func (w *Web) setup(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !w.Limiter.Allowed(ctx, ip) {
+	if !w.Limiter.Attempt(ctx, ip) {
 		w.fail(rw, r, "setup", "Set up orca-tasks", errTooManyAttempts.Error(), form)
 		return
 	}
 
 	code := strings.TrimSpace(r.PostFormValue("code"))
 	if w.SetupCode == "" || subtle.ConstantTimeCompare([]byte(code), []byte(w.SetupCode)) != 1 {
-		w.Limiter.Failed(ctx, ip)
 		w.fail(rw, r, "setup", "Set up orca-tasks", "That isn't the setup code from the server's log.", form)
 
 		return
 	}
+
+	w.Limiter.Succeeded(ctx, ip)
 
 	username, err := store.NormalizeUsername(form.Username)
 	if err != nil {
@@ -396,7 +397,9 @@ func (w *Web) login(rw http.ResponseWriter, r *http.Request) {
 	username := strings.ToLower(strings.TrimSpace(r.PostFormValue("username")))
 	keys := []string{"ip:" + w.ClientIP(r), "user:" + username}
 
-	if !w.Limiter.Allowed(ctx, keys...) {
+	// The attempt is counted before the password is checked, so concurrent
+	// guesses can't all get past the limit; a correct password gives it back.
+	if !w.Limiter.Attempt(ctx, keys...) {
 		w.fail(rw, r, "login", "Sign in", errTooManyAttempts.Error(), nil)
 		return
 	}
@@ -415,11 +418,11 @@ func (w *Web) login(rw http.ResponseWriter, r *http.Request) {
 	valid := auth.CheckPassword(r.PostFormValue("password"), hash)
 
 	if err != nil || !valid || user.Kind != "user" || user.DisabledAt != nil || user.PasswordHash == nil || (user.TotpSecret == nil && !w.PasswordOnly) {
-		w.Limiter.Failed(ctx, keys...)
 		w.fail(rw, r, "login", "Sign in", "The username or password is wrong, or the account is disabled.", nil)
-
 		return
 	}
+
+	w.Limiter.Succeeded(ctx, keys...)
 
 	// A password-only server signs the user in here; there's no second step.
 	if w.PasswordOnly {
@@ -508,7 +511,7 @@ func (w *Web) checkSecondFactor(ctx context.Context, r *http.Request, user db.Pr
 
 	keys := []string{"ip:" + w.ClientIP(r), "user:" + user.Username}
 
-	if !w.Limiter.Allowed(ctx, keys...) {
+	if !w.Limiter.Attempt(ctx, keys...) {
 		return errTooManyAttempts
 	}
 
@@ -522,10 +525,9 @@ func (w *Web) checkSecondFactor(ctx context.Context, r *http.Request, user db.Pr
 		}
 
 		if n == 1 {
+			w.Limiter.Succeeded(ctx, keys...)
 			return nil
 		}
-
-		w.Limiter.Failed(ctx, keys...)
 
 		return wrong
 	}
@@ -545,11 +547,10 @@ func (w *Web) checkSecondFactor(ctx context.Context, r *http.Request, user db.Pr
 		}
 
 		if n == 1 {
+			w.Limiter.Succeeded(ctx, keys...)
 			return nil
 		}
 	}
-
-	w.Limiter.Failed(ctx, keys...)
 
 	return wrong
 }

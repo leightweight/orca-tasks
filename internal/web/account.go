@@ -57,17 +57,17 @@ func (w *Web) changePassword(rw http.ResponseWriter, r *http.Request) {
 	user := currentUser(ctx)
 
 	keys := []string{"ip:" + w.ClientIP(r), "user:" + user.Username}
-	if !w.Limiter.Allowed(ctx, keys...) {
+	if !w.Limiter.Attempt(ctx, keys...) {
 		w.redirect(rw, r, "/account", capitalize(errTooManyAttempts.Error())+".")
 		return
 	}
 
 	if user.PasswordHash == nil || !auth.CheckPassword(r.PostFormValue("current"), *user.PasswordHash) {
-		w.Limiter.Failed(ctx, keys...)
 		w.redirect(rw, r, "/account", "Your current password is wrong.")
-
 		return
 	}
+
+	w.Limiter.Succeeded(ctx, keys...)
 
 	// Check the form before the code, so a typo doesn't use up a code.
 	hash, err := readPassword(r)

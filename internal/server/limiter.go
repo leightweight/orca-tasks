@@ -52,6 +52,29 @@ func (l *Limiter) Failed(ctx context.Context, keys ...string) {
 	}
 }
 
+// Attempt takes a token from each key, and reports whether every key had one.
+// Every key is charged even after one runs out, so an attacker can't spend one
+// key's attempts without the other's.
+func (l *Limiter) Attempt(ctx context.Context, keys ...string) bool {
+	allowed := true
+
+	for _, key := range keys {
+		if _, _, _, ok, err := l.store.Take(ctx, key); err != nil || !ok {
+			allowed = false
+		}
+	}
+
+	return allowed
+}
+
+// Succeeded gives back a token to each key, after an attempt that passed, so
+// only failures count toward the limit.
+func (l *Limiter) Succeeded(ctx context.Context, keys ...string) {
+	for _, key := range keys {
+		_ = l.store.Burst(ctx, key, 1)
+	}
+}
+
 // Close stops the limiter's cleanup.
 func (l *Limiter) Close(ctx context.Context) error {
 	return l.store.Close(ctx)

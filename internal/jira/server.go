@@ -61,6 +61,14 @@ type Limiter interface {
 
 	// Failed counts a failure against each key.
 	Failed(ctx context.Context, keys ...string)
+
+	// Attempt takes a token from each key before a check, so concurrent
+	// attempts can't all get past the limit before any of them fails. It
+	// reports whether every key had one.
+	Attempt(ctx context.Context, keys ...string) bool
+
+	// Succeeded gives back the tokens an Attempt took, after the check passed.
+	Succeeded(ctx context.Context, keys ...string)
 }
 
 // Server is the API.

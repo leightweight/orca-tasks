@@ -441,3 +441,30 @@ func TestPasswordOnlySignIn(t *testing.T) {
 		t.Errorf("signed in with a password: status %d", r.status)
 	}
 }
+
+func TestConcurrentSignInsAreLimited(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+
+	results := make(chan string, 30)
+
+	for i := range cap(results) {
+		go func() {
+			b := s.browser()
+			results <- b.post("/login", url.Values{"username": {"carol"}, "password": {fmt.Sprintf("guess %d", i)}}).body
+		}()
+	}
+
+	checked := 0
+
+	for range cap(results) {
+		if !strings.Contains(<-results, "too many failed attempts") {
+			checked++
+		}
+	}
+
+	if checked > 10 {
+		t.Errorf("%d of 30 concurrent guesses were checked, want at most 10", checked)
+	}
+}
