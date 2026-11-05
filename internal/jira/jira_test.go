@@ -705,3 +705,31 @@ func TestUnknownJQLFieldsFail(t *testing.T) {
 		t.Errorf("issue = OPS-1 matched %d issues, want 1", got)
 	}
 }
+
+func TestErrorsIsAnObject(t *testing.T) {
+	t.Parallel()
+
+	a := newAPI(t)
+
+	request, err := http.NewRequestWithContext(testutil.Context(t), "GET", a.server.URL+"/rest/api/2/issue/OPS-99", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	request.Header.Set("Authorization", "Bearer "+a.alice)
+
+	response, err := testutil.Client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+
+	var body map[string]json.RawMessage
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+
+	if string(body["errors"]) != "{}" {
+		t.Errorf("errors = %s, want {}", body["errors"])
+	}
+}

@@ -213,7 +213,9 @@ func writeError(w http.ResponseWriter, status int, message string) {
 		status = http.StatusForbidden
 	}
 
-	writeJSON(w, status, errorResponse{ErrorMessages: []string{message}})
+	// errors is an object, never null, as Jira sends it; a client that reads it
+	// with Object.entries would throw on null.
+	writeJSON(w, status, errorResponse{ErrorMessages: []string{message}, Errors: map[string]string{}})
 }
 
 // decodeString reads a JSON string, accepting the ADF document a Cloud client
