@@ -19,6 +19,7 @@ import (
 	"github.com/alexedwards/scs/pgxstore"
 	"github.com/alexedwards/scs/v2"
 	"github.com/dustin/go-humanize"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/leightweight/orca-tasks/internal/auth"
 	"github.com/leightweight/orca-tasks/internal/jira"
@@ -354,6 +355,14 @@ func (w *Web) loadUser(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		user, err := w.Store.GetPrincipal(ctx, id)
+
+		// A database error isn't a reason to sign someone out; only a missing
+		// or disabled account, or a password change since, ends the session.
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			w.serverError(rw, r, err)
+			return
+		}
+
 		if err != nil || user.DisabledAt != nil || int64(user.SessionVersion) != w.Sessions.GetInt64(ctx, sessionVersion) {
 			if err := w.Sessions.Destroy(ctx); err != nil {
 				w.serverError(rw, r, err)
