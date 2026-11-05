@@ -28,3 +28,11 @@ run = "hk check --all"
 description = "Run all linters and fix issues"
 alias = "fix"
 run = "hk fix --all"
+
+[tasks.build]
+description = "Build orca-tasks into bin/orca-tasks"
+run = "go build -ldflags '-X main.version=dev' -o bin/orca-tasks ./cmd/orca-tasks"
+
+[tasks.test]
+description = "Run the tests"
+run = "go test -timeout 2m ./..."

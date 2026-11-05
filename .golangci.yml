@@ -1,0 +1,62 @@
+version: "2"
+run:
+  allow-parallel-runners: true
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - copyloopvar
+    - depguard
+    - dupl
+    - errcheck
+    - errorlint
+    - goconst
+    - gocyclo
+    - gosec
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - modernize
+    - nakedret
+    - noctx
+    - prealloc
+    - revive
+    - rowserrcheck
+    - sloglint
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+  settings:
+    depguard:
+      rules:
+        forbid-sort-pkg:
+          deny:
+            - pkg: sort
+              desc: Should be replaced with slices package
+    lll:
+      line-length: 160
+    revive:
+      rules:
+        - name: comment-spacings
+        - name: import-shadowing
+    sloglint:
+      kv-only: true
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - dupl
+          - gosec
+        path: _test\.go
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/leightweight/orca-tasks
+  exclusions:
+    generated: lax
