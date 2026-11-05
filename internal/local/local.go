@@ -19,6 +19,7 @@ import (
 	"time"
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
+	"github.com/gofrs/flock"
 	"github.com/google/renameio/v2"
 )
 
@@ -190,22 +191,40 @@ func (w *logWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// CheckNotRunning fails if another server answers on the socket, since two
-// servers can't share one database.
-func CheckNotRunning(p Paths) error {
-	conn, err := (&net.Dialer{Timeout: time.Second}).Dial("unix", p.Socket())
+// ErrInUse means another server or admin command holds the data directory.
+var ErrInUse = errors.New("another orca-tasks server or admin command is using the data directory")
+
+// Lock is an exclusive lock on a data directory, held for as long as a process
+// uses its database.
+type Lock struct{ file *flock.Flock }
+
+// LockData takes the data directory's lock, or fails with ErrInUse if another
+// process holds it. Two processes can't share one Postgres: a second would
+// stop the first's database as an orphan, or on a first run, embedded-postgres
+// could remove the directory the first is creating. The lock is the data
+// directory's, not the socket's, so processes started with different
+// runtime directories still see each other.
+func LockData(p Paths) (*Lock, error) {
+	file := flock.New(filepath.Join(p.Data, "lock"), flock.SetPermissions(0o600))
+
+	locked, err := file.TryLock()
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
-	_ = conn.Close()
+	if !locked {
+		return nil, fmt.Errorf("%w: %s", ErrInUse, p.Data)
+	}
 
-	return fmt.Errorf("orca-tasks is already running from %s", p.Data)
+	return &Lock{file: file}, nil
 }
 
+// Release gives the lock up.
+func (l *Lock) Release() error { return l.file.Unlock() }
+
 // stopOrphan stops a Postgres that a killed server left running on the data
-// directory, which would otherwise hold its lock. Call it only after
-// CheckNotRunning, so it never stops a live server's database.
+// directory, which would otherwise hold its lock. Call it only while holding
+// the data directory's lock, so it never stops a live server's database.
 func stopOrphan(ctx context.Context, p Paths, data string, log *slog.Logger) {
 	if _, err := os.Stat(filepath.Join(data, "postmaster.pid")); err != nil {
 		return
@@ -230,4 +249,48 @@ func stopOrphan(ctx context.Context, p Paths, data string, log *slog.Logger) {
 	if err != nil {
 		log.Debug("pg_ctl stop", "error", err, "output", strings.TrimSpace(string(output)))
 	}
+}
+
+// Database is the local mode database, running and locked until Close.
+type Database struct {
+	Paths Paths
+	URL   string
+
+	postgres *Postgres
+	lock     *Lock
+}
+
+// OpenDatabase resolves the local directories, takes the data directory's
+// lock, and starts Postgres. The server and the admin commands both use it.
+func OpenDatabase(ctx context.Context, log *slog.Logger) (*Database, error) {
+	paths, err := Resolve()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := paths.Prepare(); err != nil {
+		return nil, err
+	}
+
+	lock, err := LockData(paths)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info("starting Postgres; the first run downloads it", "data", paths.Data, "cache", paths.Cache, "runtime", paths.Runtime)
+
+	pg, err := StartPostgres(ctx, paths, log)
+	if err != nil {
+		_ = lock.Release()
+		return nil, err
+	}
+
+	return &Database{Paths: paths, URL: pg.URL, postgres: pg, lock: lock}, nil
+}
+
+// Close stops Postgres and releases the lock.
+func (d *Database) Close() error {
+	err := d.postgres.Stop()
+
+	return errors.Join(err, d.lock.Release())
 }

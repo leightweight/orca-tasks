@@ -75,3 +75,29 @@ func TestEmptySecretsAreRefused(t *testing.T) {
 		t.Error("an empty secret-key was trusted")
 	}
 }
+
+func TestTheDataDirectoryLockIsExclusive(t *testing.T) {
+	t.Parallel()
+
+	p := Paths{Data: t.TempDir()}
+
+	first, err := LockData(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := LockData(p); !errors.Is(err, ErrInUse) {
+		t.Errorf("a second lock: %v, want ErrInUse", err)
+	}
+
+	if err := first.Release(); err != nil {
+		t.Fatal(err)
+	}
+
+	again, err := LockData(p)
+	if err != nil {
+		t.Fatalf("locking after the release: %v", err)
+	}
+
+	_ = again.Release()
+}

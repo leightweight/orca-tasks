@@ -92,25 +92,6 @@ func (c *serveCmd) local(ctx context.Context, cfg *server.Config, log *slog.Logg
 		return nil, usagef("--local runs its own database, so leave out --database-url and ORCA_TASKS_DATABASE_URL")
 	}
 
-	paths, err := local.Resolve()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := paths.Prepare(); err != nil {
-		return nil, err
-	}
-
-	if err := local.CheckNotRunning(paths); err != nil {
-		return nil, err
-	}
-
-	if cfg.SecretKey == "" {
-		if cfg.SecretKey, err = local.SecretKey(paths.Data); err != nil {
-			return nil, err
-		}
-	}
-
 	cfg.Addr = cmpOr(c.Addr, "127.0.0.1:8080")
 
 	// Local mode signs in with a password alone, which is only safe where no
@@ -119,25 +100,31 @@ func (c *serveCmd) local(ctx context.Context, cfg *server.Config, log *slog.Logg
 		return nil, usagef("--local only listens on this machine, so --addr must be a loopback address such as 127.0.0.1:8080, not %s", cfg.Addr)
 	}
 
-	cfg.PasswordOnly = true
-	cfg.BaseURL = cmpOr(c.BaseURL, "http://"+cfg.Addr)
-	cfg.DataDir = cmpOr(c.DataDir, paths.Attachments())
-	cfg.Socket = paths.Socket()
-
-	log.Info("starting Postgres; the first run downloads it", "data", paths.Data, "cache", paths.Cache, "runtime", paths.Runtime)
-
-	pg, err := local.StartPostgres(ctx, paths, log)
+	db, err := local.OpenDatabase(ctx, log)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg.DatabaseURL = pg.URL
-
-	return func() {
-		if err := pg.Stop(); err != nil {
+	stop := func() {
+		if err := db.Close(); err != nil {
 			log.Error("stopping Postgres", "error", err)
 		}
-	}, nil
+	}
+
+	if cfg.SecretKey == "" {
+		if cfg.SecretKey, err = local.SecretKey(db.Paths.Data); err != nil {
+			stop()
+			return nil, err
+		}
+	}
+
+	cfg.PasswordOnly = true
+	cfg.BaseURL = cmpOr(c.BaseURL, "http://"+cfg.Addr)
+	cfg.DataDir = cmpOr(c.DataDir, db.Paths.Attachments())
+	cfg.Socket = db.Paths.Socket()
+	cfg.DatabaseURL = db.URL
+
+	return stop, nil
 }
 
 // isLoopback reports whether an address listens only on this machine.
