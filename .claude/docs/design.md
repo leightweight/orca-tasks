@@ -348,10 +348,14 @@ JQL supports these operators and functions.
 
 - `AND`, `OR`, and `NOT`.
 - `=`, `!=`, `~`, `IN (...)`, and `IS EMPTY`.
+- `EMPTY` and `NULL`, unquoted, mean no value with `=`, `!=`, `IN`, and `NOT IN`; `IS` and `IS NOT` take only those.
 - `currentUser()` and relative dates such as `-7d`.
 - `ORDER BY`.
 
 `currentUser()` is the calling principal, and for an agent, its owner too, so an agent's `assignee = currentUser()` finds its owner's issues.
+A field outside the ones issues have is an error, so a typo doesn't match every issue.
+`sprint` is known but has no values, so Orca's `sprint in openSprints()` matches nothing.
+`issue` is another name for `key`, and `id` is the issue's numeric ID.
 `project = OPS` means the project the caller sees as `OPS`.
 
 The server loads the issues the caller can see and evaluates the query in Go.

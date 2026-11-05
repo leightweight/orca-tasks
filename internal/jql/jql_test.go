@@ -230,3 +230,75 @@ func TestCurrentUserMatchesAnAgentsOwner(t *testing.T) {
 		t.Error("currentUser() for an agent should match its owner")
 	}
 }
+
+func TestEmptyValues(t *testing.T) {
+	t.Parallel()
+
+	unassigned := openRecord()
+	delete(unassigned.fields, "assignee")
+
+	tests := []struct {
+		query    string
+		assigned bool
+		empty    bool
+	}{
+		{`assignee = EMPTY`, false, true},
+		{`assignee = null`, false, true},
+		{`assignee != EMPTY`, true, false},
+		{`assignee in (EMPTY, currentUser())`, true, true},
+		{`assignee not in (EMPTY)`, true, false},
+		{`assignee = "EMPTY"`, false, false},
+		{`assignee IS EMPTY`, false, true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.query, func(t *testing.T) {
+			t.Parallel()
+
+			query, err := Parse(test.query)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if got := query.Match(openRecord(), testContext()); got != test.assigned {
+				t.Errorf("assigned issue: %v, want %v", got, test.assigned)
+			}
+
+			if got := query.Match(unassigned, testContext()); got != test.empty {
+				t.Errorf("unassigned issue: %v, want %v", got, test.empty)
+			}
+		})
+	}
+}
+
+func TestISNeedsEmpty(t *testing.T) {
+	t.Parallel()
+
+	for _, query := range []string{`assignee IS currentUser()`, `status IS NOT Done`} {
+		if _, err := Parse(query); err == nil {
+			t.Errorf("Parse(%q) succeeded, want an error", query)
+		}
+	}
+}
+
+func TestValidateRejectsUnknownFields(t *testing.T) {
+	t.Parallel()
+
+	known := func(field string) bool { return field == "status" || field == "key" || field == "updated" }
+
+	for query, ok := range map[string]bool{
+		`status != Done ORDER BY updated`: true,
+		`issue = ORCA-1`:                  true,
+		`stauts != Done`:                  false,
+		`status = Done ORDER BY rank`:     false,
+	} {
+		parsed, err := Parse(query)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := parsed.Validate(known); (err == nil) != ok {
+			t.Errorf("Validate(%q) = %v, want ok %v", query, err, ok)
+		}
+	}
+}

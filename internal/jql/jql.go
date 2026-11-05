@@ -3,6 +3,7 @@
 package jql
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -99,7 +100,69 @@ func Parse(input string) (*Query, error) {
 		return &Query{}, nil
 	}
 
-	return parser.ParseString("", input)
+	query, err := parser.ParseString("", input)
+	if err != nil {
+		return nil, err
+	}
+
+	// IS and IS NOT only take EMPTY or NULL; anything else would quietly
+	// behave like IS EMPTY.
+	for _, c := range query.conditions() {
+		if op := strings.ToLower(strings.Join(strings.Fields(c.Op), " ")); (op == "is" || op == "is not") && !isEmptyValue(c.Single) {
+			return nil, fmt.Errorf("%s %s needs EMPTY or NULL", c.Field, strings.ToUpper(op))
+		}
+	}
+
+	return query, nil
+}
+
+// Validate checks that every field the query compares or orders by is one
+// known reports true for, so a typo such as stauts fails instead of matching
+// everything.
+func (q *Query) Validate(known func(field string) bool) error {
+	if q == nil {
+		return nil
+	}
+
+	for _, c := range q.conditions() {
+		if !known(CanonicalField(c.Field)) {
+			return fmt.Errorf("unknown field %q", unquote(c.Field))
+		}
+	}
+
+	for _, t := range q.Terms() {
+		if !known(CanonicalField(t.Field)) {
+			return fmt.Errorf("unknown field %q in ORDER BY", t.Field)
+		}
+	}
+
+	return nil
+}
+
+// conditions lists every comparison in the WHERE clause.
+func (q *Query) conditions() []*condition {
+	var found []*condition
+
+	var walk func(e *orExpr)
+	walk = func(e *orExpr) {
+		if e == nil {
+			return
+		}
+
+		for _, and := range e.Operands {
+			for _, not := range and.Operands {
+				if not.Primary.Group != nil {
+					walk(not.Primary.Group)
+				} else {
+					found = append(found, not.Primary.Condition)
+				}
+			}
+		}
+	}
+
+	walk(q.Where)
+
+	return found
 }
 
 // Record is the view of an issue the evaluator compares against.
@@ -220,6 +283,21 @@ func (c *condition) values() []*value {
 	return nil
 }
 
+// isEmptyValue reports whether a value means "no value": an unquoted EMPTY or
+// NULL, or the functions empty() and null(). A quoted "EMPTY" is the text.
+func isEmptyValue(v *value) bool {
+	if v == nil {
+		return false
+	}
+
+	name := v.Literal
+	if v.Function != nil {
+		name = v.Function.Name
+	}
+
+	return strings.EqualFold(name, "empty") || strings.EqualFold(name, "null")
+}
+
 // text is the comparable string a value contributes.
 func (v *value) text() string {
 	if v == nil {
@@ -276,6 +354,16 @@ func matchesAny(r Record, field string, values []*value, ctx Context, match func
 	actual := r.Field(field)
 
 	for _, v := range values {
+		// EMPTY and NULL match a field with no value, as in
+		// assignee in (EMPTY, currentUser()).
+		if isEmptyValue(v) {
+			if isEmpty(r, field) {
+				return true
+			}
+
+			continue
+		}
+
 		for _, expected := range resolve(v, ctx) {
 			for _, candidate := range actual {
 				if match(candidate, expected) {
@@ -408,7 +496,7 @@ func CanonicalField(name string) string {
 	switch name {
 	case "issuetype", "issue_type", "type":
 		return "type"
-	case "issuekey", "key", "id":
+	case "issuekey", "key", "issue":
 		return "key"
 	case "createddate", "created":
 		return "created"

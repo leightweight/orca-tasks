@@ -173,6 +173,14 @@ func (s *Server) mapAttachment(a db.Attachment, uploader *person) attachmentPayl
 	}
 }
 
+// jqlFields are the fields an issue answers to in JQL. sprint has no values,
+// so Orca's sprint in openSprints() matches nothing rather than failing.
+var jqlFields = map[string]bool{
+	"key": true, "id": true, "summary": true, "description": true, "text": true, "project": true,
+	"status": true, "statuscategory": true, "type": true, "priority": true, "assignee": true,
+	"reporter": true, "labels": true, "resolution": true, "created": true, "updated": true, "sprint": true,
+}
+
 // issueRecord adapts an issue to the JQL evaluator.
 type issueRecord struct {
 	row     db.VisibleIssuesRow
@@ -185,6 +193,8 @@ func (r issueRecord) Field(name string) []string {
 	switch name {
 	case "key":
 		return []string{issueKey(r.row)}
+	case "id":
+		return []string{id(i.ID)}
 	case "summary":
 		return []string{i.Summary}
 	case "description":

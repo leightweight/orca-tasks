@@ -685,3 +685,23 @@ func TestOrderByKeyAndPriority(t *testing.T) {
 		t.Errorf("ORDER BY priority DESC = %v, want Highest, Medium, Low", got)
 	}
 }
+
+func TestUnknownJQLFieldsFail(t *testing.T) {
+	t.Parallel()
+
+	a := newAPI(t)
+	a.create(a.alice, "OPS", "Rotate the keys")
+
+	if status := a.call(a.alice, "POST", "/rest/api/2/search", `{"jql":"stauts != Done"}`, nil); status != http.StatusBadRequest {
+		t.Errorf("a misspelled field: status %d, want 400", status)
+	}
+
+	// Orca's sprint preset still matches nothing, rather than failing.
+	if got := a.search(a.alice, "statusCategory != Done AND sprint in openSprints()").Total; got != 0 {
+		t.Errorf("sprint in openSprints() matched %d issues", got)
+	}
+
+	if got := a.search(a.alice, "issue = OPS-1").Total; got != 1 {
+		t.Errorf("issue = OPS-1 matched %d issues, want 1", got)
+	}
+}

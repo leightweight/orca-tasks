@@ -66,6 +66,10 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, c *Caller, reque
 		return badRequest("Invalid JQL syntax: %s", err)
 	}
 
+	if err := query.Validate(func(field string) bool { return jqlFields[field] }); err != nil {
+		return badRequest("Invalid JQL: %s", err)
+	}
+
 	rows, err := s.Store.VisibleIssues(r.Context(), db.VisibleIssuesParams{PrincipalID: c.PrincipalID, ProjectIds: c.ProjectIDs})
 	if err != nil {
 		return err
