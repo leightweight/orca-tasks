@@ -519,6 +519,7 @@ orca-tasks serve --local
     A runtime directory that already exists must belong to the user and be private, since another account could have made one in a shared temporary directory to read the socket.
   - Relative values are ignored, as the specification says.
   - `$ORCA_TASKS_LOCAL_DIR` puts everything under one directory instead, with the cache in `cache` and runtime files in `run`.
+    It must be absolute: a relative one would depend on where each command started.
 - Postgres runs embedded, through `fergusstrange/embedded-postgres`, which downloads a Postgres 18 build the first time and runs it as a child process.
   It listens on 127.0.0.1, on a free port each run, with a password generated once and kept in the data directory.
 - The secret key is generated the first time and kept in the data directory, so there's nothing to configure.

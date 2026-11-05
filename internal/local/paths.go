@@ -30,7 +30,8 @@ const maxSocketPath = 103
 
 // Resolve finds the local mode directories from the environment:
 //
-//   - $ORCA_TASKS_LOCAL_DIR puts everything under one directory.
+//   - $ORCA_TASKS_LOCAL_DIR puts everything under one directory, which must be
+//     absolute.
 //   - Otherwise data goes in $XDG_DATA_HOME, which defaults to ~/.local/share,
 //     the cache in $XDG_CACHE_HOME, which defaults to ~/.cache, and runtime
 //     files in $XDG_RUNTIME_DIR, each in an orca-tasks directory.
@@ -43,12 +44,18 @@ func Resolve() (Paths, error) {
 		return Paths{}, err
 	}
 
-	return resolve(os.Getenv, home, os.TempDir(), os.Getuid()), nil
+	return resolve(os.Getenv, home, os.TempDir(), os.Getuid())
 }
 
-func resolve(getenv func(string) string, home, tmp string, uid int) Paths {
+func resolve(getenv func(string) string, home, tmp string, uid int) (Paths, error) {
 	if dir := getenv("ORCA_TASKS_LOCAL_DIR"); dir != "" {
-		return Paths{Data: dir, Cache: filepath.Join(dir, "cache"), Runtime: filepath.Join(dir, "run")}
+		// A relative directory would depend on where each command started, so
+		// a CLI run elsewhere couldn't find the server.
+		if !filepath.IsAbs(dir) {
+			return Paths{}, fmt.Errorf("ORCA_TASKS_LOCAL_DIR must be an absolute path, not %q", dir)
+		}
+
+		return Paths{Data: dir, Cache: filepath.Join(dir, "cache"), Runtime: filepath.Join(dir, "run")}, nil
 	}
 
 	base := func(variable string, fallback ...string) string {
@@ -68,7 +75,7 @@ func resolve(getenv func(string) string, home, tmp string, uid int) Paths {
 		Data:    filepath.Join(base("XDG_DATA_HOME", home, ".local", "share"), "orca-tasks"),
 		Cache:   filepath.Join(base("XDG_CACHE_HOME", home, ".cache"), "orca-tasks"),
 		Runtime: runtime,
-	}
+	}, nil
 }
 
 // Socket is the agent socket.

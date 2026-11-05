@@ -43,11 +43,20 @@ func TestResolve(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := resolve(func(key string) string { return test.env[key] }, "/home/me", "/tmp", 501)
-			if got != test.want {
-				t.Errorf("resolve = %+v, want %+v", got, test.want)
+			got, err := resolve(func(key string) string { return test.env[key] }, "/home/me", "/tmp", 501)
+			if err != nil || got != test.want {
+				t.Errorf("resolve = %+v, %v; want %+v", got, err, test.want)
 			}
 		})
+	}
+}
+
+func TestRelativeLocalDirIsRejected(t *testing.T) {
+	t.Parallel()
+
+	env := map[string]string{"ORCA_TASKS_LOCAL_DIR": "tasks"}
+	if _, err := resolve(func(key string) string { return env[key] }, "/home/me", "/tmp", 501); err == nil {
+		t.Error("a relative ORCA_TASKS_LOCAL_DIR was accepted")
 	}
 }
 
