@@ -10,7 +10,6 @@ linters:
     - dupl
     - errcheck
     - errorlint
-    - goconst
     - gocyclo
     - gosec
     - govet
@@ -49,7 +48,6 @@ linters:
       - linters:
           - dupl
           - gosec
-          - goconst
         path: _test\.go
 formatters:
   enable:

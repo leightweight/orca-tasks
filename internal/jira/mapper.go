@@ -1,0 +1,264 @@
+package jira
+
+import (
+	"bytes"
+	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/yuin/goldmark"
+
+	"github.com/leightweight/orca-tasks/internal/store"
+	"github.com/leightweight/orca-tasks/internal/store/db"
+)
+
+// jiraTime is the timestamp layout Jira sends.
+const jiraTime = "2006-01-02T15:04:05.000-0700"
+
+// Jira's built-in status categories, so Orca draws the usual grey, yellow,
+// and green.
+var (
+	categoryIDs    = map[string]int{store.CategoryNew: 2, store.CategoryIndeterminate: 4, store.CategoryDone: 3}
+	categoryColors = map[string]string{store.CategoryNew: "blue-gray", store.CategoryIndeterminate: "yellow", store.CategoryDone: "green"}
+	categoryNames  = map[string]string{store.CategoryNew: "To Do", store.CategoryIndeterminate: "In Progress", store.CategoryDone: "Done"}
+)
+
+func id(n int64) string { return strconv.FormatInt(n, 10) }
+
+// person is a principal as an issue, comment, or attachment shows it.
+type person struct {
+	username, name, email string
+	active                bool
+}
+
+// mapUser renders a person. Server and Data Center have no accountId, so Orca
+// identifies people by name.
+func mapUser(p *person) *userPayload {
+	if p == nil {
+		return nil
+	}
+
+	return &userPayload{
+		Name:         p.username,
+		Key:          p.username,
+		DisplayName:  firstNonEmpty(p.name, p.username),
+		EmailAddress: p.email,
+		Active:       p.active,
+	}
+}
+
+func mapStatus(s db.Status) statusPayload {
+	return statusPayload{
+		ID:   strconv.Itoa(int(s.ID)),
+		Name: s.Name,
+		StatusCategory: statusCategoryPayload{
+			ID:        categoryIDs[s.Category],
+			Key:       s.Category,
+			Name:      categoryNames[s.Category],
+			ColorName: categoryColors[s.Category],
+		},
+	}
+}
+
+func mapIssueType(t db.IssueType) issueTypePayload {
+	return issueTypePayload{ID: strconv.Itoa(int(t.ID)), Name: t.Name, Description: t.Description}
+}
+
+func mapPriority(p *db.Priority) *priorityPayload {
+	if p == nil {
+		return nil
+	}
+
+	return &priorityPayload{ID: strconv.Itoa(int(p.ID)), Name: p.Name}
+}
+
+func issueKey(row db.VisibleIssuesRow) string {
+	return fmt.Sprintf("%s-%d", row.ProjectKey, row.Issue.Number)
+}
+
+func reporter(row db.VisibleIssuesRow) *person {
+	return &person{row.ReporterUsername, row.ReporterName, row.ReporterEmail, row.ReporterActive}
+}
+
+func assignee(row db.VisibleIssuesRow) *person {
+	if row.AssigneeUsername == nil {
+		return nil
+	}
+
+	return &person{*row.AssigneeUsername, deref(row.AssigneeName), deref(row.AssigneeEmail), row.AssigneeActive}
+}
+
+// mapIssue renders an issue. Descriptions stay Markdown, since Orca passes a
+// plain string body through as it is.
+func (s *Server) mapIssue(row db.VisibleIssuesRow, withDescription bool, attachments []attachmentPayload) issuePayload {
+	i := row.Issue
+	status := s.Catalog.StatusByID(i.StatusID)
+
+	var resolution *resolutionPayload
+	if status.Category == store.CategoryDone {
+		resolution = &resolutionPayload{ID: "10000", Name: "Done"}
+	}
+
+	if attachments == nil {
+		attachments = []attachmentPayload{}
+	}
+
+	fields := issueFields{
+		Summary:    i.Summary,
+		Project:    projectPayload{ID: id(i.ProjectID), Key: row.ProjectKey, Name: row.ProjectName},
+		IssueType:  mapIssueType(s.Catalog.IssueTypeByID(i.TypeID)),
+		Status:     mapStatus(status),
+		Assignee:   mapUser(assignee(row)),
+		Reporter:   mapUser(reporter(row)),
+		Priority:   mapPriority(s.Catalog.PriorityByID(i.PriorityID)),
+		Labels:     i.Labels,
+		Created:    i.CreatedAt.Format(jiraTime),
+		Updated:    i.UpdatedAt.Format(jiraTime),
+		Resolution: resolution,
+		Attachment: attachments,
+	}
+
+	if withDescription {
+		fields.Description = i.Description
+	}
+
+	return issuePayload{
+		ID:     id(i.ID),
+		Key:    issueKey(row),
+		Self:   fmt.Sprintf("%s/rest/api/2/issue/%s", s.BaseURL, id(i.ID)),
+		Fields: fields,
+	}
+}
+
+// renderMarkdown converts a description to HTML. goldmark drops raw HTML
+// unless told otherwise, so the result is safe to show.
+func renderMarkdown(text string) string {
+	var html bytes.Buffer
+	if err := goldmark.Convert([]byte(text), &html); err != nil {
+		return ""
+	}
+
+	return html.String()
+}
+
+func (s *Server) mapComment(c db.ListCommentsRow) commentPayload {
+	return commentPayload{
+		ID:      id(c.Comment.ID),
+		Body:    c.Comment.Body,
+		Author:  mapUser(&person{c.AuthorUsername, c.AuthorName, c.AuthorEmail, c.AuthorActive}),
+		Created: c.Comment.CreatedAt.Format(jiraTime),
+		Updated: c.Comment.UpdatedAt.Format(jiraTime),
+	}
+}
+
+func (s *Server) attachmentURL(a db.Attachment) string {
+	return fmt.Sprintf("%s/secure/attachment/%d/%s", s.BaseURL, a.ID, url.PathEscape(a.Filename))
+}
+
+func (s *Server) mapAttachment(a db.Attachment, uploader *person) attachmentPayload {
+	return attachmentPayload{
+		Self:     fmt.Sprintf("%s/rest/api/2/attachment/%d", s.BaseURL, a.ID),
+		ID:       id(a.ID),
+		Filename: a.Filename,
+		Author:   mapUser(uploader),
+		Created:  a.CreatedAt.Format(jiraTime),
+		Size:     a.Size,
+		MimeType: a.MimeType,
+		Content:  s.attachmentURL(a),
+	}
+}
+
+// issueRecord adapts an issue to the JQL evaluator.
+type issueRecord struct {
+	row     db.VisibleIssuesRow
+	catalog *store.Catalog
+}
+
+func (r issueRecord) Field(name string) []string {
+	i := r.row.Issue
+
+	switch name {
+	case "key":
+		return []string{issueKey(r.row)}
+	case "summary":
+		return []string{i.Summary}
+	case "description":
+		return []string{i.Description}
+	case "text":
+		// Jira's text searches every free-text field at once.
+		return append([]string{i.Summary, i.Description}, i.Labels...)
+	case "project":
+		return []string{r.row.ProjectKey, r.row.ProjectName, id(i.ProjectID)}
+	case "status":
+		return []string{r.catalog.StatusByID(i.StatusID).Name}
+	case "statuscategory":
+		category := r.catalog.StatusByID(i.StatusID).Category
+		return []string{category, categoryNames[category]}
+	case "type":
+		return []string{r.catalog.IssueTypeByID(i.TypeID).Name}
+	case "priority":
+		if p := r.catalog.PriorityByID(i.PriorityID); p != nil {
+			return []string{p.Name}
+		}
+
+		return nil
+	case "assignee":
+		return aliases(assignee(r.row))
+	case "reporter":
+		return aliases(reporter(r.row))
+	case "labels":
+		return i.Labels
+	case "resolution":
+		if r.catalog.StatusByID(i.StatusID).Category == store.CategoryDone {
+			return []string{"Done"}
+		}
+
+		return nil
+	case "created":
+		return []string{i.CreatedAt.Format(jiraTime)}
+	case "updated":
+		return []string{i.UpdatedAt.Format(jiraTime)}
+	default:
+		return nil
+	}
+}
+
+func (r issueRecord) Timestamp(name string) (time.Time, bool) {
+	switch name {
+	case "created":
+		return r.row.Issue.CreatedAt, true
+	case "updated":
+		return r.row.Issue.UpdatedAt, true
+	default:
+		return time.Time{}, false
+	}
+}
+
+// aliases lets a query match a username, display name, or email.
+func aliases(p *person) []string {
+	if p == nil {
+		return nil
+	}
+
+	names := []string{p.username}
+
+	if p.name != "" && !strings.EqualFold(p.name, p.username) {
+		names = append(names, p.name)
+	}
+
+	if p.email != "" {
+		names = append(names, p.email)
+	}
+
+	return names
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+
+	return *s
+}
