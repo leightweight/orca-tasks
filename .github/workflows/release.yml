@@ -124,8 +124,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      # Download the release's archives.
-      contents: read
+      # Download the release's archives. A draft release is only visible to a
+      # token that can write to the repository.
+      contents: write
       # Sign with the workflow's identity.
       id-token: write
       # Attest the archives' build provenance.
@@ -149,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      # Upload the bundle to the release.
+      # Upload the bundle to the release and publish it.
       contents: write
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -163,3 +164,7 @@ jobs:
           set -euo pipefail
           test -f packslip/packslip.sigstore.json
           gh release upload "$GITHUB_REF_NAME" packslip/packslip.sigstore.json --repo "$GITHUB_REPOSITORY" --clobber
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false --repo "$GITHUB_REPOSITORY"

@@ -113,3 +113,6 @@ release:
     owner: leightweight
     name: orca-tasks
   prerelease: auto
+  # The workflow publishes the draft once its signed packslip is attached,
+  # so no one sees a release that mise can't install yet.
+  draft: true
