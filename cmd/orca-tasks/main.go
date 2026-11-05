@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/alecthomas/kong"
@@ -63,7 +64,11 @@ func main() {
 
 	kctx, err := parser.Parse(os.Args[1:])
 	if err != nil {
-		parser.FatalIfErrorf(err)
+		// A mistake on the command line exits 2, with a pointer to the help on
+		// stderr rather than the whole help on stdout, where a script expects
+		// output.
+		fmt.Fprintln(os.Stderr, parseFailure(err))
+		os.Exit(2)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -94,8 +99,20 @@ func newParser(cmd *command, options ...kong.Option) (*kong.Kong, error) {
 		kong.Name("orca-tasks"),
 		kong.Description("A task tracker that serves a Jira-compatible API to Orca, and the CLI for it."),
 		kong.Vars{"version": version},
-		kong.UsageOnError(),
 	}, options...)...)
+}
+
+// parseFailure explains a command line kong couldn't parse, and where to
+// find the usage.
+func parseFailure(err error) string {
+	help := "orca-tasks --help"
+
+	var parseErr *kong.ParseError
+	if errors.As(err, &parseErr) && parseErr.Context != nil && parseErr.Context.Selected() != nil {
+		help = "orca-tasks " + strings.TrimPrefix(parseErr.Context.Selected().FullPath(), "orca-tasks ") + " --help"
+	}
+
+	return fmt.Sprintf("orca-tasks: %v\nRun %s for the usage.", err, help)
 }
 
 func newLogger(level, format string) (*slog.Logger, error) {

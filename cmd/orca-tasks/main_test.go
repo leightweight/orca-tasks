@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/alecthomas/kong"
@@ -51,5 +52,25 @@ func TestIsLoopback(t *testing.T) {
 		if got := isLoopback(addr); got != want {
 			t.Errorf("isLoopback(%q) = %v, want %v", addr, got, want)
 		}
+	}
+}
+
+func TestParseFailurePointsToTheCommandsHelp(t *testing.T) {
+	t.Parallel()
+
+	var cmd command
+
+	parser, err := newParser(&cmd, kong.Exit(func(int) { t.Fatal("kong exited") }))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = parser.Parse([]string{"task", "list", "--format", "yaml"})
+	if err == nil {
+		t.Fatal("an unknown format parsed")
+	}
+
+	if got := parseFailure(err); !strings.Contains(got, "Run orca-tasks task list --help") {
+		t.Errorf("parseFailure = %q", got)
 	}
 }
