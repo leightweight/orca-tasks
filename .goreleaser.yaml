@@ -76,7 +76,8 @@ snapshot:
 # through pull requests.
 changelog:
   use: git
-  sort: asc
+  # Newest first, as git logs them, with short commit hashes.
+  abbrev: 7
   filters:
     exclude:
       - "^(docs|test|ci|chore|refactor)(\\(.*\\))?!?:"
