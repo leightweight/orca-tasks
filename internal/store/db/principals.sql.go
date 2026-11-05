@@ -390,7 +390,7 @@ SELECT   u.id, u.kind, u.username, u.display_name, u.email, u.owner_id, u.site_a
         ,COALESCE(projects.n, 0)::BIGINT                                                                    AS  projects
         ,COALESCE(agents.n, 0)::BIGINT                                                                      AS  agents
         ,COALESCE(keys.active, 0)::BIGINT                                                                   AS  active_keys
-        ,keys.last_used_at::TIMESTAMPTZ                                                                     AS  last_key_use
+        ,COALESCE(keys.last_used_at, 'epoch')::TIMESTAMPTZ                                                  AS  last_key_use
         ,COALESCE(reported.n, 0)::BIGINT                                                                    AS  issues_reported
         ,COALESCE(assigned.n, 0)::BIGINT                                                                    AS  issues_assigned
         ,COALESCE(commented.n, 0)::BIGINT                                                                   AS  comments
@@ -423,7 +423,8 @@ type ListUsersRow struct {
 
 // One row per user with the counts the administration page shows. An agent's
 // work counts toward its owner, the account. Each table is read once and
-// grouped by account, so the cost doesn't grow with the number of users.
+// grouped by account, so the cost doesn't grow with the number of users. A key
+// that was never used reports the epoch.
 func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 	rows, err := q.db.Query(ctx, listUsers)
 	if err != nil {

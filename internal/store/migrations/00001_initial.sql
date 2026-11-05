@@ -145,8 +145,10 @@ CREATE TABLE issues (
     ,UNIQUE (project_id, id)
     ,FOREIGN KEY (project_id, reporter_id)
      REFERENCES memberships (project_id, id)
+     ON DELETE CASCADE
     ,FOREIGN KEY (project_id, assignee_id)
      REFERENCES memberships (project_id, id)
+     ON DELETE CASCADE
 );
 
 CREATE INDEX issues_reporter ON issues(reporter_id);
@@ -168,6 +170,7 @@ CREATE TABLE comments (
      ON DELETE CASCADE
     ,FOREIGN KEY (project_id, author_id)
      REFERENCES memberships (project_id, id)
+     ON DELETE CASCADE
 );
 
 CREATE INDEX comments_issue ON comments(issue_id, created_at);
@@ -191,6 +194,7 @@ CREATE TABLE attachments (
      ON DELETE CASCADE
     ,FOREIGN KEY (project_id, uploader_id)
      REFERENCES memberships (project_id, id)
+     ON DELETE CASCADE
 );
 
 CREATE INDEX attachments_issue ON attachments(issue_id, created_at);
@@ -213,6 +217,7 @@ CREATE TABLE issue_history (
      ON DELETE CASCADE
     ,FOREIGN KEY (project_id, actor_id)
      REFERENCES memberships (project_id, id)
+     ON DELETE CASCADE
 );
 
 CREATE INDEX issue_history_issue ON issue_history(issue_id, created_at);
