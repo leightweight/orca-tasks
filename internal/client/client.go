@@ -23,16 +23,39 @@ import (
 type Client struct {
 	BaseURL string
 	Token   string
-	HTTP    *http.Client
+
+	// HTTP is for API calls, which finish in seconds.
+	HTTP *http.Client
+
+	// Uploads is for attachments, which can take minutes on a slow link, so
+	// it has no deadline for the whole request: only the context and a limit
+	// on waiting for the response once the file is sent.
+	Uploads *http.Client
+}
+
+// callTimeout bounds an API call, and responseTimeout an upload's wait for
+// the server to answer once its file is sent.
+const (
+	callTimeout     = 30 * time.Second
+	responseTimeout = time.Minute
+)
+
+func newClient(baseURL, token string, transport *http.Transport) *Client {
+	transport.ResponseHeaderTimeout = responseTimeout
+
+	return &Client{
+		BaseURL: strings.TrimRight(baseURL, "/"),
+		Token:   token,
+		HTTP:    &http.Client{Timeout: callTimeout, Transport: transport},
+		Uploads: &http.Client{Transport: transport},
+	}
 }
 
 // New returns a client with a request timeout.
 func New(baseURL, token string) *Client {
-	return &Client{
-		BaseURL: strings.TrimRight(baseURL, "/"),
-		Token:   token,
-		HTTP:    &http.Client{Timeout: 30 * time.Second},
-	}
+	transport, _ := http.DefaultTransport.(*http.Transport)
+
+	return newClient(baseURL, token, transport.Clone())
 }
 
 // NewSocket returns a client for a local server's Unix socket, which needs no
@@ -44,7 +67,7 @@ func NewSocket(path string) *Client {
 		},
 	}
 
-	return &Client{BaseURL: "http://localhost", HTTP: &http.Client{Timeout: 30 * time.Second, Transport: transport}}
+	return newClient("http://localhost", "", transport)
 }
 
 // Error is a response the server refused. Status 400 means the request was
@@ -63,6 +86,10 @@ func BadRequest(err error) bool {
 }
 
 func (c *Client) do(ctx context.Context, method, path, contentType string, body io.Reader, into any) error {
+	return c.doWith(ctx, c.HTTP, method, path, contentType, body, into)
+}
+
+func (c *Client) doWith(ctx context.Context, httpClient *http.Client, method, path, contentType string, body io.Reader, into any) error {
 	request, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, body)
 	if err != nil {
 		return err
@@ -79,7 +106,7 @@ func (c *Client) do(ctx context.Context, method, path, contentType string, body 
 
 	request.Header.Set("X-Atlassian-Token", "no-check")
 
-	response, err := c.HTTP.Do(request)
+	response, err := httpClient.Do(request)
 	if err != nil {
 		return err
 	}
@@ -371,7 +398,8 @@ func (c *Client) Attach(ctx context.Context, key, path string) (*Attachment, err
 	}()
 
 	var attachments []Attachment
-	if err := c.do(ctx, http.MethodPost, "/rest/api/2/issue/"+url.PathEscape(key)+"/attachments", form.FormDataContentType(), reader, &attachments); err != nil {
+	route := "/rest/api/2/issue/" + url.PathEscape(key) + "/attachments"
+	if err := c.doWith(ctx, c.Uploads, http.MethodPost, route, form.FormDataContentType(), reader, &attachments); err != nil {
 		return nil, err
 	}
 
