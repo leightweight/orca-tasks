@@ -51,14 +51,25 @@ func TestAPIKey(t *testing.T) {
 func TestRecoveryCodes(t *testing.T) {
 	t.Parallel()
 
-	codes, hashes := NewRecoveryCodes()
-	if len(codes) != RecoveryCodeCount || len(hashes) != RecoveryCodeCount {
-		t.Fatalf("got %d codes and %d hashes", len(codes), len(hashes))
+	codes := NewRecoveryCodes()
+	hashes := HashRecoveryCodes(7, codes)
+
+	if len(codes) != RecoveryCodeCount || len(codes[0]) != 19 {
+		t.Fatalf("codes = %q", codes)
 	}
 
 	typed := strings.ToUpper(strings.ReplaceAll(codes[0], "-", " "))
-	if !bytes.Equal(HashRecoveryCode(typed), hashes[0]) {
+	if !bytes.Equal(HashRecoveryCode(7, typed), hashes[0]) {
 		t.Errorf("%q as typed %q didn't match its hash", codes[0], typed)
+	}
+
+	if bytes.Equal(HashRecoveryCode(8, codes[0]), hashes[0]) {
+		t.Error("another user's hash of the same code matched")
+	}
+
+	// Older servers' 10-character codes were hashed without the principal.
+	if !bytes.Equal(HashRecoveryCode(7, "k4vqd-3m7xa"), HashToken("recovery:k4vqd3m7xa")) {
+		t.Error("a legacy code hashes differently from before")
 	}
 }
 

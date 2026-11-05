@@ -191,9 +191,7 @@ func (w *Web) enroll(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	codes, hashes := auth.NewRecoveryCodes()
-
-	w.saveCredentials(rw, r, e, &factor{sealed: w.Box.Seal([]byte(e.Secret)), step: step, codes: codes, hashes: hashes})
+	w.saveCredentials(rw, r, e, &factor{sealed: w.Box.Seal([]byte(e.Secret)), step: step, codes: auth.NewRecoveryCodes()})
 }
 
 // factor is a confirmed authenticator to save along with a password.
@@ -201,7 +199,6 @@ type factor struct {
 	sealed []byte
 	step   int64
 	codes  []string
-	hashes [][]byte
 }
 
 // saveCredentials finishes setup or a reset link: it saves the password, and
@@ -287,7 +284,7 @@ func (w *Web) saveCredentials(rw http.ResponseWriter, r *http.Request, e enrollm
 			return err
 		}
 
-		return q.InsertRecoveryCodes(ctx, db.InsertRecoveryCodesParams{PrincipalID: user.ID, CodeHashes: f.hashes})
+		return q.InsertRecoveryCodes(ctx, db.InsertRecoveryCodesParams{PrincipalID: user.ID, CodeHashes: auth.HashRecoveryCodes(user.ID, f.codes)})
 	})
 
 	switch {
@@ -519,7 +516,7 @@ func (w *Web) checkSecondFactor(ctx context.Context, r *http.Request, user db.Pr
 	wrong := errors.New("that code doesn't match")
 
 	if allowRecovery && len(strings.ReplaceAll(code, " ", "")) > 6 {
-		n, err := w.Store.UseRecoveryCode(ctx, db.UseRecoveryCodeParams{PrincipalID: user.ID, CodeHash: auth.HashRecoveryCode(code)})
+		n, err := w.Store.UseRecoveryCode(ctx, db.UseRecoveryCodeParams{PrincipalID: user.ID, CodeHash: auth.HashRecoveryCode(user.ID, code)})
 		if err != nil {
 			return err
 		}

@@ -111,14 +111,14 @@ func (w *Web) newRecoveryCodes(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	codes, hashes := auth.NewRecoveryCodes()
+	codes := auth.NewRecoveryCodes()
 
 	err := w.Store.InTx(ctx, func(q *db.Queries, _ pgx.Tx) error {
 		if err := q.DeleteRecoveryCodes(ctx, user.ID); err != nil {
 			return err
 		}
 
-		return q.InsertRecoveryCodes(ctx, db.InsertRecoveryCodesParams{PrincipalID: user.ID, CodeHashes: hashes})
+		return q.InsertRecoveryCodes(ctx, db.InsertRecoveryCodesParams{PrincipalID: user.ID, CodeHashes: auth.HashRecoveryCodes(user.ID, codes)})
 	})
 	if err != nil {
 		w.serverError(rw, r, err)

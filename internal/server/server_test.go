@@ -168,7 +168,7 @@ var (
 	secretPattern   = regexp.MustCompile(`by hand: <code>([A-Z2-7]+)</code>`)
 	keyPattern      = regexp.MustCompile(`otk_[a-z2-7]+`)
 	linkPattern     = regexp.MustCompile(`/reset/[a-z2-7]+`)
-	recoveryPattern = regexp.MustCompile(`<pre>([a-z2-7]{5}-[a-z2-7]{5})`)
+	recoveryPattern = regexp.MustCompile(`<pre>([a-z2-7]{4}-[a-z2-7]{4}-[a-z2-7]{4}-[a-z2-7]{4})`)
 )
 
 func find(t *testing.T, pattern *regexp.Regexp, body string) string {

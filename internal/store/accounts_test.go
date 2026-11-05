@@ -119,12 +119,13 @@ func TestTOTPStepsAndRecoveryCodesAreSingleUse(t *testing.T) {
 		t.Error("a step was used twice")
 	}
 
-	codes, hashes := auth.NewRecoveryCodes()
-	if err := s.InsertRecoveryCodes(testutil.Context(t), db.InsertRecoveryCodesParams{PrincipalID: user.ID, CodeHashes: hashes}); err != nil {
+	codes := auth.NewRecoveryCodes()
+	params := db.InsertRecoveryCodesParams{PrincipalID: user.ID, CodeHashes: auth.HashRecoveryCodes(user.ID, codes)}
+	if err := s.InsertRecoveryCodes(testutil.Context(t), params); err != nil {
 		t.Fatal(err)
 	}
 
-	use := db.UseRecoveryCodeParams{PrincipalID: user.ID, CodeHash: auth.HashRecoveryCode(codes[3])}
+	use := db.UseRecoveryCodeParams{PrincipalID: user.ID, CodeHash: auth.HashRecoveryCode(user.ID, codes[3])}
 	if n, _ := s.UseRecoveryCode(testutil.Context(t), use); n != 1 {
 		t.Error("a recovery code was refused")
 	}
