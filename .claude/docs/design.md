@@ -544,6 +544,9 @@ The file mode limits it to the machine's owner, the same people who could read a
 
 The CLI uses `ORCA_TASKS_URL` and `ORCA_TASKS_TOKEN` when they're set.
 Without them, it uses the local socket, so a Claude Code session on the same machine works with no credentials at all.
+The server also records the socket's path in `socket-path` in the data directory.
+The CLI tries the socket its own environment points to, then the recorded one, so a command whose `TMPDIR` or `XDG_RUNTIME_DIR` differs from the server's, as from cron or a sandboxed shell, still finds it.
+If none answers, the error lists every path it tried.
 `ORCA_TASKS_SOCKET` or `--socket` names another socket.
 
 ### Keeping the data safe

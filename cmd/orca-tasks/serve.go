@@ -122,6 +122,11 @@ func (c *serveCmd) local(ctx context.Context, cfg *server.Config, log *slog.Logg
 	cfg.BaseURL = cmpOr(c.BaseURL, "http://"+cfg.Addr)
 	cfg.DataDir = cmpOr(c.DataDir, db.Paths.Attachments())
 	cfg.Socket = db.Paths.Socket()
+
+	if err := db.Paths.RecordSocket(); err != nil {
+		stop()
+		return nil, err
+	}
 	cfg.DatabaseURL = db.URL
 
 	return stop, nil

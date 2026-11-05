@@ -98,3 +98,27 @@ func TestPrepare(t *testing.T) {
 		t.Errorf("a socket path over the limit: %v", err)
 	}
 }
+
+func TestSocketCandidatesIncludeTheRecordedSocket(t *testing.T) {
+	t.Parallel()
+
+	data := t.TempDir()
+	server := Paths{Data: data, Runtime: "/run/user/501/orca-tasks"}
+
+	if err := server.RecordSocket(); err != nil {
+		t.Fatal(err)
+	}
+
+	// A command whose environment has no XDG_RUNTIME_DIR resolves another
+	// runtime directory, but the same data directory.
+	command := Paths{Data: data, Runtime: "/tmp/orca-tasks-501"}
+
+	got := command.SocketCandidates()
+	if len(got) != 2 || got[0] != "/tmp/orca-tasks-501/agent.sock" || got[1] != "/run/user/501/orca-tasks/agent.sock" {
+		t.Errorf("candidates = %q", got)
+	}
+
+	if got := server.SocketCandidates(); len(got) != 1 {
+		t.Errorf("the server's own environment = %q, want only its socket", got)
+	}
+}

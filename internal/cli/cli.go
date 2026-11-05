@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -53,22 +54,29 @@ func (f *Flags) client() (*client.Client, error) {
 		return client.New(f.URL, f.Token), nil
 	}
 
-	socket := f.Socket
-	if socket == "" {
+	candidates := []string{f.Socket}
+	if f.Socket == "" {
 		paths, err := local.Resolve()
 		if err != nil {
 			return nil, err
 		}
 
-		socket = paths.Socket()
+		candidates = paths.SocketCandidates()
 	}
 
-	if _, err := os.Stat(socket); err != nil {
-		return nil, UsageError{fmt.Errorf(
-			"no server to talk to: set ORCA_TASKS_URL and ORCA_TASKS_TOKEN, or start one with `orca-tasks serve --local` (no socket at %s)", socket)}
+	// The first socket a server answers on. A stale one, left by a server that
+	// was killed, refuses the connection.
+	for _, socket := range candidates {
+		conn, err := (&net.Dialer{Timeout: time.Second}).Dial("unix", socket)
+		if err == nil {
+			_ = conn.Close()
+			return client.NewSocket(socket), nil
+		}
 	}
 
-	return client.NewSocket(socket), nil
+	return nil, UsageError{fmt.Errorf(
+		"no server to talk to: set ORCA_TASKS_URL and ORCA_TASKS_TOKEN, or start one with `orca-tasks serve --local` (none answered at %s)",
+		strings.Join(candidates, ", "))}
 }
 
 // check turns the server rejecting the input into a usage error.

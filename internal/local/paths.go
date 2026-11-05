@@ -6,7 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
+
+	"github.com/google/renameio/v2"
 )
 
 // Paths are the directories local mode uses, following the XDG Base Directory
@@ -117,4 +120,29 @@ func checkPrivate(dir string) error {
 	}
 
 	return nil
+}
+
+// socketRecord is the file in the data directory that names where the running
+// server put its socket.
+const socketRecord = "socket-path"
+
+// RecordSocket notes the socket's path in the data directory. A command whose
+// environment points at another runtime directory, such as one run from cron
+// or a sandboxed shell with a different TMPDIR, still finds the server
+// through the data directory, which doesn't depend on those variables.
+func (p Paths) RecordSocket() error {
+	return renameio.WriteFile(filepath.Join(p.Data, socketRecord), []byte(p.Socket()+"\n"), 0o600)
+}
+
+// SocketCandidates are where a server's socket may be: where this
+// environment puts it, then where the server recorded it.
+func (p Paths) SocketCandidates() []string {
+	candidates := []string{p.Socket()}
+
+	data, err := os.ReadFile(filepath.Clean(filepath.Join(p.Data, socketRecord)))
+	if recorded := strings.TrimSpace(string(data)); err == nil && filepath.IsAbs(recorded) && recorded != p.Socket() {
+		candidates = append(candidates, recorded)
+	}
+
+	return candidates
 }
