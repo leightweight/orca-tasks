@@ -46,7 +46,7 @@ description = "Generate the query code in internal/store/db from the SQL"
 run = "sqlc generate -f .config/sqlc.yaml"
 
 [tasks."oat:update"]
-description = "Vendor a version of the Oat stylesheet the web interface uses"
+description = "Vendor a version of the Oat stylesheet and script the web interface uses"
 usage = 'arg "[version]" default="latest" help="An @knadh/oat version, such as 1.1.0"'
 run = """
 set -eu
@@ -56,6 +56,7 @@ if [ "$version" = latest ]; then
 fi
 dir=internal/web/static/oat
 curl -fsS "https://cdn.jsdelivr.net/npm/@knadh/oat@${version}/oat.min.css" -o "$dir/oat.min.css"
+curl -fsS "https://cdn.jsdelivr.net/npm/@knadh/oat@${version}/oat.min.js" -o "$dir/oat.min.js"
 curl -fsS "https://cdn.jsdelivr.net/npm/@knadh/oat@${version}/LICENSE" -o "$dir/LICENSE"
 echo "$version" > "$dir/VERSION"
 echo "Vendored Oat $version."

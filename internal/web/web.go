@@ -49,6 +49,7 @@ const (
 	sessionFlashError     = "flash_error"
 	sessionReveal         = "reveal"
 	sessionNext           = "next"
+	sessionProject        = "project"
 )
 
 // Limiter counts failed attempts; see server.Limiter.
@@ -165,6 +166,9 @@ func (w *Web) Register(mux *http.ServeMux) error {
 	page("GET /projects", w.signedIn(w.projects))
 	page("POST /projects", w.signedIn(w.createProject))
 	page("GET /projects/{key}", w.signedIn(w.project))
+	page("GET /projects/{key}/tasks", w.signedIn(w.projectTasks))
+	page("GET /projects/{key}/members", w.signedIn(w.projectMembers))
+	page("GET /projects/{key}/settings", w.signedIn(w.projectSettings))
 	page("POST /projects/{key}/key", w.signedIn(w.changeKey))
 	page("POST /projects/{key}/rename", w.signedIn(w.renameProject))
 	page("POST /projects/{key}/members", w.signedIn(w.addMember))
@@ -200,7 +204,8 @@ func origin(baseURL string) string {
 
 func (w *Web) parseTemplates() error {
 	funcs := template.FuncMap{
-		"join": strings.Join,
+		"join":      strings.Join,
+		"hasPrefix": strings.HasPrefix,
 		// lastSeen is the later of a sign-in and an API key use, or nil for
 		// neither. A key that was never used reports the epoch.
 		"lastSeen": func(signIn *time.Time, keyUse time.Time) *time.Time {
@@ -296,6 +301,11 @@ type view struct {
 	Error        string
 	Reveal       *reveal
 	Data         any
+
+	// Projects are the signed-in user's projects, for the sidebar's project
+	// selector, and Project is the one the sidebar shows, if any.
+	Projects []db.ListMyProjectsRow
+	Project  *db.ListMyProjectsRow
 }
 
 // putSealed stores a value in the session encrypted with the secret key. The
@@ -330,16 +340,9 @@ type reveal struct {
 func (w *Web) render(rw http.ResponseWriter, r *http.Request, status int, name, title string, data any) {
 	ctx := r.Context()
 
-	v := view{
-		Title:        title,
-		Path:         r.URL.Path,
-		PasswordOnly: w.PasswordOnly,
-		User:         currentUser(ctx),
-		BaseURL:      w.BaseURL,
-		Flash:        w.Sessions.PopString(ctx, sessionFlash),
-		Error:        w.Sessions.PopString(ctx, sessionFlashError),
-		Data:         data,
-	}
+	v := w.newView(r, title, data)
+	v.Flash = w.Sessions.PopString(ctx, sessionFlash)
+	v.Error = w.Sessions.PopString(ctx, sessionFlashError)
 
 	var shown reveal
 	if w.getSealed(ctx, sessionReveal, &shown) {
@@ -347,22 +350,85 @@ func (w *Web) render(rw http.ResponseWriter, r *http.Request, status int, name, 
 		v.Reveal = &shown
 	}
 
-	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
-	rw.WriteHeader(status)
-
-	if err := w.pages[name].ExecuteTemplate(rw, "layout.html", v); err != nil {
-		w.Log.Error("rendering a page", "page", name, "error", err)
-	}
+	w.write(rw, status, name, v)
 }
 
 // fail shows a page with an error and the form again.
 func (w *Web) fail(rw http.ResponseWriter, r *http.Request, name, title, message string, data any) {
+	v := w.newView(r, title, data)
+	v.Error = message
+
+	w.write(rw, http.StatusBadRequest, name, v)
+}
+
+func (w *Web) newView(r *http.Request, title string, data any) view {
+	v := view{
+		Title:        title,
+		Path:         r.URL.Path,
+		PasswordOnly: w.PasswordOnly,
+		User:         currentUser(r.Context()),
+		BaseURL:      w.BaseURL,
+		Data:         data,
+	}
+
+	if v.User != nil {
+		w.loadNavigation(r, &v)
+	}
+
+	return v
+}
+
+// loadNavigation fills in the sidebar: the user's projects, and the one the
+// page belongs to, or else the one they opened last.
+func (w *Web) loadNavigation(r *http.Request, v *view) {
 	ctx := r.Context()
 
-	v := view{Title: title, Path: r.URL.Path, User: currentUser(ctx), BaseURL: w.BaseURL, Error: message, Data: data, PasswordOnly: w.PasswordOnly}
+	projects, err := w.Store.ListMyProjects(ctx, v.User.ID)
+	if err != nil {
+		// The page can still show without its sidebar.
+		w.Log.Error("loading the sidebar's projects", "error", err)
+		return
+	}
 
+	v.Projects = projects
+
+	key := pageProjectKey(r.URL.Path)
+	last := w.Sessions.GetInt64(ctx, sessionProject)
+
+	for i, p := range projects {
+		if key != "" && strings.EqualFold(p.Membership.Key, key) {
+			v.Project = &projects[i]
+			w.Sessions.Put(ctx, sessionProject, p.Project.ID)
+
+			return
+		}
+
+		if key == "" && p.Project.ID == last {
+			v.Project = &projects[i]
+		}
+	}
+}
+
+// pageProjectKey is the project key in a page's path, as in /projects/OPS/tasks
+// or /browse/OPS-12, or empty for a page outside a project.
+func pageProjectKey(path string) string {
+	if rest, ok := strings.CutPrefix(path, "/projects/"); ok {
+		key, _, _ := strings.Cut(rest, "/")
+		return key
+	}
+
+	if rest, ok := strings.CutPrefix(path, "/browse/"); ok {
+		if i := strings.LastIndex(rest, "-"); i > 0 {
+			return rest[:i]
+		}
+	}
+
+	return ""
+}
+
+func (w *Web) write(rw http.ResponseWriter, status int, name string, v view) {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
-	rw.WriteHeader(http.StatusBadRequest)
+	rw.WriteHeader(status)
 
 	if err := w.pages[name].ExecuteTemplate(rw, "layout.html", v); err != nil {
 		w.Log.Error("rendering a page", "page", name, "error", err)
@@ -499,10 +565,22 @@ func (w *Web) admin(next http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
+// home opens the project the user had open last, or their projects.
 func (w *Web) home(rw http.ResponseWriter, r *http.Request) {
-	if currentUser(r.Context()) == nil {
+	ctx := r.Context()
+
+	user := currentUser(ctx)
+	if user == nil {
 		w.toSignIn(rw, r)
 		return
+	}
+
+	if last := w.Sessions.GetInt64(ctx, sessionProject); last != 0 {
+		membership, err := w.Store.GetMembership(ctx, db.GetMembershipParams{ProjectID: last, PrincipalID: user.ID})
+		if err == nil {
+			http.Redirect(rw, r, "/projects/"+membership.Key+"/tasks", http.StatusSeeOther)
+			return
+		}
 	}
 
 	http.Redirect(rw, r, "/projects", http.StatusSeeOther)

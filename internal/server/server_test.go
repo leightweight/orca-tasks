@@ -332,7 +332,10 @@ func TestEverythingTogether(t *testing.T) {
 		t.Errorf("a used recovery code: status %d", r.status)
 	}
 
-	for _, path := range []string{"/admin/users", "/admin/projects", "/admin/proxy", "/account", "/account/agents", "/projects/OPS"} {
+	for _, path := range []string{
+		"/admin/users", "/admin/projects", "/admin/proxy", "/account", "/account/agents",
+		"/projects/OPS/tasks", "/projects/OPS/members", "/projects/OPS/settings",
+	} {
 		if r := alice.get(path); r.status != http.StatusOK {
 			t.Errorf("%s: status %d", path, r.status)
 		}

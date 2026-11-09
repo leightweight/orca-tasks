@@ -32,7 +32,7 @@ If a task you need doesn't exist, add it to `.config/mise/config.toml` and list 
   The release stays a draft until its signed packslip is attached, so mise never sees a release it can't install.
   The plugin's `version` in `.claude-plugin/marketplace.json` must match the tag without any prerelease suffix, or the release stops before publishing, so bump it in the commit you tag.
   Only push release tags when the user asks.
-- `mise run oat:update [version]`: vendor a version of the Oat stylesheet into `internal/web/static/oat/`, the latest by default.
+- `mise run oat:update [version]`: vendor a version of the Oat stylesheet and script into `internal/web/static/oat/`, the latest by default.
   Check the web interface in light and dark mode after an update, and keep the notice in `THIRD_PARTY_NOTICES.md` matching its `LICENSE`.
 - `mise tasks ls`: list all available tasks.
 

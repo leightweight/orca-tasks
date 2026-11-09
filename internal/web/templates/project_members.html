@@ -1,0 +1,45 @@
+{{define "intro"}}<p>Members see and change every task in {{.Data.Project.Name}}. Administrators also manage members and the project's settings.</p>{{end}}
+{{define "content"}}
+{{$admin := .Data.Admin}}
+<section class="card">
+  <div class="table">
+  <table>
+    <thead><tr><th>Username</th><th>Display name</th><th>Role</th><th></th></tr></thead>
+    <tbody>
+    {{range .Data.Members}}
+      {{$last := and (eq .Membership.Role "admin") (le $.Data.Admins 1)}}
+      <tr>
+        <td>{{.Principal.Username}}</td>
+        <td>{{.Principal.DisplayName}}</td>
+        <td>
+          {{if and $admin (not $last)}}
+          <form method="post" action="/projects/{{$.Data.Membership.Key}}/members/{{.Principal.Username}}/role" class="inline">
+            <select name="role" aria-label="Role for {{.Principal.Username}}">
+              <option value="member"{{if eq .Membership.Role "member"}} selected{{end}}>member</option>
+              <option value="admin"{{if eq .Membership.Role "admin"}} selected{{end}}>admin</option>
+            </select><button class="small" data-variant="secondary">Change</button>
+          </form>
+          {{else}}{{template "role" .Membership.Role}}{{end}}
+        </td>
+        <td class="actions">
+          {{if $last}}
+          <span class="text-light small">Only administrator</span>
+          {{else if or $admin (eq .Principal.ID $.User.ID)}}
+          <a class="button small outline" data-variant="danger" href="/projects/{{$.Data.Membership.Key}}/members/{{.Principal.Username}}/remove">{{if eq .Principal.ID $.User.ID}}Leave{{else}}Remove{{end}}</a>
+          {{end}}
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  {{if and $admin (le .Data.Admins 1)}}<p class="mt-4">A project needs an administrator, so the last one can't leave or become a member. Make someone else an administrator first.</p>{{end}}
+  {{if $admin}}
+  <form method="post" action="/projects/{{.Data.Membership.Key}}/members" class="inline">
+    <label>Username <input name="username" required></label>
+    <label>Role <select name="role"><option value="member">member</option><option value="admin">admin</option></select></label>
+    <button>Add member</button>
+  </form>
+  {{end}}
+</section>
+{{end}}

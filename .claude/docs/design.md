@@ -283,29 +283,38 @@ A user can revoke any of their keys or their agents' keys.
 
 ## Web interface
 
-The web interface is server-rendered `html/template` pages embedded in the binary, with no JavaScript.
-[Oat](https://oat.ink) styles the pages, and `internal/web/static/style.css` adds the layout and what Oat doesn't cover.
+The web interface is server-rendered `html/template` pages embedded in the binary.
+[Oat](https://oat.ink) styles the pages, and its small script positions menus and opens the sidebar on phones; `internal/web/static/style.css` adds the layout and what Oat doesn't cover.
 The binary embeds a pinned copy of Oat in `internal/web/static/oat/`, so pages load nothing from another site and work in local mode without a network.
 `mise run oat:update [version]` replaces it.
-Forms post and redirect.
-Times read as relative, such as "4 days ago", and show the exact time in UTC on hover, since the pages have no JavaScript to find the viewer's time zone.
+Every page works with scripts blocked, since menus are native popovers and forms post and redirect.
+
+Pages are organized around projects.
+A sidebar has a project selector, then Tasks, Members, and Settings for the selected project, and, for site administrators, the administration pages at its foot.
+The selected project is the one the page belongs to, or the one the user opened last, and `/` opens that project's tasks.
+A profile menu at the top right has Profile, API keys, Agents, and Sign out, and those three account pages share tabs.
+
+Times read as relative, such as "4 days ago", and show the exact time in UTC on hover, since the server doesn't know the viewer's time zone.
 Revoking a key, removing or leaving a member, disabling an agent or user, and changing site administration link to a page that says what will happen, and its button posts the change.
 
 | Page | Who | Purpose |
 | --- | --- | --- |
 | `/setup` | Anyone, before the first user exists | Create the first administrator. |
 | `/login`, `/logout` | Users | Sign in and out. |
+| `/` | Users | Open the last project's tasks, or the project list. |
 | `/account` | Users | Change display name, email, and password, and generate recovery codes. |
 | `/account/keys` | Users | Create and revoke the user's API keys. |
 | `/account/agents` | Users | Create and manage agents and their API keys. |
 | `/projects` | Users | List the user's projects and create a project. |
-| `/projects/{key}` | Project members | List the project's open or all issues, change the key the user sees the project under, and let administrators rename the project, manage members, and delete it. |
+| `/projects/{key}/tasks` | Project members | List the project's open or all tasks. `/projects/{key}` leads here. |
+| `/projects/{key}/members` | Project members | List members, and let administrators add and remove them and change roles. |
+| `/projects/{key}/settings` | Project members | Change the key the user sees the project under, and let administrators rename and delete it. |
 | `/admin/users` | Site administrators | List users with their counts and create users. |
 | `/admin/users/{id}` | Site administrators | Show one user's projects and counts, disable or enable them, grant administration, and generate a reset link. |
 | `/admin/projects` | Site administrators | List every project with counts and members. |
 | `/admin/projects/{id}` | Site administrators | Show one project's members, add members, and delete the project. |
 | `/admin/proxy` | Site administrators | Show the connecting address, the forwarding headers, which hops are trusted, and the client address the server resolved. |
-| `/browse/{key}` | Project members | Show one issue with its parent, description, child issues, comments, and attachments, read-only. |
+| `/browse/{key}` | Project members | Show one task with its parent, description, child tasks, comments, and attachments, read-only, under its project in the sidebar. |
 
 Orca links each issue to `{site}/browse/{KEY}`, which is why the read-only issue page exists.
 

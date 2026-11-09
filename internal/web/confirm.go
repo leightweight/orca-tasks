@@ -107,7 +107,7 @@ func (w *Web) confirmRemoveMember(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	back := "/projects/" + row.Membership.Key
+	back := "/projects/" + row.Membership.Key + "/members"
 
 	if user.ID == me.ID {
 		w.confirm(rw, r, "Leave "+row.Project.Name+"?", confirmPage{

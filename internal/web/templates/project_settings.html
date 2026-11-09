@@ -1,0 +1,30 @@
+{{define "intro"}}<p>{{.Data.Project.Name}}{{if ne .Data.Project.Key .Data.Membership.Key}} · its own key is <code>{{.Data.Project.Key}}</code>, and you see it as <code>{{.Data.Membership.Key}}</code>{{end}}</p>{{end}}
+{{define "content"}}
+<section class="card">
+  <h2>Your key</h2>
+  <p>Only you and your agents see this key, and your task keys use it, such as <code>{{.Data.Membership.Key}}-12</code>. Changing it unlinks Orca worktrees from the old task keys.</p>
+  <form method="post" action="/projects/{{.Data.Membership.Key}}/key" class="inline">
+    <label>Key <input name="key" value="{{.Data.Membership.Key}}" required maxlength="20" pattern="[A-Za-z][A-Za-z0-9_]*"></label>
+    <button data-variant="secondary">Change key</button>
+  </form>
+</section>
+{{if .Data.Admin}}
+<section class="card">
+  <h2>Name</h2>
+  <form method="post" action="/projects/{{.Data.Membership.Key}}/rename" class="inline">
+    <label>Name <input name="name" value="{{.Data.Project.Name}}" required></label>
+    <button data-variant="secondary">Rename</button>
+  </form>
+</section>
+<section class="card danger-zone">
+  <h2>Delete</h2>
+  <p>Deleting the project deletes its tasks, comments, history, and attachments for every member. There is no undo.</p>
+  <form method="post" action="/projects/{{.Data.Membership.Key}}/delete" class="inline">
+    <label>Type <code>{{.Data.Membership.Key}}</code> to confirm <input name="confirm" required></label>
+    <button data-variant="danger">Delete project</button>
+  </form>
+</section>
+{{else}}
+<p class="text-light">Only the project's administrators can rename or delete it.</p>
+{{end}}
+{{end}}

@@ -6,32 +6,79 @@
 <title>{{.Title}} · orca-tasks</title>
 <link rel="stylesheet" href="/static/oat/oat.min.css">
 <link rel="stylesheet" href="/static/style.css">
+<script src="/static/oat/oat.min.js" defer></script>
 </head>
 <body>
+{{if .User}}
+<div data-sidebar-layout>
+  <nav data-topnav>
+    <button type="button" class="ghost small" data-sidebar-toggle aria-label="Show the sidebar">☰</button>
+    <a class="brand" href="/">orca-tasks</a>
+    <ot-dropdown class="profile">
+      <button type="button" class="ghost small" popovertarget="profile-menu">{{.User.Username}} <span aria-hidden="true">▾</span></button>
+      <menu popover id="profile-menu">
+        <li class="menu-header"><strong>{{.User.DisplayName}}</strong><span class="text-light small">{{.User.Username}}</span></li>
+        <hr>
+        <a role="menuitem" href="/account">Profile</a>
+        <a role="menuitem" href="/account/keys">API keys</a>
+        <a role="menuitem" href="/account/agents">Agents</a>
+        <hr>
+        <form method="post" action="/logout"><button role="menuitem" class="ghost">Sign out</button></form>
+      </menu>
+    </ot-dropdown>
+  </nav>
+  <aside data-sidebar>
+    <header>
+      <ot-dropdown class="project-picker">
+        <button type="button" class="outline" popovertarget="project-menu">
+          {{with .Project}}<span class="picked"><span class="key">{{.Membership.Key}}</span> {{.Project.Name}}</span>{{else}}<span class="picked">Choose a project</span>{{end}}
+          <span aria-hidden="true">▾</span>
+        </button>
+        <menu popover id="project-menu">
+          {{range .Projects}}<a role="menuitem" href="/projects/{{.Membership.Key}}/tasks"><span class="key">{{.Membership.Key}}</span> {{.Project.Name}}</a>{{end}}
+          {{if .Projects}}<hr>{{end}}
+          <a role="menuitem" href="/projects">All your projects</a>
+        </menu>
+      </ot-dropdown>
+    </header>
+    <nav aria-label="Project">
+      <ul>
+      {{with .Project}}
+        {{$base := print "/projects/" .Membership.Key}}
+        <li><a href="{{$base}}/tasks"{{if or (current $.Path (print $base "/tasks")) (hasPrefix $.Path "/browse/")}} aria-current="page"{{end}}>Tasks</a></li>
+        <li><a href="{{$base}}/members"{{if current $.Path (print $base "/members")}} aria-current="page"{{end}}>Members</a></li>
+        <li><a href="{{$base}}/settings"{{if current $.Path (print $base "/settings")}} aria-current="page"{{end}}>Settings</a></li>
+      {{else}}
+        <li><a href="/projects"{{if eq $.Path "/projects"}} aria-current="page"{{end}}>Your projects</a></li>
+      {{end}}
+      </ul>
+    </nav>
+    {{if .User.SiteAdmin}}
+    <footer>
+      <nav aria-label="Site administration">
+        <p class="label">Admin</p>
+        <ul>
+          <li><a href="/admin/users"{{if current $.Path "/admin/users"}} aria-current="page"{{end}}>Users</a></li>
+          <li><a href="/admin/projects"{{if current $.Path "/admin/projects"}} aria-current="page"{{end}}>All projects</a></li>
+          <li><a href="/admin/proxy"{{if current $.Path "/admin/proxy"}} aria-current="page"{{end}}>Proxy check</a></li>
+        </ul>
+      </nav>
+    </footer>
+    {{end}}
+  </aside>
+  <main>
+    <div class="container">{{template "page" .}}</div>
+  </main>
+</div>
+{{else}}
 <nav data-topnav>
   <a class="brand" href="/">orca-tasks</a>
-  {{with .User}}
-  <div class="links">
-    <a href="/projects"{{if current $.Path "/projects" "/browse"}} aria-current="page"{{end}}>Projects</a>
-    <a href="/account/keys"{{if current $.Path "/account/keys"}} aria-current="page"{{end}}>API keys</a>
-    <a href="/account/agents"{{if current $.Path "/account/agents"}} aria-current="page"{{end}}>Agents</a>
-    <a href="/account"{{if eq $.Path "/account"}} aria-current="page"{{end}}>Account</a>
-  </div>
-  {{if .SiteAdmin}}
-  <div class="links admin" role="group" aria-label="Site administration">
-    <span class="label">Admin</span>
-    <a href="/admin/users"{{if current $.Path "/admin/users"}} aria-current="page"{{end}}>Users</a>
-    <a href="/admin/projects"{{if current $.Path "/admin/projects"}} aria-current="page"{{end}}>All projects</a>
-    <a href="/admin/proxy"{{if current $.Path "/admin/proxy"}} aria-current="page"{{end}}>Proxy check</a>
-  </div>
-  {{end}}
-  <form method="post" action="/logout" class="signout">
-    <span class="text-light"><span class="wide-only">Signed in as </span><strong>{{.Username}}</strong></span>
-    <button class="small outline">Sign out</button>
-  </form>
-  {{end}}
 </nav>
-<main class="container{{if not .User}} signed-out{{end}}">
+<main class="container signed-out">{{template "page" .}}</main>
+{{end}}
+</body>
+</html>
+{{define "page"}}
   <header class="page">
     <div>
       {{block "crumbs" .}}{{end}}
@@ -40,6 +87,7 @@
     </div>
     {{block "actions" .}}{{end}}
   </header>
+  {{block "subnav" .}}{{end}}
   {{with .Flash}}<div role="alert" data-variant="success">{{.}}</div>{{end}}
   {{with .Error}}<div role="alert" data-variant="danger">{{.}}</div>{{end}}
   {{with .Reveal}}
@@ -50,9 +98,14 @@
   </section>
   {{end}}
   {{template "content" .}}
-</main>
-</body>
-</html>
+{{end}}
 {{define "role"}}{{if eq . "admin"}}<span class="badge outline">admin</span>{{else}}<span class="badge" data-variant="secondary">member</span>{{end}}{{end}}
 {{define "status"}}<span class="badge"{{if eq .Category "done"}} data-variant="success"{{else if eq .Category "indeterminate"}} data-variant="warning"{{else}} data-variant="secondary"{{end}}>{{.Status}}</span>{{end}}
 {{define "userBadges"}}{{if .SiteAdmin}} <span class="badge outline">admin</span>{{end}}{{if .DisabledAt}} <span class="badge" data-variant="secondary">disabled</span>{{end}}{{if not .PasswordHash}} <span class="badge" data-variant="warning">invited</span>{{end}}{{end}}
+{{define "accountTabs"}}
+<nav class="tabs" aria-label="Account">
+  <a href="/account"{{if eq .Path "/account"}} aria-current="page"{{end}}>Profile</a>
+  <a href="/account/keys"{{if current .Path "/account/keys"}} aria-current="page"{{end}}>API keys</a>
+  <a href="/account/agents"{{if current .Path "/account/agents"}} aria-current="page"{{end}}>Agents</a>
+</nav>
+{{end}}

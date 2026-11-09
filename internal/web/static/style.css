@@ -8,11 +8,11 @@
   --link: light-dark(#1d4ed8, #8ab4ff);
 }
 
-/* Navigation */
+/* Top bar and sidebar */
 
 nav[data-topnav] {
-  gap: var(--space-6);
-  padding: var(--space-3) var(--space-6);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
   font-size: var(--text-7);
 }
 
@@ -22,35 +22,120 @@ nav[data-topnav] .brand {
   color: var(--foreground);
 }
 
-nav[data-topnav] .links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-5);
+nav[data-topnav] .profile {
+  margin-inline-start: auto;
 }
 
-nav[data-topnav] .links a {
-  color: var(--muted-foreground);
-  padding-block: var(--space-1);
-  border-bottom: 2px solid transparent;
+ot-dropdown menu[popover] {
+  padding: var(--space-1);
+  list-style: none;
+  font-size: var(--text-7);
 }
 
-nav[data-topnav] .links a:hover {
+ot-dropdown menu[popover] a[role="menuitem"] {
   color: var(--foreground);
+  border-radius: var(--radius-small);
   text-decoration: none;
 }
 
-nav[data-topnav] .links a[aria-current="page"] {
+ot-dropdown menu[popover] form {
+  margin: 0;
+}
+
+ot-dropdown menu[popover] button[role="menuitem"] {
+  font-weight: var(--font-normal);
+  border-radius: var(--radius-small);
+}
+
+.menu-header {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+aside[data-sidebar] .project-picker,
+aside[data-sidebar] .project-picker > button {
+  display: flex;
+  width: 100%;
+}
+
+aside[data-sidebar] .project-picker > button {
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+aside[data-sidebar] .picked {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.key {
+  font-family: var(--font-mono);
+  font-size: var(--text-8);
+  color: var(--muted-foreground);
+}
+
+aside[data-sidebar] .project-picker .key {
+  margin-inline-end: var(--space-1);
+}
+
+ot-dropdown menu[popover] .key {
+  min-width: 3.5rem;
+}
+
+aside[data-sidebar] nav a:not(.button) {
   color: var(--foreground);
-  border-bottom-color: var(--foreground);
 }
 
-nav[data-topnav] .links.admin {
-  align-items: center;
-  padding-inline-start: var(--space-5);
-  border-inline-start: 1px solid var(--border);
+aside[data-sidebar] nav a:not(.button):hover {
+  text-decoration: none;
 }
 
-nav[data-topnav] .links .label {
+aside[data-sidebar] nav a[aria-current] {
+  font-weight: var(--font-medium);
+}
+
+aside[data-sidebar] footer {
+  border-top: 1px solid var(--border);
+}
+
+/* Oat styles only the sidebar's main nav, so the footer's matches it here. */
+aside[data-sidebar] footer nav {
+  padding: 0;
+  font-size: var(--text-7);
+}
+
+aside[data-sidebar] footer ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+aside[data-sidebar] footer li {
+  margin: 0;
+}
+
+aside[data-sidebar] footer a:not(.button) {
+  display: flex;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-medium);
+}
+
+aside[data-sidebar] footer a:is(:hover, [aria-current]) {
+  background-color: var(--accent);
+}
+
+[data-sidebar-layout] > main {
+  padding: 0;
+}
+
+aside[data-sidebar] .label {
+  margin: 0;
+  padding: var(--space-1) var(--space-3) var(--space-2);
   font-size: var(--text-8);
   font-weight: var(--font-medium);
   text-transform: uppercase;
@@ -58,15 +143,41 @@ nav[data-topnav] .links .label {
   color: var(--faint-foreground);
 }
 
-nav[data-topnav] .signout {
+[data-sidebar-toggle] {
+  font-size: var(--text-5);
+  line-height: 1;
+}
+
+/* Tabs within a page, such as the account pages */
+
+nav.tabs {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-inline-start: auto;
+  gap: var(--space-5);
+  margin-block-end: var(--space-6);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-7);
+}
+
+nav.tabs a:not(.button) {
+  padding-block: var(--space-2);
+  margin-block-end: -1px;
+  color: var(--muted-foreground);
+  border-bottom: 2px solid transparent;
+}
+
+nav.tabs a:not(.button):hover {
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+nav.tabs a[aria-current="page"] {
+  color: var(--foreground);
+  border-bottom-color: var(--foreground);
 }
 
 /* Page */
 
+[data-sidebar-layout] > main > .container,
 main.container {
   padding-block: var(--space-8) var(--space-16);
 }
@@ -120,10 +231,12 @@ main.signed-out form.stack > button {
   justify-self: stretch;
 }
 
+.container > [role="alert"],
 main > [role="alert"] {
   margin-block-end: var(--space-6);
 }
 
+.container > section,
 main > section,
 main > .card {
   margin-block-end: var(--space-6);
@@ -397,37 +510,7 @@ dl.fields dd {
     --container-pad: var(--space-4);
   }
 
-  .wide-only {
-    display: none;
-  }
-
-  /* The brand and Sign out share the first row, and each group of links gets
-     a row of its own that scrolls sideways if it has to. */
-  nav[data-topnav] {
-    flex-wrap: wrap;
-    gap: var(--space-2) var(--space-4);
-    padding: var(--space-3) var(--space-4) 0;
-  }
-
-  nav[data-topnav] .signout {
-    order: 1;
-  }
-
-  nav[data-topnav] .links,
-  nav[data-topnav] .links.admin {
-    order: 2;
-    flex-basis: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-inline-start: 0;
-    border-inline-start: none;
-    white-space: nowrap;
-  }
-
-  nav[data-topnav] .links:last-of-type {
-    padding-block-end: var(--space-1);
-  }
-
+  [data-sidebar-layout] > main > .container,
   main.container {
     padding-block: var(--space-6) var(--space-12);
   }

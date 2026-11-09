@@ -134,12 +134,15 @@ func TestNavigationMarksTheCurrentPage(t *testing.T) {
 
 	s := newSite(t)
 	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}, "name": {"Operations"}}), "/projects/OPS/tasks")
+	createIssue(t, s, "Rotate the keys", "To Do", nil)
 
 	for path, current := range map[string]string{
-		"/account/keys": "/account/keys",
-		"/account":      "/account",
-		"/admin/proxy":  "/admin/proxy",
-		"/browse/OPS-9": "/projects",
+		"/account/keys":         "/account/keys",
+		"/account":              "/account",
+		"/admin/proxy":          "/admin/proxy",
+		"/projects/OPS/members": "/projects/OPS/members",
+		"/browse/OPS-1":         "/projects/OPS/tasks",
 	} {
 		body := alice.get(path).body
 
@@ -186,7 +189,7 @@ func TestRiskyActionsAskFirst(t *testing.T) {
 		t.Errorf("the leave confirmation: status %d: %.1500s", page.status, page.body)
 	}
 
-	if r := alice.get("/projects/OPS"); r.status != http.StatusOK {
+	if r := alice.get("/projects/OPS/tasks"); r.status != http.StatusOK {
 		t.Errorf("asking to leave left the project: status %d", r.status)
 	}
 
@@ -205,9 +208,9 @@ func TestChangingYourKeyStaysOnTheProject(t *testing.T) {
 	alice, _ := signUp(t, s)
 	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}, "name": {"Operations"}}), "/projects/OPS")
 
-	alice.expectRedirect(alice.post("/projects/OPS/key", url.Values{"key": {"ops2"}}), "/projects/OPS2")
+	alice.expectRedirect(alice.post("/projects/OPS/key", url.Values{"key": {"ops2"}}), "/projects/OPS2/settings")
 
-	if body := alice.get("/projects/OPS2").body; !strings.Contains(body, "Its own key is <code>OPS</code>") {
+	if body := alice.get("/projects/OPS2/settings").body; !strings.Contains(body, "its own key is <code>OPS</code>") {
 		t.Errorf("the project page doesn't say the project's own key: %.1500s", body)
 	}
 
@@ -316,12 +319,12 @@ func TestAProjectListsItsIssues(t *testing.T) {
 	createIssue(t, s, "Rotate the keys", "In Progress", &epic)
 	createIssue(t, s, "Renew the certificates", "Done", &epic)
 
-	open := alice.get("/projects/OPS").body
+	open := alice.get("/projects/OPS/tasks").body
 	if !strings.Contains(open, `href="/browse/OPS-2">OPS-2</a>`) || !strings.Contains(open, "in OPS-1") || strings.Contains(open, "OPS-3") {
 		t.Errorf("the open issues: %.3000s", open)
 	}
 
-	if all := alice.get("/projects/OPS?show=all").body; !strings.Contains(all, `href="/browse/OPS-3">OPS-3</a>`) {
+	if all := alice.get("/projects/OPS/tasks?show=all").body; !strings.Contains(all, `href="/browse/OPS-3">OPS-3</a>`) {
 		t.Errorf("all issues leaves out the done one: %.3000s", all)
 	}
 }
@@ -334,7 +337,7 @@ func TestAnIssueLinksBackToItsProject(t *testing.T) {
 	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}, "name": {"Operations"}}), "/projects/OPS")
 	createIssue(t, s, "Rotate the keys", "To Do", nil)
 
-	if body := alice.get("/browse/OPS-1").body; !strings.Contains(body, `<a class="crumbs" href="/projects/OPS">Operations</a>`) {
+	if body := alice.get("/browse/OPS-1").body; !strings.Contains(body, `<a class="crumbs" href="/projects/OPS/tasks">Operations</a>`) {
 		t.Errorf("the issue page doesn't link to its project: %.1500s", body)
 	}
 }
@@ -352,4 +355,19 @@ func TestRelativeTimesShowTheExactTime(t *testing.T) {
 	if body := alice.get("/browse/OPS-1").body; !strings.Contains(body, want) {
 		t.Errorf("no %s in the issue page: %.2500s", want, body)
 	}
+}
+
+func TestHomeOpensTheLastProject(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+
+	alice.expectRedirect(alice.get("/"), "/projects")
+
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}}), "/projects/OPS/tasks")
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"WEB"}}), "/projects/WEB/tasks")
+	alice.get("/projects/OPS/members")
+
+	alice.expectRedirect(alice.get("/"), "/projects/OPS/tasks")
 }

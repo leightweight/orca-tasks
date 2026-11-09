@@ -54,7 +54,7 @@ func (w *Web) createProject(rw http.ResponseWriter, r *http.Request) {
 		note = " You already use " + project.Key + " for another project, so you see this one as " + membership.Key + "."
 	}
 
-	w.redirect(rw, r, "/projects/"+membership.Key, "Created "+project.Name+"."+note)
+	w.redirect(rw, r, "/projects/"+membership.Key+"/tasks", "Created "+project.Name+"."+note)
 }
 
 // membership finds the signed-in user's project by their key for it.
@@ -90,39 +90,37 @@ func (w *Web) adminMembership(rw http.ResponseWriter, r *http.Request) (db.GetMe
 type projectPage struct {
 	Membership db.Membership
 	Project    db.Project
-	Issues     int64
 	Members    []db.ListMembersRow
 
 	// List is the issues to show, newest change first: the open ones, or all of
-	// them when All is set. Open counts the open ones.
-	List []issueRow
-	All  bool
-	Open int
+	// them when All is set. Open and Total count the open ones and all of them.
+	List  []issueRow
+	All   bool
+	Open  int
+	Total int
 
 	// Admins counts the active administrators, so the page can keep the last
 	// one from leaving or stepping down.
 	Admins int
 }
 
+// Admin reports whether the signed-in user administers the project.
+func (p projectPage) Admin() bool { return p.Membership.Role == store.RoleAdmin }
+
+// project sends a project's address to its tasks.
 func (w *Web) project(rw http.ResponseWriter, r *http.Request) {
+	if row, ok := w.membership(rw, r); ok {
+		http.Redirect(rw, r, "/projects/"+row.Membership.Key+"/tasks", http.StatusSeeOther)
+	}
+}
+
+func (w *Web) projectTasks(rw http.ResponseWriter, r *http.Request) {
 	row, ok := w.membership(rw, r)
 	if !ok {
 		return
 	}
 
-	members, err := w.Store.ListMembers(r.Context(), row.Project.ID)
-	if err != nil {
-		w.serverError(rw, r, err)
-		return
-	}
-
-	mine, err := w.Store.ListMyProjects(r.Context(), currentUser(r.Context()).ID)
-	if err != nil {
-		w.serverError(rw, r, err)
-		return
-	}
-
-	page := projectPage{Membership: row.Membership, Project: row.Project, Members: members, All: r.URL.Query().Get("show") == "all"}
+	page := projectPage{Membership: row.Membership, Project: row.Project, All: r.URL.Query().Get("show") == "all"}
 
 	issues, err := w.Store.VisibleIssues(r.Context(), db.VisibleIssuesParams{PrincipalID: currentUser(r.Context()).ID, Key: &row.Membership.Key})
 	if err != nil {
@@ -131,6 +129,8 @@ func (w *Web) project(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	slices.SortFunc(issues, func(a, b db.VisibleIssuesRow) int { return b.Issue.UpdatedAt.Compare(a.Issue.UpdatedAt) })
+
+	page.Total = len(issues)
 
 	for _, i := range issues {
 		item := w.issueRow(i)
@@ -143,19 +143,36 @@ func (w *Web) project(rw http.ResponseWriter, r *http.Request) {
 		page.List = append(page.List, item)
 	}
 
+	w.render(rw, r, http.StatusOK, "project_tasks", "Tasks", page)
+}
+
+func (w *Web) projectMembers(rw http.ResponseWriter, r *http.Request) {
+	row, ok := w.membership(rw, r)
+	if !ok {
+		return
+	}
+
+	members, err := w.Store.ListMembers(r.Context(), row.Project.ID)
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
+	page := projectPage{Membership: row.Membership, Project: row.Project, Members: members}
+
 	for _, m := range members {
 		if m.Membership.Role == store.RoleAdmin && m.Principal.DisabledAt == nil {
 			page.Admins++
 		}
 	}
 
-	for _, p := range mine {
-		if p.Project.ID == row.Project.ID {
-			page.Issues = p.Issues
-		}
-	}
+	w.render(rw, r, http.StatusOK, "project_members", "Members", page)
+}
 
-	w.render(rw, r, http.StatusOK, "project", row.Project.Name, page)
+func (w *Web) projectSettings(rw http.ResponseWriter, r *http.Request) {
+	if row, ok := w.membership(rw, r); ok {
+		w.render(rw, r, http.StatusOK, "project_settings", "Settings", projectPage{Membership: row.Membership, Project: row.Project})
+	}
 }
 
 func (w *Web) changeKey(rw http.ResponseWriter, r *http.Request) {
@@ -164,7 +181,7 @@ func (w *Web) changeKey(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	back := "/projects/" + row.Membership.Key
+	back := "/projects/" + row.Membership.Key + "/settings"
 
 	key, err := store.NormalizeKey(r.PostFormValue("key"))
 	if err == nil {
@@ -181,7 +198,7 @@ func (w *Web) changeKey(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.redirect(rw, r, "/projects/"+key, "Changed your key to "+key+". Its issue keys changed with it, such as "+key+"-1.")
+	w.redirect(rw, r, "/projects/"+key+"/settings", "Changed your key to "+key+". Its issue keys changed with it, such as "+key+"-1.")
 }
 
 func (w *Web) renameProject(rw http.ResponseWriter, r *http.Request) {
@@ -192,7 +209,7 @@ func (w *Web) renameProject(rw http.ResponseWriter, r *http.Request) {
 
 	name := strings.TrimSpace(r.PostFormValue("name"))
 	if name == "" {
-		w.redirectError(rw, r, "/projects/"+row.Membership.Key, "A project needs a name.")
+		w.redirectError(rw, r, "/projects/"+row.Membership.Key+"/settings", "A project needs a name.")
 		return
 	}
 
@@ -201,7 +218,7 @@ func (w *Web) renameProject(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.redirect(rw, r, "/projects/"+row.Membership.Key, "Renamed the project.")
+	w.redirect(rw, r, "/projects/"+row.Membership.Key+"/settings", "Renamed the project.")
 }
 
 func (w *Web) addMember(rw http.ResponseWriter, r *http.Request) {
@@ -210,7 +227,7 @@ func (w *Web) addMember(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.addMemberTo(rw, r, row.Project, "/projects/"+row.Membership.Key)
+	w.addMemberTo(rw, r, row.Project, "/projects/"+row.Membership.Key+"/members")
 }
 
 // addMemberTo adds a user by username, for project and site administrators.
@@ -265,7 +282,7 @@ func (w *Web) changeMember(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	self := user.ID == me.ID
-	back := "/projects/" + row.Membership.Key
+	back := "/projects/" + row.Membership.Key + "/members"
 
 	// Anyone can leave; only administrators change other people.
 	leaving := self && r.PathValue("action") == "remove"
@@ -293,7 +310,7 @@ func (w *Web) changeMember(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if errors.Is(err, store.ErrLastAdmin) {
-		w.redirectError(rw, r, "/projects/"+row.Membership.Key, lastAdmin(user.Username, row.Project.Name))
+		w.redirectError(rw, r, "/projects/"+row.Membership.Key+"/members", lastAdmin(user.Username, row.Project.Name))
 		return
 	}
 
@@ -312,7 +329,7 @@ func (w *Web) deleteProject(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if !strings.EqualFold(strings.TrimSpace(r.PostFormValue("confirm")), row.Membership.Key) {
-		w.redirectError(rw, r, "/projects/"+row.Membership.Key, "Type the project's key to delete it.")
+		w.redirectError(rw, r, "/projects/"+row.Membership.Key+"/settings", "Type the project's key to delete it.")
 		return
 	}
 
