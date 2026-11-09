@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/leightweight/orca-tasks/internal/jql"
 	"github.com/leightweight/orca-tasks/internal/store"
 	"github.com/leightweight/orca-tasks/internal/store/db"
 )
@@ -62,13 +61,13 @@ const maxPageSize = 100
 // caller can see in one query, which a task list of thousands of issues
 // handles in milliseconds, and then pages the result.
 func (s *Server) search(w http.ResponseWriter, r *http.Request, c *Caller, request searchRequest) error {
-	query, err := jql.Parse(request.JQL)
+	query, err := ParseJQL(request.JQL)
 	if err != nil {
-		// Orca shows a syntax hint when the message mentions JQL.
-		return badRequest("Invalid JQL syntax: %s", err)
-	}
+		if syntax, ok := errors.AsType[*JQLSyntaxError](err); ok {
+			// Orca shows a syntax hint when the message mentions JQL.
+			return badRequest("Invalid JQL syntax: %s", syntax.Err)
+		}
 
-	if err := query.Validate(func(field string) bool { return jqlFields[field] }); err != nil {
 		return badRequest("Invalid JQL: %s", err)
 	}
 
@@ -77,16 +76,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, c *Caller, reque
 		return err
 	}
 
-	ctx := jql.Context{CurrentUsers: c.names(), Now: s.Now()}
-
-	records := make([]issueRecord, 0, len(rows))
-	for _, row := range rows {
-		if record := (issueRecord{row: row, catalog: s.Catalog}); query.Match(record, ctx) {
-			records = append(records, record)
-		}
-	}
-
-	jql.Sort(records, query.Terms())
+	records := Filter(query, rows, s.Catalog, c.names(), s.Now())
 
 	// A request over the cap gets the cap, not the default, so a client that
 	// pages by the size it asked for doesn't skip issues.
@@ -111,7 +101,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, c *Caller, reque
 	if wants("attachment") {
 		ids := make([]int64, len(page))
 		for i, record := range page {
-			ids[i] = record.row.Issue.ID
+			ids[i] = record.Issue.ID
 		}
 
 		if files, err = s.attachmentsOf(r, ids); err != nil {
@@ -123,9 +113,9 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request, c *Caller, reque
 
 	issues := make([]issuePayload, 0, len(page))
 	for _, record := range page {
-		issue := s.mapIssue(record.row, wants("description"), files[record.row.Issue.ID])
+		issue := s.mapIssue(record, wants("description"), files[record.Issue.ID])
 		if rendered {
-			issue.RenderedFields = &renderedFields{Description: renderMarkdown(record.row.Issue.Description)}
+			issue.RenderedFields = &renderedFields{Description: renderMarkdown(record.Issue.Description)}
 		}
 
 		issues = append(issues, issue)

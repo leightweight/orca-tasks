@@ -208,6 +208,51 @@ var jqlFields = map[string]bool{
 	"parent": true,
 }
 
+// JQLSyntaxError is a query JQL can't parse, as opposed to one that names an
+// unknown field.
+type JQLSyntaxError struct{ Err error }
+
+func (e *JQLSyntaxError) Error() string { return "invalid JQL syntax: " + e.Err.Error() }
+func (e *JQLSyntaxError) Unwrap() error { return e.Err }
+
+// ParseJQL parses a query and checks it names only fields issues answer to.
+func ParseJQL(text string) (*jql.Query, error) {
+	query, err := jql.Parse(text)
+	if err != nil {
+		return nil, &JQLSyntaxError{Err: err}
+	}
+
+	if err := query.Validate(func(field string) bool { return jqlFields[field] }); err != nil {
+		return nil, err
+	}
+
+	return query, nil
+}
+
+// Filter keeps the issues a query matches, in the query's order. Search and
+// the web interface's task list both use it, so a filter matches the same
+// issues in Orca and in the browser. currentUsers are the names
+// currentUser() matches.
+func Filter(query *jql.Query, rows []db.VisibleIssuesRow, catalog *store.Catalog, currentUsers []string, now time.Time) []db.VisibleIssuesRow {
+	ctx := jql.Context{CurrentUsers: currentUsers, Now: now}
+
+	records := make([]issueRecord, 0, len(rows))
+	for _, row := range rows {
+		if record := (issueRecord{row: row, catalog: catalog}); query.Match(record, ctx) {
+			records = append(records, record)
+		}
+	}
+
+	jql.Sort(records, query.Terms())
+
+	matched := make([]db.VisibleIssuesRow, len(records))
+	for i, record := range records {
+		matched[i] = record.row
+	}
+
+	return matched
+}
+
 // issueRecord adapts an issue to the JQL evaluator.
 type issueRecord struct {
 	row     db.VisibleIssuesRow
