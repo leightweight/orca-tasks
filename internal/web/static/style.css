@@ -80,6 +80,17 @@ header.page {
   margin-block-end: var(--space-6);
 }
 
+header.page a.crumbs {
+  display: inline-block;
+  margin-block-end: var(--space-2);
+  font-size: var(--text-7);
+  color: var(--muted-foreground);
+}
+
+header.page a.crumbs::before {
+  content: "← ";
+}
+
 header.page h1 {
   margin: 0;
   font-size: var(--text-2);
@@ -132,8 +143,12 @@ a:not(.button, .brand):hover {
   color: var(--muted-foreground);
 }
 
-span.small {
+.small {
   font-size: var(--text-8);
+}
+
+.nowrap {
+  white-space: nowrap;
 }
 
 /* Forms */
@@ -250,25 +265,25 @@ section.danger-zone {
   border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
 }
 
-/* Issue page */
+/* Pages with a sidebar of fields, such as an issue */
 
-.issue {
+.split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 18rem;
   gap: var(--space-6);
   align-items: start;
 }
 
-.issue-main > section {
+.split-main > section {
   margin-block-end: var(--space-6);
 }
 
 @media (max-width: 768px) {
-  .issue {
+  .split {
     grid-template-columns: 1fr;
   }
 
-  .issue-fields {
+  .split-side {
     order: -1;
   }
 }

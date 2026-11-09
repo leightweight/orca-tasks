@@ -77,7 +77,7 @@ func TestDisablingAndResettingEndSessions(t *testing.T) {
 		t.Errorf("a used link: status %d, want 404", r.status)
 	}
 
-	bobID := find(t, regexpFor(`href="/admin/users/(\d+)/disable"`), alice.get("/admin/users").body)
+	bobID := find(t, regexpFor(`href="/admin/users/(\d+)">bob<`), alice.get("/admin/users").body)
 
 	// A reset ends bob's session, since it sets new credentials.
 	alice.expectRedirect(alice.post("/admin/users/"+bobID+"/reset", nil), "/admin/users")
@@ -234,4 +234,28 @@ func TestAdministratorsManageAProjectOnItsOwnPage(t *testing.T) {
 	}
 
 	alice.expectRedirect(alice.post(page+"/delete", url.Values{"confirm": {"nope"}}), page)
+}
+
+func TestAUserHasAnAdministrationPage(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/admin/users", url.Values{"username": {"bob"}}), "/admin/users")
+
+	users := alice.get("/admin/users").body
+	page := "/admin/users/" + find(t, regexpFor(`href="/admin/users/(\d+)">bob<`), users)
+
+	body := alice.get(page).body
+	if !strings.Contains(body, "Make a reset link") || !strings.Contains(body, `href="`+page+`/disable"`) || !strings.Contains(body, "invited") {
+		t.Errorf("bob's page: %.2000s", body)
+	}
+
+	// An administrator's own page has no way to lock them out.
+	self := "/admin/users/" + find(t, regexpFor(`href="/admin/users/(\d+)">alice<`), users)
+	if body := alice.get(self).body; strings.Contains(body, self+"/disable") {
+		t.Error("alice's own page offers to disable her")
+	}
+
+	alice.expectRedirect(alice.post(page+"/reset", nil), page)
 }

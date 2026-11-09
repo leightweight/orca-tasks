@@ -1,40 +1,31 @@
+{{define "intro"}}<p>Open a user to see their projects and counts, make a reset link, or disable the account.</p>{{end}}
 {{define "content"}}
 <section class="card">
   <div class="table">
   <table>
     <thead><tr>
-      <th>Username</th><th>Name</th><th class="num">Projects</th><th class="num">Agents</th><th class="num">Keys</th><th class="num">Reported</th><th class="num">Assigned</th>
-      <th class="num">Comments</th><th class="num">Attachments</th><th class="num">Data</th><th>Last sign-in</th><th>Last key use</th><th></th>
+      <th>User</th><th class="num">Projects</th><th class="num">Agents</th><th class="num">Keys</th><th class="num">Issues</th><th class="num">Comments</th><th class="num">Data</th><th>Last seen</th>
     </tr></thead>
     <tbody>
     {{range .Data.Users}}
       <tr{{if .Principal.DisabledAt}} class="muted"{{end}}>
-        <td>{{.Principal.Username}}{{if .Principal.SiteAdmin}} <span class="badge outline">admin</span>{{end}}{{if .Principal.DisabledAt}} <span class="badge" data-variant="secondary">disabled</span>{{end}}{{if not .Principal.PasswordHash}} <span class="badge" data-variant="warning">invited</span>{{end}}</td>
-        <td>{{.Principal.DisplayName}}</td>
+        <td>
+          <a href="/admin/users/{{.Principal.ID}}">{{.Principal.Username}}</a>{{template "userBadges" .Principal}}
+          {{if ne .Principal.DisplayName .Principal.Username}}<div class="text-light small">{{.Principal.DisplayName}}</div>{{end}}
+        </td>
         <td class="num">{{.Projects}}</td>
         <td class="num">{{.Agents}}</td>
         <td class="num">{{.ActiveKeys}}</td>
         <td class="num">{{.IssuesReported}}</td>
-        <td class="num">{{.IssuesAssigned}}</td>
         <td class="num">{{.Comments}}</td>
-        <td class="num">{{.Attachments}}</td>
         <td class="num">{{bytes .Bytes}}</td>
-        <td>{{if .Principal.LastSignInAt}}{{ago .Principal.LastSignInAt}}{{else}}Never{{end}}</td>
-        <td>{{if eq .LastKeyUse.Unix 0}}Never{{else}}{{ago .LastKeyUse}}{{end}}</td>
-        <td class="actions">
-          {{if ne .Principal.ID $.User.ID}}
-          {{if .Principal.DisabledAt}}<form method="post" action="/admin/users/{{.Principal.ID}}/enable"><button class="small outline">Enable</button></form>
-          {{else}}<a class="button small outline" data-variant="danger" href="/admin/users/{{.Principal.ID}}/disable">Disable</a>{{end}}
-          <a class="button small outline" href="/admin/users/{{.Principal.ID}}/{{if .Principal.SiteAdmin}}unadmin{{else}}admin{{end}}">{{if .Principal.SiteAdmin}}Remove admin{{else}}Make admin{{end}}</a>
-          {{end}}
-          <form method="post" action="/admin/users/{{.Principal.ID}}/reset"><button class="small outline">Reset link</button></form>
-        </td>
+        <td class="nowrap">{{with lastSeen .Principal.LastSignInAt .LastKeyUse}}{{ago .}}{{else}}Never{{end}}</td>
       </tr>
     {{end}}
     </tbody>
   </table>
   </div>
-  <p class="mt-4">Data is the size of the descriptions, comments, and attachments from each user and their agents.</p>
+  <p class="mt-4">Issues counts the issues each user and their agents reported. Data is the size of their descriptions, comments, and attachments.</p>
 </section>
 <section class="card">
   <h2>Create a user</h2>

@@ -1,6 +1,6 @@
 {{define "content"}}
-<div class="issue">
-  <div class="issue-main">
+<div class="split">
+  <div class="split-main">
     <section class="card markdown">{{with .Data.Description}}{{.}}{{else}}<p class="text-light">No description.</p>{{end}}</section>
     {{with .Data.Children}}
     <section class="card">
@@ -26,7 +26,7 @@
       {{else}}<p>No comments yet.</p>{{end}}
     </section>
   </div>
-  <aside class="card issue-fields">
+  <aside class="card split-side">
     <dl class="fields">
       <dt>Status</dt><dd>{{template "status" .Data}}</dd>
       <dt>Type</dt><dd>{{.Data.Type}}</dd>

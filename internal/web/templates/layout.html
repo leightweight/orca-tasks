@@ -34,6 +34,7 @@
 <main class="container">
   <header class="page">
     <div>
+      {{block "crumbs" .}}{{end}}
       <h1>{{.Title}}</h1>
       {{block "intro" .}}{{end}}
     </div>
@@ -54,3 +55,4 @@
 </html>
 {{define "role"}}{{if eq . "admin"}}<span class="badge outline">admin</span>{{else}}<span class="badge" data-variant="secondary">member</span>{{end}}{{end}}
 {{define "status"}}<span class="badge"{{if eq .Category "done"}} data-variant="success"{{else if eq .Category "indeterminate"}} data-variant="warning"{{else}} data-variant="secondary"{{end}}>{{.Status}}</span>{{end}}
+{{define "userBadges"}}{{if .SiteAdmin}} <span class="badge outline">admin</span>{{end}}{{if .DisabledAt}} <span class="badge" data-variant="secondary">disabled</span>{{end}}{{if not .PasswordHash}} <span class="badge" data-variant="warning">invited</span>{{end}}{{end}}

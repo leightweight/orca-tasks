@@ -151,7 +151,7 @@ func (w *Web) confirmUserChange(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page := confirmPage{Cancel: "/admin/users"}
+	page := confirmPage{Cancel: "/admin/users/" + strconv.FormatInt(user.ID, 10)}
 
 	var question string
 

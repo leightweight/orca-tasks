@@ -32,6 +32,48 @@ func (w *Web) users(rw http.ResponseWriter, r *http.Request) {
 	w.render(rw, r, http.StatusOK, "admin_users", "Users", usersPage{Users: users})
 }
 
+type adminUserPage struct {
+	db.ListUsersRow
+
+	Memberships []db.ListMyProjectsRow
+}
+
+// adminUser shows one user's counts, projects, and the actions a site
+// administrator can take on the account.
+func (w *Web) adminUser(rw http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		w.notFound(rw, r)
+		return
+	}
+
+	users, err := w.Store.ListUsers(ctx)
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
+	for _, u := range users {
+		if u.Principal.ID != id {
+			continue
+		}
+
+		memberships, err := w.Store.ListMyProjects(ctx, id)
+		if err != nil {
+			w.serverError(rw, r, err)
+			return
+		}
+
+		w.render(rw, r, http.StatusOK, "admin_user", u.Principal.Username, adminUserPage{ListUsersRow: u, Memberships: memberships})
+
+		return
+	}
+
+	w.notFound(rw, r)
+}
+
 // NewResetLink makes a link that sets a user's password and authenticator.
 // The admin reset-link command uses it too.
 func NewResetLink(ctx context.Context, s *store.Store, baseURL string, userID int64) (string, error) {
@@ -111,10 +153,11 @@ func (w *Web) changeUser(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	action := r.PathValue("action")
+	back := "/admin/users/" + strconv.FormatInt(user.ID, 10)
 
 	// Administrators can't lock themselves out.
 	if user.ID == me.ID && action != "reset" {
-		w.redirectError(rw, r, "/admin/users", "You can't disable yourself or remove your own administration.")
+		w.redirectError(rw, r, back, "You can't disable yourself or remove your own administration.")
 		return
 	}
 
@@ -131,7 +174,7 @@ func (w *Web) changeUser(rw http.ResponseWriter, r *http.Request) {
 		}
 
 		w.revealLink(r, user.Username, link)
-		http.Redirect(rw, r, "/admin/users", http.StatusSeeOther)
+		http.Redirect(rw, r, back, http.StatusSeeOther)
 
 		return
 	default:
@@ -144,7 +187,7 @@ func (w *Web) changeUser(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.redirect(rw, r, "/admin/users", "Saved the change to "+user.Username+".")
+	w.redirect(rw, r, back, "Saved the change to "+user.Username+".")
 }
 
 type allProjectsPage struct {

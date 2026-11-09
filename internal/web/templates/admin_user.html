@@ -1,0 +1,59 @@
+{{define "crumbs"}}<a class="crumbs" href="/admin/users">Users</a>{{end}}
+{{define "intro"}}<p>{{.Data.Principal.DisplayName}}{{with .Data.Principal.Email}} · {{.}}{{end}}{{template "userBadges" .Data.Principal}}</p>{{end}}
+{{define "content"}}
+{{$self := eq .Data.Principal.ID .User.ID}}
+<div class="split">
+  <div class="split-main">
+    <section class="card">
+      <h2>Projects</h2>
+      <div class="table">
+      <table>
+        <thead><tr><th>Their key</th><th>Name</th><th>Role</th><th class="num">Issues</th></tr></thead>
+        <tbody>
+        {{range .Data.Memberships}}
+          <tr>
+            <td><a href="/admin/projects/{{.Project.ID}}">{{.Membership.Key}}</a></td>
+            <td>{{.Project.Name}}</td>
+            <td>{{template "role" .Membership.Role}}</td>
+            <td class="num">{{.Issues}}</td>
+          </tr>
+        {{else}}
+          <tr><td colspan="4" class="empty">Not in any projects.</td></tr>
+        {{end}}
+        </tbody>
+      </table>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Account</h2>
+      <p>A reset link sets a new password and authenticator, and ends the user's sessions once they use it.</p>
+      <div class="hstack">
+        <form method="post" action="/admin/users/{{.Data.Principal.ID}}/reset"><button data-variant="secondary">Make a reset link</button></form>
+        {{if not $self}}
+        <a class="button outline" href="/admin/users/{{.Data.Principal.ID}}/{{if .Data.Principal.SiteAdmin}}unadmin{{else}}admin{{end}}">{{if .Data.Principal.SiteAdmin}}Remove site administration{{else}}Make site administrator{{end}}</a>
+        {{if .Data.Principal.DisabledAt}}
+        <form method="post" action="/admin/users/{{.Data.Principal.ID}}/enable"><button class="outline">Enable</button></form>
+        {{else}}
+        <a class="button outline" data-variant="danger" href="/admin/users/{{.Data.Principal.ID}}/disable">Disable</a>
+        {{end}}
+        {{end}}
+      </div>
+      {{if $self}}<p class="mt-4">You can't disable yourself or remove your own administration.</p>{{end}}
+    </section>
+  </div>
+  <aside class="card split-side">
+    <dl class="fields">
+      <dt>Projects</dt><dd>{{.Data.Projects}}</dd>
+      <dt>Agents</dt><dd>{{.Data.Agents}}</dd>
+      <dt>Active keys</dt><dd>{{.Data.ActiveKeys}}</dd>
+      <dt>Reported</dt><dd>{{.Data.IssuesReported}}</dd>
+      <dt>Assigned</dt><dd>{{.Data.IssuesAssigned}}</dd>
+      <dt>Comments</dt><dd>{{.Data.Comments}}</dd>
+      <dt>Attachments</dt><dd>{{.Data.Attachments}}</dd>
+      <dt>Data</dt><dd>{{bytes .Data.Bytes}}</dd>
+      <dt>Last sign-in</dt><dd>{{if .Data.Principal.LastSignInAt}}{{ago .Data.Principal.LastSignInAt}}{{else}}Never{{end}}</dd>
+      <dt>Last key use</dt><dd>{{if eq .Data.LastKeyUse.Unix 0}}Never{{else}}{{ago .Data.LastKeyUse}}{{end}}</dd>
+    </dl>
+  </aside>
+</div>
+{{end}}

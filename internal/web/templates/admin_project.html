@@ -1,4 +1,5 @@
-{{define "intro"}}<p>Project key <code>{{.Data.Project.Key}}</code>, ID {{.Data.Project.ID}}. {{.Data.Issues}} issues. <a href="/admin/projects">All projects</a></p>{{end}}
+{{define "crumbs"}}<a class="crumbs" href="/admin/projects">All projects</a>{{end}}
+{{define "intro"}}<p>Project key <code>{{.Data.Project.Key}}</code>, ID {{.Data.Project.ID}}. {{.Data.Issues}} issues.</p>{{end}}
 {{define "content"}}
 <section class="card">
   <h2>Members</h2>

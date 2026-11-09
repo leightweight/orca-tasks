@@ -173,6 +173,7 @@ func (w *Web) Register(mux *http.ServeMux) error {
 
 	page("GET /admin/users", w.admin(w.users))
 	page("POST /admin/users", w.admin(w.createUser))
+	page("GET /admin/users/{id}", w.admin(w.adminUser))
 	page("GET /admin/users/{id}/{action}", w.admin(w.confirmUserChange))
 	page("POST /admin/users/{id}/{action}", w.admin(w.changeUser))
 	page("GET /admin/projects", w.admin(w.allProjects))
@@ -199,6 +200,20 @@ func origin(baseURL string) string {
 func (w *Web) parseTemplates() error {
 	funcs := template.FuncMap{
 		"join": strings.Join,
+		// lastSeen is the later of a sign-in and an API key use, or nil for
+		// neither. A key that was never used reports the epoch.
+		"lastSeen": func(signIn *time.Time, keyUse time.Time) *time.Time {
+			var last *time.Time
+			if keyUse.Unix() != 0 {
+				last = &keyUse
+			}
+
+			if signIn != nil && (last == nil || signIn.After(*last)) {
+				last = signIn
+			}
+
+			return last
+		},
 		// current reports whether a page's path is one a navigation link covers.
 		"current": func(path string, prefixes ...string) bool {
 			for _, prefix := range prefixes {

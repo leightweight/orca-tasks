@@ -299,7 +299,8 @@ Revoking a key, removing or leaving a member, disabling an agent or user, and ch
 | `/account/agents` | Users | Create and manage agents and their API keys. |
 | `/projects` | Users | List the user's projects and create a project. |
 | `/projects/{key}` | Project members | Show counts, change the key the user sees the project under, and let administrators rename the project, manage members, and delete it. |
-| `/admin/users` | Site administrators | List users with their counts, create users, disable or enable them, grant administration, and generate reset links. |
+| `/admin/users` | Site administrators | List users with their counts and create users. |
+| `/admin/users/{id}` | Site administrators | Show one user's projects and counts, disable or enable them, grant administration, and generate a reset link. |
 | `/admin/projects` | Site administrators | List every project with counts and members. |
 | `/admin/projects/{id}` | Site administrators | Show one project's members, add members, and delete the project. |
 | `/admin/proxy` | Site administrators | Show the connecting address, the forwarding headers, which hops are trusted, and the client address the server resolved. |
@@ -307,8 +308,9 @@ Revoking a key, removing or leaving a member, disabling an agent or user, and ch
 
 Orca links each issue to `{site}/browse/{KEY}`, which is why the read-only issue page exists.
 
-For each user, the user list shows their projects, agents, active API keys, issues reported, issues assigned, comments, and attachments.
+For each user, the user's page shows their projects, agents, active API keys, issues reported, issues assigned, comments, and attachments.
 It also shows the bytes of description, comment, and attachment data from the user and their agents, the last sign-in, and the last API key use.
+The user list shows the main counts and when each user was last seen, by sign-in or key use.
 
 ## Jira-compatible API
 
