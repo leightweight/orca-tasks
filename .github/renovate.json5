@@ -41,6 +41,14 @@
       semanticCommitType: 'fix',
     },
     {
+      // A new digest for the builder image only reaches development builds, since releases use goreleaser's binary.
+      // A separate group keeps it out of a Go version pull request, which is a fix.
+      groupName: 'Go builder image',
+      matchPackageNames: ['golang'],
+      matchUpdateTypes: ['digest'],
+      semanticCommitType: 'chore',
+    },
+    {
       // Pin base images by digest so a moved tag shows up as a pull request.
       matchManagers: ['dockerfile'],
       pinDigests: true,
