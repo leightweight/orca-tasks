@@ -54,6 +54,13 @@ func (w *Web) moveTask(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The board's script moves the card itself, so it needs no page or
+	// message, which would otherwise show on the next page opened.
+	if r.Header.Get("X-Requested-With") == "fetch" {
+		rw.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	w.redirect(rw, r, page, "Moved "+issueKey(row)+" to "+status.Name+".")
 }
 

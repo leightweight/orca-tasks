@@ -603,3 +603,41 @@ func TestPreviewingMarkdown(t *testing.T) {
 
 	s.browser().expectRedirect(s.browser().post("/preview", url.Values{"text": {"x"}}), "/login")
 }
+
+func TestTheBoard(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}}), "/projects/OPS/tasks")
+	createIssue(t, s, "Rotate the keys", "To Do", nil)
+	createIssue(t, s, "Renew the certificates", "Done", nil)
+
+	// The board shows done tasks too, each in its status's column.
+	board := alice.get("/projects/OPS/tasks?view=board").body
+	for _, column := range []string{"To Do", "Done"} {
+		pattern := regexpFor(`(?s)<section class="column" data-status="\d+" aria-label="` + column + `">.*?</section>`)
+		if !strings.Contains(pattern.FindString(board), `data-key="OPS-`) {
+			t.Errorf("the %s column has no card: %.3000s", column, board)
+		}
+	}
+
+	// Its script moves a card without leaving a message for the next page.
+	inProgress := find(t, regexpFor(`data-status="(\d+)" aria-label="In Progress"`), board)
+
+	request, err := http.NewRequestWithContext(testutil.Context(t), "POST", s.url+"/browse/OPS-1/status", strings.NewReader("status="+inProgress))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("X-Requested-With", "fetch")
+
+	if r := alice.do(request); r.status != http.StatusNoContent {
+		t.Errorf("a move from the board: status %d, want 204", r.status)
+	}
+
+	if body := alice.get("/browse/OPS-1").body; !strings.Contains(body, "selected>In Progress<") || strings.Contains(body, "Moved OPS-1") {
+		t.Errorf("after a move from the board: %.3000s", body)
+	}
+}

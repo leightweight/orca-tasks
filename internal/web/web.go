@@ -229,6 +229,8 @@ func (w *Web) parseTemplates() error {
 		"hasPrefix": strings.HasPrefix,
 		"formHas":   formHas,
 		"list":      func(values ...string) []string { return values },
+		// statusBadge gives a status what the "status" template reads.
+		"statusBadge": func(s db.Status) issueLink { return issueLink{Status: s.Name, Category: s.Category} },
 		// lastSeen is the later of a sign-in and an API key use, or nil for
 		// neither. A key that was never used reports the epoch.
 		"lastSeen": func(signIn *time.Time, keyUse time.Time) *time.Time {

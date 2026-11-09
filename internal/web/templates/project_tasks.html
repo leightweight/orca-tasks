@@ -5,13 +5,18 @@
 {{$f := .Data.Filters}}
 <section class="card">
   <header class="card-header">
+    <nav class="filter" aria-label="View">
+      <a href="{{$d.Link "view" ""}}"{{if not $d.Board}} aria-current="page"{{end}}>List</a>
+      <a href="{{$d.Link "view" "board"}}"{{if $d.Board}} aria-current="page"{{end}}>Board</a>
+    </nav>
     <nav class="filter" aria-label="Which tasks">
-      <a href="{{$d.Link "show" ""}}"{{if eq $d.Show "open"}} aria-current="page"{{end}}>Open {{$d.Open}}</a>
+      <a href="{{$d.Link "show" "open"}}"{{if eq $d.Show "open"}} aria-current="page"{{end}}>Open {{$d.Open}}</a>
       <a href="{{$d.Link "show" "done"}}"{{if eq $d.Show "done"}} aria-current="page"{{end}}>Done {{$d.Done}}</a>
       <a href="{{$d.Link "show" "all"}}"{{if eq $d.Show "all"}} aria-current="page"{{end}}>All {{$d.Total}}</a>
     </nav>
     <form method="get" class="filters" role="search">
       {{with $f.Get "show"}}<input type="hidden" name="show" value="{{.}}">{{end}}
+      {{with $f.Get "view"}}<input type="hidden" name="view" value="{{.}}">{{end}}
       <input type="search" name="q" value="{{$f.Get "q"}}" placeholder="Search" aria-label="Search summaries, descriptions, and labels">
       <select name="assignee" aria-label="Assignee">
         <option value="">Anyone</option>
@@ -43,6 +48,28 @@
     </form>
   </header>
   {{with $d.Problem}}<div role="alert" data-variant="danger" class="mb-4">{{.}}</div>{{end}}
+  {{if $d.Board}}
+  <div class="board" data-board>
+    {{range $d.Columns}}
+    <section class="column" data-status="{{.Status.ID}}" aria-label="{{.Status.Name}}">
+      <header>{{template "status" (statusBadge .Status)}} <span class="count text-light small">{{len .Tasks}}</span></header>
+      <ol>
+        {{range .Tasks}}
+        <li class="task-card" draggable="true" data-key="{{.Key}}">
+          <a href="/browse/{{.Key}}" class="key">{{.Key}}</a>
+          <p>{{.Summary}}</p>
+          <footer>
+            <span class="text-light small">{{.Type}}{{with .Priority}} · {{.}}{{end}}</span>
+            {{with .Assignee}}<span class="small">{{.}}</span>{{end}}
+          </footer>
+        </li>
+        {{end}}
+      </ol>
+    </section>
+    {{end}}
+  </div>
+  <p class="text-light small mt-4 drag-hint" hidden>Drag a card to another column to move it.</p>
+  {{else}}
   <div class="table">
   <table>
     <thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Type</th><th>Priority</th><th>Assignee</th><th>Updated</th></tr></thead>
@@ -63,6 +90,7 @@
     </tbody>
   </table>
   </div>
+  {{end}}
   <details class="advanced"{{if $f.Get "jql"}} open{{end}}>
     <summary>Advanced: filter with JQL</summary>
     <form method="get" class="inline">

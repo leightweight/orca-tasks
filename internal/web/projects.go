@@ -129,14 +129,31 @@ type taskList struct {
 	// The choices the filters offer.
 	Catalog *store.Catalog
 	Labels  []string
+
+	// Columns are the tasks by status, for the board.
+	Columns []boardColumn
 }
 
-// Show is which tasks the tabs select: open, done, or all.
+// boardColumn is a status and the listed tasks in it.
+type boardColumn struct {
+	Status db.Status
+	Tasks  []issueRow
+}
+
+// Board reports whether the page shows the tasks as a board.
+func (l taskList) Board() bool { return l.Filters.Get("view") == "board" }
+
+// Show is which tasks the tabs select: open, done, or all. The board shows
+// all of them unless asked otherwise, since its done columns are part of it.
 func (l taskList) Show() string {
 	switch show := l.Filters.Get("show"); show {
-	case "done", "all":
+	case "open", "done", "all":
 		return show
 	default:
+		if l.Board() {
+			return "all"
+		}
+
 		return "open"
 	}
 }
@@ -168,11 +185,10 @@ func (l taskList) Link(key, value string) string {
 func filterJQL(filters url.Values) string {
 	var clauses []string
 
-	switch filters.Get("show") {
+	switch (taskList{Filters: filters}).Show() {
 	case "done":
 		clauses = append(clauses, "statusCategory = Done")
-	case "all":
-	default:
+	case "open":
 		clauses = append(clauses, "statusCategory != Done")
 	}
 
@@ -269,6 +285,20 @@ func (w *Web) projectTasks(rw http.ResponseWriter, r *http.Request) {
 
 	for _, i := range jira.Filter(query, issues, w.Catalog, []string{user.Username}, w.Now()) {
 		page.List = append(page.List, w.issueRow(i))
+	}
+
+	if page.Board() {
+		for _, status := range w.Catalog.Statuses {
+			column := boardColumn{Status: status}
+
+			for _, item := range page.List {
+				if item.Status == status.Name {
+					column.Tasks = append(column.Tasks, item)
+				}
+			}
+
+			page.Columns = append(page.Columns, column)
+		}
 	}
 
 	w.render(rw, r, http.StatusOK, "project_tasks", "Tasks", page)
