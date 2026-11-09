@@ -1,0 +1,25 @@
+/* With scripts blocked, the sidebar's menu button can't open it on a phone,
+   so the sidebar shows above the page instead. */
+
+@media (max-width: 768px) {
+  [data-sidebar-toggle] {
+    display: none;
+  }
+
+  [data-sidebar-layout] {
+    grid-template-rows: auto auto 1fr;
+  }
+
+  [data-sidebar-layout] > aside[data-sidebar] {
+    grid-row: 2;
+    width: 100%;
+    transform: none;
+    box-shadow: none;
+    border-inline-end: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  [data-sidebar-layout] > main {
+    grid-row: 3;
+  }
+}
