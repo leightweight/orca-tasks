@@ -8,6 +8,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"log/slog"
@@ -225,13 +226,14 @@ func (w *Web) parseTemplates() error {
 			return false
 		},
 		"bytes": func(n int64) string { return humanize.IBytes(uint64(max(n, 0))) },
-		"ago": func(t any) string {
+		// ago shows a time relative to now, with the exact time on hover.
+		"ago": func(t any) template.HTML {
 			switch t := t.(type) {
 			case time.Time:
-				return humanize.Time(t)
+				return timeElement(t)
 			case *time.Time:
 				if t != nil {
-					return humanize.Time(*t)
+					return timeElement(*t)
 				}
 			}
 
@@ -265,6 +267,16 @@ func (w *Web) parseTemplates() error {
 	}
 
 	return nil
+}
+
+// timeElement is a <time> that reads like "4 days ago" and shows the exact
+// time in UTC as its tooltip. Pages have no JavaScript to find the viewer's
+// time zone, so UTC is the one zone everyone can convert from.
+func timeElement(t time.Time) template.HTML {
+	t = t.UTC()
+
+	return template.HTML(fmt.Sprintf(`<time datetime="%s" title="%s">%s</time>`,
+		t.Format(time.RFC3339), t.Format("Mon, 2 Jan 2006 15:04 MST"), template.HTMLEscapeString(humanize.Time(t))))
 }
 
 // view is what every page template gets.

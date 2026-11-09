@@ -30,9 +30,10 @@ linters:
   settings:
     gosec:
       excludes:
-        # G203 flags every conversion to template.HTML. The only one is goldmark's
-        # Markdown output with raw HTML off, which html/template can't take any
-        # other way.
+        # G203 flags every conversion to template.HTML. The conversions are
+        # goldmark's Markdown output with raw HTML off, which html/template can't
+        # take any other way, and the <time> element for relative times, built
+        # from formatted times and escaped text.
         - G203
     depguard:
       rules:

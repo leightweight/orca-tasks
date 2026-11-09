@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leightweight/orca-tasks/internal/auth"
 	"github.com/leightweight/orca-tasks/internal/store"
@@ -335,5 +336,20 @@ func TestAnIssueLinksBackToItsProject(t *testing.T) {
 
 	if body := alice.get("/browse/OPS-1").body; !strings.Contains(body, `<a class="crumbs" href="/projects/OPS">Operations</a>`) {
 		t.Errorf("the issue page doesn't link to its project: %.1500s", body)
+	}
+}
+
+func TestRelativeTimesShowTheExactTime(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}}), "/projects/OPS")
+
+	issue := createIssue(t, s, "Rotate the keys", "To Do", nil)
+	want := `<time datetime="` + issue.CreatedAt.UTC().Format(time.RFC3339) + `" title="` + issue.CreatedAt.UTC().Format("Mon, 2 Jan 2006 15:04 MST") + `">`
+
+	if body := alice.get("/browse/OPS-1").body; !strings.Contains(body, want) {
+		t.Errorf("no %s in the issue page: %.2500s", want, body)
 	}
 }

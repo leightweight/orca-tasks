@@ -36,6 +36,7 @@
       <dt>Reporter</dt><dd>{{.Data.Reporter}}</dd>
       {{with .Data.Parent}}<dt>Parent</dt><dd><a href="/browse/{{.Key}}">{{.Key}}</a> {{.Summary}}</dd>{{end}}
       {{with .Data.Labels}}<dt>Labels</dt><dd>{{range .}}<span class="badge outline">{{.}}</span> {{end}}</dd>{{end}}
+      <dt>Created</dt><dd>{{ago .Data.Created}}</dd>
       <dt>Updated</dt><dd>{{ago .Data.Updated}}</dd>
     </dl>
   </aside>

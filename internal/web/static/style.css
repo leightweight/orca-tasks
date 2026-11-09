@@ -190,6 +190,12 @@ a:not(.button, .brand):hover {
   white-space: nowrap;
 }
 
+time[title] {
+  cursor: help;
+  text-decoration: underline dotted var(--faint-foreground);
+  text-underline-offset: 3px;
+}
+
 /* Forms */
 
 form.stack {

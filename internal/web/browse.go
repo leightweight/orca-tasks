@@ -28,6 +28,7 @@ type issuePage struct {
 	Assignee    string
 	Reporter    string
 	Labels      []string
+	Created     time.Time
 	Updated     time.Time
 	Parent      *issueLink
 	Children    []issueLink
@@ -130,6 +131,7 @@ func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
 		Type:        w.Catalog.IssueTypeByID(i.TypeID).Name,
 		Reporter:    row.ReporterName,
 		Labels:      i.Labels,
+		Created:     i.CreatedAt,
 		Updated:     i.UpdatedAt,
 		Description: markdown(i.Description),
 	}
