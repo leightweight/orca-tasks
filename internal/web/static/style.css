@@ -319,6 +319,10 @@ section.danger-zone {
   align-items: start;
 }
 
+.split > * {
+  min-width: 0;
+}
+
 .split-main > section {
   margin-block-end: var(--space-6);
 }
@@ -353,6 +357,10 @@ dl.fields dd {
   max-width: 100%;
 }
 
+.markdown :not(pre) > code {
+  overflow-wrap: anywhere;
+}
+
 .comment {
   border-top: 1px solid var(--border);
   padding-block: var(--space-4);
@@ -362,4 +370,67 @@ dl.fields dd {
   font-size: var(--text-7);
   color: var(--muted-foreground);
   margin-block-end: var(--space-2);
+}
+
+/* Phones */
+
+@media (max-width: 768px) {
+  :root {
+    --container-pad: var(--space-4);
+  }
+
+  .wide-only {
+    display: none;
+  }
+
+  /* The brand and Sign out share the first row, and each group of links gets
+     a row of its own that scrolls sideways if it has to. */
+  nav[data-topnav] {
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-3) var(--space-4) 0;
+  }
+
+  nav[data-topnav] .signout {
+    order: 1;
+  }
+
+  nav[data-topnav] .links,
+  nav[data-topnav] .links.admin {
+    order: 2;
+    flex-basis: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-inline-start: 0;
+    border-inline-start: none;
+    white-space: nowrap;
+  }
+
+  nav[data-topnav] .links:last-of-type {
+    padding-block-end: var(--space-1);
+  }
+
+  main.container {
+    padding-block: var(--space-6) var(--space-12);
+  }
+
+  section.card {
+    padding: var(--space-4);
+  }
+
+  form.inline label:not(:has(input[type="checkbox"], input[type="radio"])) {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  /* A cell keeps to one line and the table scrolls sideways, rather than
+     squeezing "9 minutes ago" onto three lines. Summaries still wrap. */
+  .table :is(th, td) {
+    white-space: nowrap;
+  }
+
+  .table td.wrap {
+    white-space: normal;
+    min-width: 14rem;
+  }
 }

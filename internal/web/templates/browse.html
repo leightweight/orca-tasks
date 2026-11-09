@@ -9,7 +9,7 @@
       <div class="table">
       <table>
         <tbody>
-        {{range .}}<tr><td><a href="/browse/{{.Key}}">{{.Key}}</a></td><td>{{.Summary}}</td><td class="actions">{{template "status" .}}</td></tr>{{end}}
+        {{range .}}<tr><td><a href="/browse/{{.Key}}">{{.Key}}</a></td><td class="wrap">{{.Summary}}</td><td class="actions">{{template "status" .}}</td></tr>{{end}}
         </tbody>
       </table>
       </div>

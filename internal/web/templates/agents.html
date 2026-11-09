@@ -11,7 +11,7 @@
         <td><code>{{.Username}}</code></td>
         <td>
           <form method="post" action="/account/agents/{{.ID}}/rename" class="inline">
-            <label>Display name <input name="display_name" value="{{.DisplayName}}" required></label>
+            <input name="display_name" value="{{.DisplayName}}" required aria-label="Display name for {{.Username}}">
             <button class="small" data-variant="secondary">Rename</button>
           </form>
         </td>

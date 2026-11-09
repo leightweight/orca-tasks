@@ -16,7 +16,7 @@
     {{range .Data.List}}
       <tr>
         <td class="nowrap"><a href="/browse/{{.Key}}">{{.Key}}</a></td>
-        <td>{{.Summary}}{{with .Parent}} <span class="text-light small">in {{.}}</span>{{end}}</td>
+        <td class="wrap">{{.Summary}}{{with .Parent}} <span class="text-light small">in {{.}}</span>{{end}}</td>
         <td class="nowrap">{{template "status" .}}</td>
         <td>{{.Type}}</td>
         <td>{{or .Assignee "Unassigned"}}</td>
