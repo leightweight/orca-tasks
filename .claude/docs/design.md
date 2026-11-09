@@ -281,7 +281,10 @@ A user can revoke any of their keys or their agents' keys.
 
 ## Web interface
 
-The web interface is server-rendered `html/template` pages embedded in the binary, with one stylesheet and no JavaScript build.
+The web interface is server-rendered `html/template` pages embedded in the binary, with no JavaScript.
+[Oat](https://oat.ink) styles the pages, and `internal/web/static/style.css` adds the layout and what Oat doesn't cover.
+The binary embeds a pinned copy of Oat in `internal/web/static/oat/`, so pages load nothing from another site and work in local mode without a network.
+`mise run oat:update [version]` replaces it.
 Forms post and redirect.
 
 | Page | Who | Purpose |
@@ -636,6 +639,7 @@ The server builds links and decides whether cookies are `Secure` from `ORCA_TASK
 | Client addresses behind proxies | `github.com/realclientip/realclientip-go` |
 | JQL parsing | `github.com/alecthomas/participle/v2` |
 | Markdown to HTML | `github.com/yuin/goldmark` |
+| Web interface styles | Oat (`@knadh/oat`) |
 | CLI tables | `github.com/jedib0t/go-pretty/v6` |
 | Human-readable sizes and times | `github.com/dustin/go-humanize` |
 | SQL formatting | steveql-fmt |

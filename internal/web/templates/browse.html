@@ -1,31 +1,42 @@
 {{define "content"}}
-<dl class="fields">
-  <dt>Status</dt><dd>{{.Data.Status}}</dd>
-  <dt>Type</dt><dd>{{.Data.Type}}</dd>
-  <dt>Priority</dt><dd>{{or .Data.Priority "None"}}</dd>
-  <dt>Assignee</dt><dd>{{or .Data.Assignee "Unassigned"}}</dd>
-  <dt>Reporter</dt><dd>{{.Data.Reporter}}</dd>
-  {{with .Data.Parent}}<dt>Parent</dt><dd><a href="/browse/{{.Key}}">{{.Key}}</a> {{.Summary}} ({{.Status}})</dd>{{end}}
-  {{with .Data.Labels}}<dt>Labels</dt><dd>{{join . ", "}}</dd>{{end}}
-  <dt>Updated</dt><dd>{{ago .Data.Updated}}</dd>
-</dl>
-{{with .Data.Description}}<section class="markdown">{{.}}</section>{{end}}
-{{with .Data.Children}}
-<section>
-  <h2>Child issues</h2>
-  <ul>{{range .}}<li><a href="/browse/{{.Key}}">{{.Key}}</a> {{.Summary}} ({{.Status}})</li>{{end}}</ul>
-</section>
-{{end}}
-{{with .Data.Attachments}}
-<section>
-  <h2>Attachments</h2>
-  <ul>{{range .}}<li><a href="{{.URL}}">{{.Name}}</a> ({{bytes .Size}})</li>{{end}}</ul>
-</section>
-{{end}}
-{{with .Data.Comments}}
-<section>
-  <h2>Comments</h2>
-  {{range .}}<article class="comment"><header>{{.Author}}, {{ago .Created}}</header><div class="markdown">{{.Body}}</div></article>{{end}}
-</section>
-{{end}}
+<div class="issue">
+  <div class="issue-main">
+    <section class="card markdown">{{with .Data.Description}}{{.}}{{else}}<p class="text-light">No description.</p>{{end}}</section>
+    {{with .Data.Children}}
+    <section class="card">
+      <h2>Child issues</h2>
+      <div class="table">
+      <table>
+        <tbody>
+        {{range .}}<tr><td><a href="/browse/{{.Key}}">{{.Key}}</a></td><td>{{.Summary}}</td><td class="actions">{{template "status" .}}</td></tr>{{end}}
+        </tbody>
+      </table>
+      </div>
+    </section>
+    {{end}}
+    {{with .Data.Attachments}}
+    <section class="card">
+      <h2>Attachments</h2>
+      <ul class="unstyled">{{range .}}<li><a href="{{.URL}}">{{.Name}}</a> <span class="text-light">{{bytes .Size}}</span></li>{{end}}</ul>
+    </section>
+    {{end}}
+    <section class="card">
+      <h2>Comments</h2>
+      {{range .Data.Comments}}<article class="comment"><header><strong>{{.Author}}</strong> · {{ago .Created}}</header><div class="markdown">{{.Body}}</div></article>
+      {{else}}<p>No comments yet.</p>{{end}}
+    </section>
+  </div>
+  <aside class="card issue-fields">
+    <dl class="fields">
+      <dt>Status</dt><dd>{{template "status" .Data}}</dd>
+      <dt>Type</dt><dd>{{.Data.Type}}</dd>
+      <dt>Priority</dt><dd>{{or .Data.Priority "None"}}</dd>
+      <dt>Assignee</dt><dd>{{or .Data.Assignee "Unassigned"}}</dd>
+      <dt>Reporter</dt><dd>{{.Data.Reporter}}</dd>
+      {{with .Data.Parent}}<dt>Parent</dt><dd><a href="/browse/{{.Key}}">{{.Key}}</a> {{.Summary}}</dd>{{end}}
+      {{with .Data.Labels}}<dt>Labels</dt><dd>{{range .}}<span class="badge outline">{{.}}</span> {{end}}</dd>{{end}}
+      <dt>Updated</dt><dd>{{ago .Data.Updated}}</dd>
+    </dl>
+  </aside>
+</div>
 {{end}}

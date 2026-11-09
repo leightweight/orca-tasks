@@ -4,28 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}} · orca-tasks</title>
+<link rel="stylesheet" href="/static/oat/oat.min.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header>
+<nav data-topnav>
   <a class="brand" href="/">orca-tasks</a>
   {{with .User}}
-  <nav>
+  <div class="links">
     <a href="/projects">Projects</a>
     <a href="/account">Account</a>
     <a href="/account/keys">API keys</a>
     <a href="/account/agents">Agents</a>
     {{if .SiteAdmin}}<a href="/admin/users">Users</a><a href="/admin/projects">All projects</a>{{end}}
-    <form method="post" action="/logout"><button class="link">Sign out {{.Username}}</button></form>
-  </nav>
+  </div>
+  <form method="post" action="/logout" class="signout">
+    <span class="text-light">{{.Username}}</span>
+    <button class="small outline">Sign out</button>
+  </form>
   {{end}}
-</header>
-<main>
-  <h1>{{.Title}}</h1>
-  {{with .Flash}}<p class="flash">{{.}}</p>{{end}}
-  {{with .Error}}<p class="error">{{.}}</p>{{end}}
+</nav>
+<main class="container">
+  <header class="page">
+    <div>
+      <h1>{{.Title}}</h1>
+      {{block "intro" .}}{{end}}
+    </div>
+    {{block "actions" .}}{{end}}
+  </header>
+  {{with .Flash}}<div role="alert" data-variant="success">{{.}}</div>{{end}}
+  {{with .Error}}<div role="alert" data-variant="danger">{{.}}</div>{{end}}
   {{with .Reveal}}
-  <section class="reveal">
+  <section class="card reveal">
     <h2>{{.Title}}</h2>
     <p>{{.Note}}</p>
     {{range .Lines}}<pre>{{.}}</pre>{{end}}
@@ -35,3 +45,5 @@
 </main>
 </body>
 </html>
+{{define "role"}}{{if eq . "admin"}}<span class="badge outline">admin</span>{{else}}<span class="badge" data-variant="secondary">member</span>{{end}}{{end}}
+{{define "status"}}<span class="badge"{{if eq .Category "done"}} data-variant="success"{{else if eq .Category "indeterminate"}} data-variant="warning"{{else}} data-variant="secondary"{{end}}>{{.Status}}</span>{{end}}

@@ -1,34 +1,8 @@
+{{define "intro"}}<p>Orca and the CLI sign in with an API key. In Orca, open Settings, then Integrations, then Jira. Enter <code>{{.BaseURL}}</code> as the site, choose Server / Data Center, leave the username empty, and paste a key as the token.</p>{{end}}
 {{define "content"}}
-<p>Orca and the CLI sign in with an API key. In Orca, open Settings, then Integrations, then Jira.
-Enter <code>{{.BaseURL}}</code> as the site, choose Server / Data Center, leave the username empty, and paste a key as the token.</p>
-<section>
-  <h2>Create a key</h2>
-  <form method="post" class="stack">
-    <label>Name <input name="name" required placeholder="laptop"></label>
-    <label>For
-      <select name="principal">
-        <option value="{{.User.ID}}">{{.User.Username}} (you)</option>
-        {{range .Data.Agents}}{{if not .DisabledAt}}<option value="{{.ID}}">{{.Username}} (agent)</option>{{end}}{{end}}
-      </select>
-    </label>
-    <label>Access
-      <select name="access"><option value="write">Read and write</option><option value="read">Read only</option></select>
-    </label>
-    <fieldset>
-      <legend>Projects</legend>
-      <label class="check"><input type="radio" name="scope" value="all" checked> All of them, including ones joined later</label>
-      <label class="check"><input type="radio" name="scope" value="some"> Only these:</label>
-      {{range .Data.Projects}}<label class="check indent"><input type="checkbox" name="project" value="{{.Project.ID}}"> {{.Membership.Key}}: {{.Project.Name}}</label>{{end}}
-    </fieldset>
-    <label>Expires
-      <select name="expires"><option value="0">Never</option><option value="30">In 30 days</option><option value="90">In 90 days</option><option value="365">In a year</option></select>
-    </label>
-    {{if not .PasswordOnly}}<label>Authenticator code <input name="code" required inputmode="numeric" autocomplete="one-time-code"></label>{{end}}
-    <button>Create key</button>
-  </form>
-</section>
-<section>
+<section class="card">
   <h2>Keys</h2>
+  <div class="table">
   <table>
     <thead><tr><th>Name</th><th>For</th><th>Access</th><th>Projects</th><th>Created</th><th>Last used</th><th>Expires</th><th></th></tr></thead>
     <tbody>
@@ -40,13 +14,42 @@ Enter <code>{{.BaseURL}}</code> as the site, choose Server / Data Center, leave 
         <td>{{if .ApiKey.AllProjects}}All{{else}}{{join .ProjectKeys ", "}}{{end}}</td>
         <td>{{ago .ApiKey.CreatedAt}}</td>
         <td>{{if .ApiKey.LastUsedAt}}{{ago .ApiKey.LastUsedAt}}{{else}}Never{{end}}</td>
-        <td>{{if .ApiKey.RevokedAt}}Revoked{{else if .ApiKey.ExpiresAt}}{{ago .ApiKey.ExpiresAt}}{{else}}Never{{end}}</td>
-        <td>{{if not .ApiKey.RevokedAt}}<form method="post" action="/account/keys/{{.ApiKey.ID}}/revoke"><button class="danger">Revoke</button></form>{{end}}</td>
+        <td>{{if .ApiKey.RevokedAt}}<span class="badge" data-variant="danger">Revoked</span>{{else if .ApiKey.ExpiresAt}}{{ago .ApiKey.ExpiresAt}}{{else}}Never{{end}}</td>
+        <td class="actions">{{if not .ApiKey.RevokedAt}}<form method="post" action="/account/keys/{{.ApiKey.ID}}/revoke"><button class="small outline" data-variant="danger">Revoke</button></form>{{end}}</td>
       </tr>
     {{else}}
-      <tr><td colspan="8">No keys yet.</td></tr>
+      <tr><td colspan="8" class="empty">No API keys yet. Create one below to connect Orca or the CLI.</td></tr>
     {{end}}
     </tbody>
   </table>
+  </div>
+</section>
+<section class="card">
+  <h2>Create a key</h2>
+  <form method="post" class="stack">
+    <label>Name <input name="name" required placeholder="laptop">
+      <small data-hint>Where it's used, so you can tell keys apart.</small>
+    </label>
+    <label>For
+      <select name="principal">
+        <option value="{{.User.ID}}">{{.User.Username}} (you)</option>
+        {{range .Data.Agents}}{{if not .DisabledAt}}<option value="{{.ID}}">{{.Username}} (agent)</option>{{end}}{{end}}
+      </select>
+    </label>
+    <label>Access
+      <select name="access"><option value="write">Read and write</option><option value="read">Read only</option></select>
+    </label>
+    <fieldset>
+      <legend>Projects</legend>
+      <label><input type="radio" name="scope" value="all" checked> All of them, including ones joined later</label>
+      <label><input type="radio" name="scope" value="some"> Only these:</label>
+      {{range .Data.Projects}}<label class="indent"><input type="checkbox" name="project" value="{{.Project.ID}}"> {{.Membership.Key}}: {{.Project.Name}}</label>{{end}}
+    </fieldset>
+    <label>Expires
+      <select name="expires"><option value="0">Never</option><option value="30">In 30 days</option><option value="90">In 90 days</option><option value="365">In a year</option></select>
+    </label>
+    {{if not .PasswordOnly}}<label>Authenticator code <input name="code" required inputmode="numeric" autocomplete="one-time-code"></label>{{end}}
+    <button>Create key</button>
+  </form>
 </section>
 {{end}}

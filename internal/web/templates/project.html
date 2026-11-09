@@ -1,16 +1,9 @@
+{{define "intro"}}<p>Project key <code>{{.Data.Project.Key}}</code>, which you see as <code>{{.Data.Membership.Key}}</code>. {{.Data.Issues}} issues.</p>{{end}}
 {{define "content"}}
 {{$admin := eq .Data.Membership.Role "admin"}}
-<p>Project key <code>{{.Data.Project.Key}}</code>, which you see as <code>{{.Data.Membership.Key}}</code>. {{.Data.Issues}} issues.</p>
-{{if $admin}}
-<section>
-  <h2>Rename</h2>
-  <form method="post" action="/projects/{{.Data.Membership.Key}}/rename" class="inline">
-    <input name="name" value="{{.Data.Project.Name}}" required><button>Rename</button>
-  </form>
-</section>
-{{end}}
-<section>
+<section class="card">
   <h2>Members</h2>
+  <div class="table">
   <table>
     <thead><tr><th>Username</th><th>Display name</th><th>Role</th><th></th></tr></thead>
     <tbody>
@@ -21,17 +14,17 @@
         <td>
           {{if $admin}}
           <form method="post" action="/projects/{{$.Data.Membership.Key}}/members/{{.Principal.Username}}/role" class="inline">
-            <select name="role">
+            <select name="role" aria-label="Role">
               <option value="member"{{if eq .Membership.Role "member"}} selected{{end}}>member</option>
               <option value="admin"{{if eq .Membership.Role "admin"}} selected{{end}}>admin</option>
-            </select><button>Change</button>
+            </select><button class="small" data-variant="secondary">Change</button>
           </form>
-          {{else}}{{.Membership.Role}}{{end}}
+          {{else}}{{template "role" .Membership.Role}}{{end}}
         </td>
-        <td>
+        <td class="actions">
           {{if or $admin (eq .Principal.ID $.User.ID)}}
           <form method="post" action="/projects/{{$.Data.Membership.Key}}/members/{{.Principal.Username}}/remove">
-            <button class="danger">{{if eq .Principal.ID $.User.ID}}Leave{{else}}Remove{{end}}</button>
+            <button class="small outline" data-variant="danger">{{if eq .Principal.ID $.User.ID}}Leave{{else}}Remove{{end}}</button>
           </form>
           {{end}}
         </td>
@@ -39,21 +32,29 @@
     {{end}}
     </tbody>
   </table>
+  </div>
   {{if $admin}}
   <form method="post" action="/projects/{{.Data.Membership.Key}}/members" class="inline">
     <label>Username <input name="username" required></label>
-    <select name="role"><option value="member">member</option><option value="admin">admin</option></select>
+    <label>Role <select name="role"><option value="member">member</option><option value="admin">admin</option></select></label>
     <button>Add member</button>
   </form>
   {{end}}
 </section>
 {{if $admin}}
-<section>
+<section class="card">
+  <h2>Rename</h2>
+  <form method="post" action="/projects/{{.Data.Membership.Key}}/rename" class="inline">
+    <label>Name <input name="name" value="{{.Data.Project.Name}}" required></label>
+    <button data-variant="secondary">Rename</button>
+  </form>
+</section>
+<section class="card danger-zone">
   <h2>Delete</h2>
   <p>Deleting the project deletes its issues, comments, history, and attachments. There is no undo.</p>
   <form method="post" action="/projects/{{.Data.Membership.Key}}/delete" class="inline">
     <label>Type <code>{{.Data.Membership.Key}}</code> to confirm <input name="confirm" required></label>
-    <button class="danger">Delete project</button>
+    <button data-variant="danger">Delete project</button>
   </form>
 </section>
 {{end}}

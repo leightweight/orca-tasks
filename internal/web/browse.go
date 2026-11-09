@@ -20,6 +20,7 @@ import (
 
 type issuePage struct {
 	Status      string
+	Category    string
 	Type        string
 	Priority    string
 	Assignee    string
@@ -34,9 +35,10 @@ type issuePage struct {
 }
 
 type issueLink struct {
-	Key     string
-	Summary string
-	Status  string
+	Key      string
+	Summary  string
+	Status   string
+	Category string
 }
 
 type attachmentLink struct {
@@ -116,8 +118,11 @@ func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	status := w.Catalog.StatusByID(i.StatusID)
+
 	page := issuePage{
-		Status:      w.Catalog.StatusByID(i.StatusID).Name,
+		Status:      status.Name,
+		Category:    status.Category,
 		Type:        w.Catalog.IssueTypeByID(i.TypeID).Name,
 		Reporter:    row.ReporterName,
 		Labels:      i.Labels,
@@ -134,20 +139,24 @@ func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if row.ParentNumber != nil {
+		parentStatus := w.Catalog.StatusByID(*row.ParentStatusID)
 		page.Parent = &issueLink{
-			Key:     fmt.Sprintf("%s-%d", row.ProjectKey, *row.ParentNumber),
-			Summary: *row.ParentSummary,
-			Status:  w.Catalog.StatusByID(*row.ParentStatusID).Name,
+			Key:      fmt.Sprintf("%s-%d", row.ProjectKey, *row.ParentNumber),
+			Summary:  *row.ParentSummary,
+			Status:   parentStatus.Name,
+			Category: parentStatus.Category,
 		}
 	}
 
 	slices.SortFunc(children, func(a, b db.VisibleIssuesRow) int { return cmp.Compare(a.Issue.Number, b.Issue.Number) })
 
 	for _, c := range children {
+		childStatus := w.Catalog.StatusByID(c.Issue.StatusID)
 		page.Children = append(page.Children, issueLink{
-			Key:     fmt.Sprintf("%s-%d", c.ProjectKey, c.Issue.Number),
-			Summary: c.Issue.Summary,
-			Status:  w.Catalog.StatusByID(c.Issue.StatusID).Name,
+			Key:      fmt.Sprintf("%s-%d", c.ProjectKey, c.Issue.Number),
+			Summary:  c.Issue.Summary,
+			Status:   childStatus.Name,
+			Category: childStatus.Category,
 		})
 	}
 

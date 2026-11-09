@@ -7,10 +7,13 @@ dist: .cache/dist
 # The binary bundles modules whose licenses ask for their notices to go with
 # it, so each release collects them into .cache/release/licenses for the
 # archives and the image. github.com/xi2/xz is public domain, which needs no
-# notice and which go-licenses can't classify.
+# notice and which go-licenses can't classify. The binary also embeds Oat's
+# stylesheet, which go-licenses doesn't see.
 before:
   hooks:
     - go-licenses save ./cmd/orca-tasks --save_path .cache/release/licenses --force --ignore github.com/xi2/xz --ignore github.com/leightweight/orca-tasks
+    - mkdir -p .cache/release/licenses/oat
+    - cp internal/web/static/oat/LICENSE .cache/release/licenses/oat/LICENSE
 
 builds:
   - id: orca-tasks

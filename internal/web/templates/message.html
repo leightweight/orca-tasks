@@ -1,1 +1,2 @@
-{{define "content"}}<p>{{.Data}}</p>{{end}}
+{{define "intro"}}<p>{{.Data}}</p>{{end}}
+{{define "content"}}{{if .User}}<p><a class="button outline" href="/projects">Back to your projects</a></p>{{end}}{{end}}
