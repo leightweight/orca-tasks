@@ -201,6 +201,7 @@ func (w *Web) Register(mux *http.ServeMux) error {
 	page("POST /admin/projects/{id}/delete", w.admin(w.adminDeleteProject))
 	page("GET /admin/proxy", w.admin(w.proxy))
 
+	page("POST /preview", w.signedIn(w.preview))
 	page("GET /browse/{key}", w.signedIn(w.browse))
 	page("GET /browse/{key}/edit", w.signedIn(w.editTaskForm))
 	page("POST /browse/{key}/edit", w.signedIn(w.updateTask))

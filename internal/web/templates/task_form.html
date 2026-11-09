@@ -7,10 +7,15 @@
     <section class="card">
       <div class="stack-fields">
         <label>Summary <input name="summary" required value="{{$f.Get "summary"}}" placeholder="Rotate the API keys" autofocus></label>
-        <label>Description
-          <textarea name="description" rows="14" placeholder="What needs doing, and how you'll know it's done.">{{$f.Get "description"}}</textarea>
+        <div class="markdown-field">
+          <div class="field-header">
+            <label for="description">Description</label>
+            <button type="button" class="small ghost" data-preview="description" aria-pressed="false" hidden>Preview</button>
+          </div>
+          <textarea id="description" name="description" rows="14" placeholder="What needs doing, and how you'll know it's done.">{{$f.Get "description"}}</textarea>
+          <div id="description-preview" class="markdown preview" hidden></div>
           <small data-hint>Markdown. Attach images on the task's page, then paste the Markdown it gives you here.</small>
-        </label>
+        </div>
       </div>
       <div class="buttons mt-6"><button>{{.Data.Submit}}</button><a class="button outline" href="{{.Data.Cancel}}">Cancel</a></div>
     </section>

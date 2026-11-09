@@ -286,7 +286,8 @@ The web interface is server-rendered `html/template` pages embedded in the binar
 [Oat](https://oat.ink) styles the pages, and its small script positions menus and opens the sidebar on phones; `internal/web/static/style.css` adds the layout and what Oat doesn't cover.
 The binary embeds a pinned copy of Oat in `internal/web/static/oat/`, so pages load nothing from another site and work in local mode without a network.
 `mise run oat:update [version]` replaces it.
-Every page works with scripts blocked, since menus are native popovers and forms post and redirect.
+`internal/web/static/app.js` adds a Preview button to Markdown fields, which shows the text as the server renders it through `POST /preview`.
+Every page works with scripts blocked, since menus are native popovers, forms post and redirect, and the Preview buttons stay hidden.
 Forms that create something have a page of their own, at the list's path followed by `/new`, linked from a button in the list's header.
 A form that fails shows again with the problem and what was typed.
 

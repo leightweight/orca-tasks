@@ -422,6 +422,24 @@ table form.inline :is(input, select) {
   margin-block-start: 0;
 }
 
+.markdown-field .field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.markdown-field textarea {
+  margin-block-start: var(--space-1);
+}
+
+.markdown-field .preview {
+  margin-block-start: var(--space-1);
+  min-height: 6rem;
+  padding: var(--space-3);
+  border: 1px dashed var(--input);
+  border-radius: var(--radius-medium);
+}
+
 .stack-fields {
   display: grid;
   gap: var(--space-4);

@@ -589,3 +589,17 @@ func TestFilteringTheTaskList(t *testing.T) {
 		t.Errorf("a broken query doesn't say so: %.2000s", body)
 	}
 }
+
+func TestPreviewingMarkdown(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+
+	r := alice.post("/preview", url.Values{"text": {"Use **the** vault. <script>alert(1)</script>"}})
+	if r.status != http.StatusOK || !strings.Contains(r.body, "<strong>the</strong>") || strings.Contains(r.body, "<script>") {
+		t.Errorf("the preview: status %d: %s", r.status, r.body)
+	}
+
+	s.browser().expectRedirect(s.browser().post("/preview", url.Values{"text": {"x"}}), "/login")
+}

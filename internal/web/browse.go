@@ -77,6 +77,14 @@ func markdown(text string) template.HTML {
 	return template.HTML(out.String())
 }
 
+// preview renders Markdown for a form's Preview button.
+func (w *Web) preview(rw http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(rw, r.Body, 1<<20)
+
+	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = rw.Write([]byte(markdown(r.PostFormValue("text"))))
+}
+
 // visibleIssue finds the task the path's key names among those the signed-in
 // user can see, showing a 404 if there isn't one.
 func (w *Web) visibleIssue(rw http.ResponseWriter, r *http.Request) (db.VisibleIssuesRow, bool) {
