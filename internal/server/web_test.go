@@ -194,3 +194,19 @@ func TestRiskyActionsAskFirst(t *testing.T) {
 		}
 	}
 }
+
+func TestChangingYourKeyStaysOnTheProject(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}, "name": {"Operations"}}), "/projects/OPS")
+
+	alice.expectRedirect(alice.post("/projects/OPS/key", url.Values{"key": {"ops2"}}), "/projects/OPS2")
+
+	if body := alice.get("/projects/OPS2").body; !strings.Contains(body, "Its own key is <code>OPS</code>") {
+		t.Errorf("the project page doesn't say the project's own key: %.1500s", body)
+	}
+
+	alice.expectRedirect(alice.post("/projects/OPS2/key", url.Values{"key": {"2BAD"}}), "/projects/OPS2")
+}

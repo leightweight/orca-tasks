@@ -1,4 +1,4 @@
-{{define "intro"}}<p>Project key <code>{{.Data.Project.Key}}</code>, which you see as <code>{{.Data.Membership.Key}}</code>. {{.Data.Issues}} issues.</p>{{end}}
+{{define "intro"}}<p>{{.Data.Issues}} issues. {{if ne .Data.Project.Key .Data.Membership.Key}}Its own key is <code>{{.Data.Project.Key}}</code>, and you see it as <code>{{.Data.Membership.Key}}</code>.{{else}}You see it as <code>{{.Data.Membership.Key}}</code>.{{end}}</p>{{end}}
 {{define "content"}}
 {{$admin := eq .Data.Membership.Role "admin"}}
 <section class="card">
@@ -42,6 +42,14 @@
     <button>Add member</button>
   </form>
   {{end}}
+</section>
+<section class="card">
+  <h2>Your key</h2>
+  <p>Only you and your agents see this key, and your issue keys use it, such as <code>{{.Data.Membership.Key}}-12</code>. Changing it unlinks Orca worktrees from the old issue keys.</p>
+  <form method="post" action="/projects/{{.Data.Membership.Key}}/key" class="inline">
+    <label>Key <input name="key" value="{{.Data.Membership.Key}}" required maxlength="20" pattern="[A-Za-z][A-Za-z0-9_]*"></label>
+    <button data-variant="secondary">Change key</button>
+  </form>
 </section>
 {{if $admin}}
 <section class="card">

@@ -136,9 +136,15 @@ func (w *Web) changeKey(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := w.Store.SetMemberKey(r.Context(), row.Project.ID, currentUser(r.Context()).ID, r.PostFormValue("key"))
+	back := "/projects/" + row.Membership.Key
+
+	key, err := store.NormalizeKey(r.PostFormValue("key"))
+	if err == nil {
+		err = w.Store.SetMemberKey(r.Context(), row.Project.ID, currentUser(r.Context()).ID, key)
+	}
+
 	if errors.Is(err, store.ErrInvalidKey) || errors.Is(err, store.ErrKeyTaken) {
-		w.redirectError(rw, r, "/projects", capitalize(err.Error())+".")
+		w.redirectError(rw, r, back, capitalize(err.Error())+".")
 		return
 	}
 
@@ -147,7 +153,7 @@ func (w *Web) changeKey(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.redirect(rw, r, "/projects", "Changed your key for "+row.Project.Name+". Its issue keys changed with it.")
+	w.redirect(rw, r, "/projects/"+key, "Changed your key to "+key+". Its issue keys changed with it, such as "+key+"-1.")
 }
 
 func (w *Web) renameProject(rw http.ResponseWriter, r *http.Request) {

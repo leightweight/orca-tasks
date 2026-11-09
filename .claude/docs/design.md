@@ -106,7 +106,7 @@ It starts as the project's key, and it is unique among the user's active members
 An agent's membership uses its owner's key.
 
 When a user is added to a project whose key they already use, the membership gets the key with the lowest free number appended, such as `OPS2`.
-The user can change the key for any of their memberships on the projects page, to replace that suffix with something clearer.
+The user can change the key for any of their memberships on the project's page, to replace that suffix with something clearer.
 
 An issue's key is the viewer's key for its project followed by the issue number, such as `OPS-12` for one member and `OPS2-12` for another.
 The API, JQL, the CLI, and `/browse` links all use the caller's keys.
@@ -297,8 +297,8 @@ Revoking a key, removing or leaving a member, disabling an agent or user, and ch
 | `/account` | Users | Change display name, email, and password, and generate recovery codes. |
 | `/account/keys` | Users | Create and revoke the user's API keys. |
 | `/account/agents` | Users | Create and manage agents and their API keys. |
-| `/projects` | Users | List the user's projects, change the key the user sees each under, and create a project. |
-| `/projects/{key}` | Project members | Show counts, and let administrators rename the project, manage members, and delete it. |
+| `/projects` | Users | List the user's projects and create a project. |
+| `/projects/{key}` | Project members | Show counts, change the key the user sees the project under, and let administrators rename the project, manage members, and delete it. |
 | `/admin/users` | Site administrators | List users with their counts, create users, disable or enable them, grant administration, and generate reset links. |
 | `/admin/projects` | Site administrators | List every project with counts and members, add members, and delete projects. |
 | `/admin/proxy` | Site administrators | Show the connecting address, the forwarding headers, which hops are trusted, and the client address the server resolved. |
