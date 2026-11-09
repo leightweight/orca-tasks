@@ -22,6 +22,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/leightweight/orca-tasks/internal/attachments"
 	"github.com/leightweight/orca-tasks/internal/auth"
 	"github.com/leightweight/orca-tasks/internal/jira"
 	"github.com/leightweight/orca-tasks/internal/store"
@@ -67,6 +68,11 @@ type Web struct {
 	Now       func() time.Time
 	Sessions  *scs.SessionManager
 	SetupCode string
+
+	// Files holds attachment contents, and MaxUpload is the largest file a
+	// task's page accepts.
+	Files     *attachments.Dir
+	MaxUpload int64
 
 	// LocalAgent makes setup also create an agent named "agent", which the local
 	// socket acts as.
@@ -198,6 +204,10 @@ func (w *Web) Register(mux *http.ServeMux) error {
 	page("GET /browse/{key}", w.signedIn(w.browse))
 	page("GET /browse/{key}/edit", w.signedIn(w.editTaskForm))
 	page("POST /browse/{key}/edit", w.signedIn(w.updateTask))
+	page("POST /browse/{key}/status", w.signedIn(w.moveTask))
+	page("POST /browse/{key}/assignee", w.signedIn(w.assignTask))
+	page("POST /browse/{key}/comments", w.signedIn(w.commentOnTask))
+	page("POST /browse/{key}/attachments", w.signedIn(w.attachToTask))
 
 	return nil
 }

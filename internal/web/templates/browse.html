@@ -1,45 +1,77 @@
 {{define "crumbs"}}<a class="crumbs" href="/projects/{{.Data.ProjectKey}}/tasks">Tasks</a>{{end}}
 {{define "actions"}}<div class="buttons"><a class="button outline" href="/projects/{{.Data.ProjectKey}}/tasks/new?parent={{.Data.Key}}">New child task</a><a class="button" href="/browse/{{.Data.Key}}/edit">Edit</a></div>{{end}}
 {{define "content"}}
+{{$key := .Data.Key}}
 <div class="split">
   <div class="split-main">
-    <section class="card markdown">{{with .Data.Description}}{{.}}{{else}}<p class="text-light">No description.</p>{{end}}</section>
+    <section class="card markdown">{{with .Data.Description}}{{.}}{{else}}<p class="text-light">No description. <a href="/browse/{{$key}}/edit">Add one</a>.</p>{{end}}</section>
     {{with .Data.Children}}
     <section class="card">
-      <h2>Child issues</h2>
+      <h2>Child tasks</h2>
       <div class="table">
       <table>
         <tbody>
-        {{range .}}<tr><td><a href="/browse/{{.Key}}">{{.Key}}</a></td><td class="wrap">{{.Summary}}</td><td class="actions">{{template "status" .}}</td></tr>{{end}}
+        {{range .}}<tr><td class="nowrap"><a href="/browse/{{.Key}}">{{.Key}}</a></td><td class="wrap">{{.Summary}}</td><td class="actions">{{template "status" .}}</td></tr>{{end}}
         </tbody>
       </table>
       </div>
     </section>
     {{end}}
-    {{with .Data.Attachments}}
     <section class="card">
       <h2>Attachments</h2>
-      <ul class="unstyled">{{range .}}<li><a href="{{.URL}}">{{.Name}}</a> <span class="text-light">{{bytes .Size}}</span></li>{{end}}</ul>
+      {{with .Data.Attachments}}<ul class="files">{{range .}}<li><a href="{{.URL}}">{{.Name}}</a> <span class="text-light small">{{bytes .Size}}</span></li>{{end}}</ul>{{end}}
+      <form method="post" action="/browse/{{$key}}/attachments" enctype="multipart/form-data" class="inline">
+        <label>Attach files <input type="file" name="file" multiple required></label>
+        <button data-variant="secondary">Upload</button>
+      </form>
     </section>
-    {{end}}
-    <section class="card">
+    <section class="card" id="comments">
       <h2>Comments</h2>
-      {{range .Data.Comments}}<article class="comment"><header><strong>{{.Author}}</strong> · {{ago .Created}}</header><div class="markdown">{{.Body}}</div></article>
+      {{range .Data.Comments}}<article class="comment" id="comment-{{.ID}}"><header><strong>{{.Author}}</strong> · {{ago .Created}}</header><div class="markdown">{{.Body}}</div></article>
       {{else}}<p>No comments yet.</p>{{end}}
+      <form method="post" action="/browse/{{$key}}/comments" class="stack-fields comment-form" id="comment">
+        <label>Add a comment
+          <textarea name="body" rows="4" required placeholder="What changed, what you found, or what's next."></textarea>
+          <small data-hint>Markdown.</small>
+        </label>
+        <div><button>Comment</button></div>
+      </form>
     </section>
   </div>
-  <aside class="card split-side">
-    <dl class="fields">
-      <dt>Status</dt><dd>{{template "status" .Data}}</dd>
-      <dt>Type</dt><dd>{{.Data.Type}}</dd>
-      <dt>Priority</dt><dd>{{or .Data.Priority "None"}}</dd>
-      <dt>Assignee</dt><dd>{{or .Data.Assignee "Unassigned"}}</dd>
-      <dt>Reporter</dt><dd>{{.Data.Reporter}}</dd>
-      {{with .Data.Parent}}<dt>Parent</dt><dd><a href="/browse/{{.Key}}">{{.Key}}</a> {{.Summary}}</dd>{{end}}
-      {{with .Data.Labels}}<dt>Labels</dt><dd>{{range .}}<span class="badge outline">{{.}}</span> {{end}}</dd>{{end}}
-      <dt>Created</dt><dd>{{ago .Data.Created}}</dd>
-      <dt>Updated</dt><dd>{{ago .Data.Updated}}</dd>
-    </dl>
+  <aside class="split-side">
+    <section class="card">
+      <form method="post" action="/browse/{{$key}}/status" class="stack-fields">
+        <label>Status
+          <select name="status">{{range .Data.Statuses}}<option value="{{.ID}}"{{if eq .ID $.Data.StatusID}} selected{{end}}>{{.Name}}</option>{{end}}</select>
+        </label>
+        <details class="move-comment">
+          <summary>Add a comment with the move</summary>
+          <textarea name="comment" rows="3" aria-label="Comment with the move"></textarea>
+        </details>
+        <div><button class="small" data-variant="secondary">Move</button></div>
+      </form>
+      <hr>
+      <form method="post" action="/browse/{{$key}}/assignee" class="stack-fields">
+        <label>Assignee
+          <select name="assignee">
+            <option value="">Unassigned</option>
+            {{range .Data.Members}}<option value="{{.Principal.Username}}"{{if eq .Principal.Username $.Data.AssigneeUsername}} selected{{end}}>{{.Principal.DisplayName}}{{if eq .Principal.ID $.User.ID}} (you){{end}}</option>{{end}}
+          </select>
+        </label>
+        <div class="buttons"><button class="small" data-variant="secondary">Assign</button>{{if ne .Data.AssigneeUsername .User.Username}}<button class="small outline" name="me" value="1">Assign to me</button>{{end}}</div>
+      </form>
+    </section>
+    <section class="card">
+      <dl class="fields">
+        <dt>Type</dt><dd>{{.Data.Type}}</dd>
+        <dt>Priority</dt><dd>{{or .Data.Priority "None"}}</dd>
+        <dt>Reporter</dt><dd>{{.Data.Reporter}}</dd>
+        {{with .Data.Parent}}<dt>Parent</dt><dd><a href="/browse/{{.Key}}">{{.Key}}</a> {{.Summary}}</dd>{{end}}
+        {{with .Data.Labels}}<dt>Labels</dt><dd>{{range .}}<span class="badge outline">{{.}}</span> {{end}}</dd>{{end}}
+        <dt>Created</dt><dd>{{ago .Data.Created}}</dd>
+        <dt>Updated</dt><dd>{{ago .Data.Updated}}</dd>
+      </dl>
+    </section>
   </aside>
 </div>
 {{end}}

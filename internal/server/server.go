@@ -137,6 +137,8 @@ func Build(ctx context.Context, s *store.Store, cfg Config, log *slog.Logger) (*
 		Proxy:        clientIPs.describe,
 		LocalAgent:   cfg.Socket != "",
 		PasswordOnly: cfg.PasswordOnly,
+		Files:        files,
+		MaxUpload:    cfg.MaxUpload,
 	}
 
 	hasUsers, err := s.HasUsers(ctx)

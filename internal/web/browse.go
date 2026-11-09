@@ -19,6 +19,12 @@ import (
 )
 
 type issuePage struct {
+	// The choices the forms on the page offer, and the task's values for them.
+	Statuses         []db.Status
+	StatusID         int32
+	Members          []db.ListMembersRow
+	AssigneeUsername string
+
 	Key         string
 	ProjectKey  string
 	ProjectName string
@@ -52,6 +58,7 @@ type attachmentLink struct {
 }
 
 type commentView struct {
+	ID      int64
 	Author  string
 	Created time.Time
 	Body    template.HTML
@@ -155,7 +162,18 @@ func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
 
 	if row.AssigneeName != nil {
 		page.Assignee = *row.AssigneeName
+		page.AssigneeUsername = *row.AssigneeUsername
 	}
+
+	page.Statuses, page.StatusID = w.Catalog.Statuses, i.StatusID
+
+	members, err := w.Store.ListMembers(ctx, i.ProjectID)
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
+	page.Members = slices.DeleteFunc(members, func(m db.ListMembersRow) bool { return m.Principal.DisabledAt != nil })
 
 	if row.ParentNumber != nil {
 		parentStatus := w.Catalog.StatusByID(*row.ParentStatusID)
@@ -188,7 +206,9 @@ func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, c := range comments {
-		page.Comments = append(page.Comments, commentView{Author: c.AuthorName, Created: c.Comment.CreatedAt, Body: markdown(c.Comment.Body)})
+		page.Comments = append(page.Comments, commentView{
+			ID: c.Comment.ID, Author: c.AuthorName, Created: c.Comment.CreatedAt, Body: markdown(c.Comment.Body),
+		})
 	}
 
 	w.render(rw, r, http.StatusOK, "browse", fmt.Sprintf("%s-%d: %s", row.ProjectKey, i.Number, i.Summary), page)

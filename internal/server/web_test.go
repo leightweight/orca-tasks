@@ -1,6 +1,8 @@
 package server_test
 
 import (
+	"bytes"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -496,4 +498,58 @@ func deref(s *string) string {
 	}
 
 	return *s
+}
+
+func TestWorkingOnATaskFromItsPage(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}}), "/projects/OPS/tasks")
+	task := createIssue(t, s, "Rotate the keys", "To Do", nil)
+
+	page := alice.get("/browse/OPS-1").body
+	inProgress := find(t, regexpFor(`<option value="(\d+)">In Progress<`), page)
+
+	alice.expectRedirect(alice.post("/browse/OPS-1/status", url.Values{"status": {inProgress}, "comment": {"Starting."}}), "/browse/OPS-1")
+	alice.expectRedirect(alice.post("/browse/OPS-1/assignee", url.Values{"assignee": {""}, "me": {"1"}}), "/browse/OPS-1")
+	alice.expectRedirect(alice.post("/browse/OPS-1/comments", url.Values{"body": {"Staging is **done**."}}), "/browse/OPS-1#comment-")
+
+	// An empty comment isn't saved.
+	alice.expectRedirect(alice.post("/browse/OPS-1/comments", url.Values{"body": {"  "}}), "/browse/OPS-1#comment")
+
+	var body bytes.Buffer
+
+	parts := multipart.NewWriter(&body)
+
+	part, err := parts.CreateFormFile("file", "notes.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, _ = part.Write([]byte("rotated"))
+	_ = parts.Close()
+
+	request, err := http.NewRequestWithContext(testutil.Context(t), "POST", s.url+"/browse/OPS-1/attachments", &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	request.Header.Set("Content-Type", parts.FormDataContentType())
+	alice.expectRedirect(alice.do(request), "/browse/OPS-1")
+
+	page = alice.get("/browse/OPS-1").body
+	for _, want := range []string{
+		`selected>In Progress<`, `value="alice" selected`, "<p>Starting.</p>", "<strong>done</strong>",
+		`[notes.txt](` + s.url + `/secure/attachment/`, ">notes.txt</a>",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the task's page has no %s: %.4000s", want, page)
+		}
+	}
+
+	comments, err := s.store.ListComments(testutil.Context(t), task.ID)
+	if err != nil || len(comments) != 2 {
+		t.Errorf("%d comments, %v; want the move's and the comment", len(comments), err)
+	}
 }

@@ -471,6 +471,39 @@ section.danger-zone {
   min-width: 0;
 }
 
+.split-side > section {
+  margin-block-end: var(--space-6);
+}
+
+.split-side hr {
+  margin: var(--space-5) 0;
+}
+
+details.move-comment summary {
+  font-size: var(--text-8);
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+details.move-comment textarea {
+  margin-block-start: var(--space-2);
+  min-height: 4rem;
+}
+
+ul.files {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+}
+
+ul.files li {
+  padding-block: var(--space-1);
+}
+
+.comment-form {
+  margin-block-start: var(--space-5);
+}
+
 .split-main > section {
   margin-block-end: var(--space-6);
 }
