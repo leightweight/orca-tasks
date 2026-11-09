@@ -292,7 +292,7 @@ func (w *Web) saveCredentials(rw http.ResponseWriter, r *http.Request, e enrollm
 	switch {
 	case errors.Is(err, errAlreadySetUp):
 		w.Sessions.Remove(ctx, sessionEnroll)
-		w.redirect(rw, r, "/login", "Someone else finished setup first. Sign in with their account, or ask them for one.")
+		w.redirectError(rw, r, "/login", "Someone else finished setup first. Sign in with their account, or ask them for one.")
 
 		return
 	case errors.Is(err, pgx.ErrNoRows):
@@ -504,7 +504,7 @@ func (w *Web) loginTOTP(rw http.ResponseWriter, r *http.Request) {
 	if w.Now().Unix() > w.Sessions.GetInt64(ctx, sessionPendingUntil) || user.DisabledAt != nil ||
 		int64(user.SessionVersion) != w.Sessions.GetInt64(ctx, sessionPendingVersion) {
 		w.Sessions.Remove(ctx, sessionPending)
-		w.redirect(rw, r, "/login", "Sign in again: the password step expired.")
+		w.redirectError(rw, r, "/login", "Sign in again: the password step expired.")
 
 		return
 	}

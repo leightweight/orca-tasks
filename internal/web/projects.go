@@ -31,7 +31,7 @@ func (w *Web) createProject(rw http.ResponseWriter, r *http.Request) {
 
 	project, err := w.Store.CreateProject(ctx, user.ID, r.PostFormValue("key"), r.PostFormValue("name"))
 	if errors.Is(err, store.ErrInvalidKey) {
-		w.redirect(rw, r, "/projects", capitalize(err.Error())+".")
+		w.redirectError(rw, r, "/projects", capitalize(err.Error())+".")
 		return
 	}
 
@@ -128,7 +128,7 @@ func (w *Web) changeKey(rw http.ResponseWriter, r *http.Request) {
 
 	err := w.Store.SetMemberKey(r.Context(), row.Project.ID, currentUser(r.Context()).ID, r.PostFormValue("key"))
 	if errors.Is(err, store.ErrInvalidKey) || errors.Is(err, store.ErrKeyTaken) {
-		w.redirect(rw, r, "/projects", capitalize(err.Error())+".")
+		w.redirectError(rw, r, "/projects", capitalize(err.Error())+".")
 		return
 	}
 
@@ -148,7 +148,7 @@ func (w *Web) renameProject(rw http.ResponseWriter, r *http.Request) {
 
 	name := strings.TrimSpace(r.PostFormValue("name"))
 	if name == "" {
-		w.redirect(rw, r, "/projects/"+row.Membership.Key, "A project needs a name.")
+		w.redirectError(rw, r, "/projects/"+row.Membership.Key, "A project needs a name.")
 		return
 	}
 
@@ -176,7 +176,7 @@ func (w *Web) addMemberTo(rw http.ResponseWriter, r *http.Request, projectID int
 
 	user, err := w.Store.GetPrincipalByUsername(ctx, username)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && user.Kind != "user") {
-		w.redirect(rw, r, back, "There's no user named "+username+". Agents join with their owner.")
+		w.redirectError(rw, r, back, "There's no user named "+username+". Agents join with their owner.")
 		return
 	}
 
@@ -258,7 +258,7 @@ func (w *Web) deleteProject(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if !strings.EqualFold(strings.TrimSpace(r.PostFormValue("confirm")), row.Membership.Key) {
-		w.redirect(rw, r, "/projects/"+row.Membership.Key, "Type the project's key to delete it.")
+		w.redirectError(rw, r, "/projects/"+row.Membership.Key, "Type the project's key to delete it.")
 		return
 	}
 

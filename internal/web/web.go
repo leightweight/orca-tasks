@@ -45,6 +45,7 @@ const (
 	sessionPendingUntil   = "pending_until"
 	sessionEnroll         = "enroll"
 	sessionFlash          = "flash"
+	sessionFlashError     = "flash_error"
 	sessionReveal         = "reveal"
 	sessionNext           = "next"
 )
@@ -304,6 +305,7 @@ func (w *Web) render(rw http.ResponseWriter, r *http.Request, status int, name, 
 		User:         currentUser(ctx),
 		BaseURL:      w.BaseURL,
 		Flash:        w.Sessions.PopString(ctx, sessionFlash),
+		Error:        w.Sessions.PopString(ctx, sessionFlashError),
 		Data:         data,
 	}
 
@@ -342,6 +344,13 @@ func (w *Web) redirect(rw http.ResponseWriter, r *http.Request, to, flash string
 		w.Sessions.Put(r.Context(), sessionFlash, flash)
 	}
 
+	http.Redirect(rw, r, to, http.StatusSeeOther)
+}
+
+// redirectError sends the browser elsewhere after a form that failed, with
+// the problem to show there as an error.
+func (w *Web) redirectError(rw http.ResponseWriter, r *http.Request, to, problem string) {
+	w.Sessions.Put(r.Context(), sessionFlashError, problem)
 	http.Redirect(rw, r, to, http.StatusSeeOther)
 }
 

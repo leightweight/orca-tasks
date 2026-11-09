@@ -149,3 +149,22 @@ func TestNavigationMarksTheCurrentPage(t *testing.T) {
 		}
 	}
 }
+
+func TestFailedFormsShowAnError(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"1BAD"}}), "/projects")
+
+	body := alice.get("/projects").body
+	if !strings.Contains(body, `<div role="alert" data-variant="danger">`) || strings.Contains(body, `data-variant="success"`) {
+		t.Errorf("an invalid key isn't shown as an error: %.1500s", body)
+	}
+
+	// The message shows once.
+	if strings.Contains(alice.get("/projects").body, `data-variant="danger"`) {
+		t.Error("the error shows again on the next page")
+	}
+}

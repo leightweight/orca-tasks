@@ -58,12 +58,12 @@ func (w *Web) changePassword(rw http.ResponseWriter, r *http.Request) {
 
 	keys := []string{"ip:" + w.ClientIP(r), "user:" + user.Username}
 	if !w.Limiter.Attempt(ctx, keys...) {
-		w.redirect(rw, r, "/account", capitalize(errTooManyAttempts.Error())+".")
+		w.redirectError(rw, r, "/account", capitalize(errTooManyAttempts.Error())+".")
 		return
 	}
 
 	if user.PasswordHash == nil || !auth.CheckPassword(r.PostFormValue("current"), *user.PasswordHash) {
-		w.redirect(rw, r, "/account", "Your current password is wrong.")
+		w.redirectError(rw, r, "/account", "Your current password is wrong.")
 		return
 	}
 
@@ -72,7 +72,7 @@ func (w *Web) changePassword(rw http.ResponseWriter, r *http.Request) {
 	// Check the form before the code, so a typo doesn't use up a code.
 	hash, err := readPassword(r)
 	if err != nil {
-		w.redirect(rw, r, "/account", "The password wasn't changed: "+err.Error()+".")
+		w.redirectError(rw, r, "/account", "The password wasn't changed: "+err.Error()+".")
 		return
 	}
 
@@ -82,7 +82,7 @@ func (w *Web) changePassword(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.redirect(rw, r, "/account", "The password wasn't changed: "+err.Error()+".")
+		w.redirectError(rw, r, "/account", "The password wasn't changed: "+err.Error()+".")
 		return
 	}
 
@@ -117,7 +117,7 @@ func (w *Web) newRecoveryCodes(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.redirect(rw, r, "/account", "No new codes: "+err.Error()+".")
+		w.redirectError(rw, r, "/account", "No new codes: "+err.Error()+".")
 		return
 	}
 
@@ -175,19 +175,19 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 	user := currentUser(ctx)
 
 	if err := r.ParseForm(); err != nil {
-		w.redirect(rw, r, "/account/keys", "The form didn't arrive whole. Try again.")
+		w.redirectError(rw, r, "/account/keys", "The form didn't arrive whole. Try again.")
 		return
 	}
 
 	name := strings.TrimSpace(r.PostFormValue("name"))
 	if name == "" {
-		w.redirect(rw, r, "/account/keys", "A key needs a name.")
+		w.redirectError(rw, r, "/account/keys", "A key needs a name.")
 		return
 	}
 
 	principal, err := strconv.ParseInt(r.PostFormValue("principal"), 10, 64)
 	if err != nil {
-		w.redirect(rw, r, "/account/keys", "Choose who the key is for.")
+		w.redirectError(rw, r, "/account/keys", "Choose who the key is for.")
 		return
 	}
 
@@ -202,7 +202,7 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 
 		i := slices.IndexFunc(agents, func(a db.Principal) bool { return a.ID == principal && a.DisabledAt == nil })
 		if i < 0 {
-			w.redirect(rw, r, "/account/keys", "You can only create keys for yourself and your active agents.")
+			w.redirectError(rw, r, "/account/keys", "You can only create keys for yourself and your active agents.")
 			return
 		}
 
@@ -227,7 +227,7 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(projects) == 0 {
-			w.redirect(rw, r, "/account/keys", "Choose at least one project, or all of them.")
+			w.redirectError(rw, r, "/account/keys", "Choose at least one project, or all of them.")
 			return
 		}
 	}
@@ -244,7 +244,7 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.redirect(rw, r, "/account/keys", "No key was created: "+err.Error()+".")
+		w.redirectError(rw, r, "/account/keys", "No key was created: "+err.Error()+".")
 		return
 	}
 
@@ -320,7 +320,7 @@ func (w *Web) createAgent(rw http.ResponseWriter, r *http.Request) {
 
 	agent, err := w.Store.CreateAgent(r.Context(), user.ID, r.PostFormValue("username"), r.PostFormValue("display_name"))
 	if errors.Is(err, store.ErrInvalidUsername) || errors.Is(err, store.ErrUsernameTaken) {
-		w.redirect(rw, r, "/account/agents", capitalize(err.Error())+".")
+		w.redirectError(rw, r, "/account/agents", capitalize(err.Error())+".")
 		return
 	}
 
@@ -348,7 +348,7 @@ func (w *Web) changeAgent(rw http.ResponseWriter, r *http.Request) {
 	case "rename":
 		name := strings.TrimSpace(r.PostFormValue("display_name"))
 		if name == "" {
-			w.redirect(rw, r, "/account/agents", "A display name can't be empty.")
+			w.redirectError(rw, r, "/account/agents", "A display name can't be empty.")
 			return
 		}
 

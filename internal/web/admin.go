@@ -58,7 +58,7 @@ func (w *Web) createUser(rw http.ResponseWriter, r *http.Request) {
 
 	username, err := store.NormalizeUsername(r.PostFormValue("username"))
 	if err != nil {
-		w.redirect(rw, r, "/admin/users", capitalize(err.Error())+".")
+		w.redirectError(rw, r, "/admin/users", capitalize(err.Error())+".")
 		return
 	}
 
@@ -70,7 +70,7 @@ func (w *Web) createUser(rw http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if _, taken := w.Store.GetPrincipalByUsername(ctx, username); taken == nil {
-			w.redirect(rw, r, "/admin/users", "That username is taken.")
+			w.redirectError(rw, r, "/admin/users", "That username is taken.")
 			return
 		}
 
@@ -114,7 +114,7 @@ func (w *Web) changeUser(rw http.ResponseWriter, r *http.Request) {
 
 	// Administrators can't lock themselves out.
 	if user.ID == me.ID && action != "reset" {
-		w.redirect(rw, r, "/admin/users", "You can't disable yourself or remove your own administration.")
+		w.redirectError(rw, r, "/admin/users", "You can't disable yourself or remove your own administration.")
 		return
 	}
 
@@ -195,7 +195,7 @@ func (w *Web) adminDeleteProject(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if !strings.EqualFold(strings.TrimSpace(r.PostFormValue("confirm")), project.Key) {
-		w.redirect(rw, r, "/admin/projects", "Type the project's key to delete it.")
+		w.redirectError(rw, r, "/admin/projects", "Type the project's key to delete it.")
 		return
 	}
 
