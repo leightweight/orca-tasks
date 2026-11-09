@@ -36,6 +36,19 @@ func (q *Queries) ActiveKeys(ctx context.Context, principalID int64) ([]string, 
 	return items, nil
 }
 
+const countProjectIssues = `-- name: CountProjectIssues :one
+SELECT  COUNT(*)
+FROM    issues
+WHERE   project_id = $1
+`
+
+func (q *Queries) CountProjectIssues(ctx context.Context, projectID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countProjectIssues, projectID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deleteProject = `-- name: DeleteProject :exec
 DELETE
 FROM    projects

@@ -182,9 +182,39 @@ func (w *Web) adminProject(rw http.ResponseWriter, r *http.Request) (db.Project,
 	return project, true
 }
 
+type adminProjectPage struct {
+	Project db.Project
+	Issues  int64
+	Members []db.ListMembersRow
+}
+
+// adminProjectDetail shows a project's members and counts to a site
+// administrator, with forms to add a member and delete the project. It shows
+// no issues: administrators read those only as members.
+func (w *Web) adminProjectDetail(rw http.ResponseWriter, r *http.Request) {
+	project, ok := w.adminProject(rw, r)
+	if !ok {
+		return
+	}
+
+	members, err := w.Store.ListMembers(r.Context(), project.ID)
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
+	issues, err := w.Store.CountProjectIssues(r.Context(), project.ID)
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
+	w.render(rw, r, http.StatusOK, "admin_project", project.Name, adminProjectPage{Project: project, Issues: issues, Members: members})
+}
+
 func (w *Web) adminAddMember(rw http.ResponseWriter, r *http.Request) {
 	if project, ok := w.adminProject(rw, r); ok {
-		w.addMemberTo(rw, r, project, "/admin/projects")
+		w.addMemberTo(rw, r, project, "/admin/projects/"+strconv.FormatInt(project.ID, 10))
 	}
 }
 
@@ -195,7 +225,7 @@ func (w *Web) adminDeleteProject(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if !strings.EqualFold(strings.TrimSpace(r.PostFormValue("confirm")), project.Key) {
-		w.redirectError(rw, r, "/admin/projects", "Type the project's key to delete it.")
+		w.redirectError(rw, r, "/admin/projects/"+strconv.FormatInt(project.ID, 10), "Type the project's key to delete it.")
 		return
 	}
 

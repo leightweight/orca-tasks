@@ -300,7 +300,8 @@ Revoking a key, removing or leaving a member, disabling an agent or user, and ch
 | `/projects` | Users | List the user's projects and create a project. |
 | `/projects/{key}` | Project members | Show counts, change the key the user sees the project under, and let administrators rename the project, manage members, and delete it. |
 | `/admin/users` | Site administrators | List users with their counts, create users, disable or enable them, grant administration, and generate reset links. |
-| `/admin/projects` | Site administrators | List every project with counts and members, add members, and delete projects. |
+| `/admin/projects` | Site administrators | List every project with counts and members. |
+| `/admin/projects/{id}` | Site administrators | Show one project's members, add members, and delete the project. |
 | `/admin/proxy` | Site administrators | Show the connecting address, the forwarding headers, which hops are trusted, and the client address the server resolved. |
 | `/browse/{key}` | Project members | Show one issue with its parent, description, child issues, comments, and attachments, read-only. |
 

@@ -163,3 +163,8 @@ WHERE   m.project_id = @project_id
         AND m.removed_at IS NULL
         AND p.disabled_at IS NULL
         AND p.kind = 'user';
+
+-- name: CountProjectIssues :one
+SELECT  COUNT(*)
+FROM    issues
+WHERE   project_id = @project_id;

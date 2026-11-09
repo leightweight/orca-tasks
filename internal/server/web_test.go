@@ -210,3 +210,28 @@ func TestChangingYourKeyStaysOnTheProject(t *testing.T) {
 
 	alice.expectRedirect(alice.post("/projects/OPS2/key", url.Values{"key": {"2BAD"}}), "/projects/OPS2")
 }
+
+func TestAdministratorsManageAProjectOnItsOwnPage(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}, "name": {"Operations"}}), "/projects/OPS")
+	alice.expectRedirect(alice.post("/admin/users", url.Values{"username": {"bob"}}), "/admin/users")
+
+	page := "/admin/projects/" + find(t, regexpFor(`href="/admin/projects/(\d+)">OPS<`), alice.get("/admin/projects").body)
+
+	alice.expectRedirect(alice.post(page+"/members", url.Values{"username": {"bob"}}), page)
+
+	body := alice.get(page).body
+	if !strings.Contains(body, "<td>bob</td>") || !strings.Contains(body, `href="/admin/projects" aria-current="page"`) {
+		t.Errorf("the project's admin page: %.2000s", body)
+	}
+
+	// A new member joins as a member unless the form says otherwise.
+	if strings.Contains(body, `<option value="admin" selected`) {
+		t.Error("the add-member form defaults to admin")
+	}
+
+	alice.expectRedirect(alice.post(page+"/delete", url.Values{"confirm": {"nope"}}), page)
+}

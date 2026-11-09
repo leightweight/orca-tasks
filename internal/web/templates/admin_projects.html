@@ -1,33 +1,20 @@
-{{define "intro"}}<p>Administrators see every project's members and counts, but read its issues only as a member. Add yourself to reach one whose administrators have left.</p>{{end}}
+{{define "intro"}}<p>Administrators see every project's members and counts, but read its issues only as a member. Open a project to add a member, such as yourself to recover one whose administrators have left, or to delete it.</p>{{end}}
 {{define "content"}}
 <section class="card">
   <div class="table">
   <table>
-    <thead><tr><th class="num">ID</th><th>Key</th><th>Name</th><th class="num">Issues</th><th>Members</th><th>Add a member</th><th>Delete</th></tr></thead>
+    <thead><tr><th>Key</th><th>Name</th><th class="num">Issues</th><th>Members</th><th class="num">ID</th></tr></thead>
     <tbody>
     {{range .Data.Projects}}
       <tr>
-        <td class="num">{{.Project.ID}}</td>
-        <td>{{.Project.Key}}</td>
+        <td><a href="/admin/projects/{{.Project.ID}}">{{.Project.Key}}</a></td>
         <td>{{.Project.Name}}</td>
         <td class="num">{{.Issues}}</td>
-        <td>{{join .Members ", "}}</td>
-        <td>
-          <form method="post" action="/admin/projects/{{.Project.ID}}/members" class="inline">
-            <input name="username" required size="10" placeholder="username" aria-label="Username">
-            <select name="role" aria-label="Role"><option value="admin">admin</option><option value="member">member</option></select>
-            <button class="small" data-variant="secondary">Add</button>
-          </form>
-        </td>
-        <td>
-          <form method="post" action="/admin/projects/{{.Project.ID}}/delete" class="inline">
-            <input name="confirm" required size="8" placeholder="{{.Project.Key}}" aria-label="Type {{.Project.Key}} to confirm">
-            <button class="small outline" data-variant="danger">Delete</button>
-          </form>
-        </td>
+        <td>{{if .Members}}{{join .Members ", "}}{{else}}<span class="badge" data-variant="warning">no members</span>{{end}}</td>
+        <td class="num text-light">{{.Project.ID}}</td>
       </tr>
     {{else}}
-      <tr><td colspan="7" class="empty">No projects yet.</td></tr>
+      <tr><td colspan="5" class="empty">No projects yet.</td></tr>
     {{end}}
     </tbody>
   </table>

@@ -176,6 +176,7 @@ func (w *Web) Register(mux *http.ServeMux) error {
 	page("GET /admin/users/{id}/{action}", w.admin(w.confirmUserChange))
 	page("POST /admin/users/{id}/{action}", w.admin(w.changeUser))
 	page("GET /admin/projects", w.admin(w.allProjects))
+	page("GET /admin/projects/{id}", w.admin(w.adminProjectDetail))
 	page("POST /admin/projects/{id}/members", w.admin(w.adminAddMember))
 	page("POST /admin/projects/{id}/delete", w.admin(w.adminDeleteProject))
 	page("GET /admin/proxy", w.admin(w.proxy))

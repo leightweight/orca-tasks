@@ -1,0 +1,35 @@
+{{define "intro"}}<p>Project key <code>{{.Data.Project.Key}}</code>, ID {{.Data.Project.ID}}. {{.Data.Issues}} issues. <a href="/admin/projects">All projects</a></p>{{end}}
+{{define "content"}}
+<section class="card">
+  <h2>Members</h2>
+  <div class="table">
+  <table>
+    <thead><tr><th>Username</th><th>Display name</th><th>Role</th></tr></thead>
+    <tbody>
+    {{range .Data.Members}}
+      <tr{{if .Principal.DisabledAt}} class="muted"{{end}}>
+        <td>{{.Principal.Username}}{{if .Principal.DisabledAt}} <span class="badge" data-variant="secondary">disabled</span>{{end}}</td>
+        <td>{{.Principal.DisplayName}}</td>
+        <td>{{template "role" .Membership.Role}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="3" class="empty">Nobody is a member. Add an administrator to recover the project.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  <form method="post" action="/admin/projects/{{.Data.Project.ID}}/members" class="inline">
+    <label>Username <input name="username" required></label>
+    <label>Role <select name="role"><option value="member">member</option><option value="admin">admin</option></select></label>
+    <button>Add member</button>
+  </form>
+</section>
+<section class="card danger-zone">
+  <h2>Delete</h2>
+  <p>Deleting the project deletes its issues, comments, history, and attachments for every member. There is no undo.</p>
+  <form method="post" action="/admin/projects/{{.Data.Project.ID}}/delete" class="inline">
+    <label>Type <code>{{.Data.Project.Key}}</code> to confirm <input name="confirm" required></label>
+    <button data-variant="danger">Delete project</button>
+  </form>
+</section>
+{{end}}
