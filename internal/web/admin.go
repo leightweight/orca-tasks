@@ -184,7 +184,7 @@ func (w *Web) adminProject(rw http.ResponseWriter, r *http.Request) (db.Project,
 
 func (w *Web) adminAddMember(rw http.ResponseWriter, r *http.Request) {
 	if project, ok := w.adminProject(rw, r); ok {
-		w.addMemberTo(rw, r, project.ID, "/admin/projects")
+		w.addMemberTo(rw, r, project, "/admin/projects")
 	}
 }
 

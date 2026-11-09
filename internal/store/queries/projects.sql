@@ -143,3 +143,23 @@ SELECT   sqlc.embed(p)
 FROM    projects    p
 ORDER BY p.key
         ,p.id;
+
+-- name: LockProject :exec
+-- Locks a project's row, so changes to who administers it apply one at a time.
+SELECT  id
+FROM    projects
+WHERE   id = @id
+FOR NO KEY UPDATE;
+
+-- name: OtherAdmins :one
+-- How many active administrators a project has besides one user. Disabled users
+-- count as gone, since they can't sign in to administer it.
+SELECT  COUNT(*)
+FROM    memberships m
+JOIN    principals  p   ON  p.id = m.principal_id
+WHERE   m.project_id = @project_id
+        AND m.principal_id <> @user_id  -- 🤮
+        AND m.role = 'admin'
+        AND m.removed_at IS NULL
+        AND p.disabled_at IS NULL
+        AND p.kind = 'user';

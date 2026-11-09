@@ -140,3 +140,64 @@ func TestValidation(t *testing.T) {
 		t.Errorf("an agent name with the separator: %v", err)
 	}
 }
+
+func TestAProjectKeepsAnAdministrator(t *testing.T) {
+	t.Parallel()
+
+	s := testutil.Store(t)
+	alice := createUser(t, s, "alice")
+	bob := createUser(t, s, "bob")
+
+	project, err := s.CreateProject(testutil.Context(t), alice.ID, "OPS", "Operations")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.AddMember(testutil.Context(t), project.ID, bob.ID, store.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, err := range map[string]error{
+		"leaving":           s.RemoveMember(testutil.Context(t), project.ID, alice.ID),
+		"becoming a member": s.SetMemberRole(testutil.Context(t), project.ID, alice.ID, store.RoleMember),
+		"being re-added a member": func() error {
+			_, err := s.AddMember(testutil.Context(t), project.ID, alice.ID, store.RoleMember)
+			return err
+		}(),
+	} {
+		if !errors.Is(err, store.ErrLastAdmin) {
+			t.Errorf("the last administrator %s: %v, want ErrLastAdmin", name, err)
+		}
+	}
+
+	// A member can always leave.
+	if err := s.RemoveMember(testutil.Context(t), project.ID, bob.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.AddMember(testutil.Context(t), project.ID, bob.ID, store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+
+	// With two administrators, both leaving at once leaves one behind.
+	errs := make(chan error, 2)
+
+	for _, user := range []int64{alice.ID, bob.ID} {
+		go func() { errs <- s.RemoveMember(testutil.Context(t), project.ID, user) }()
+	}
+
+	var refused int
+
+	for range 2 {
+		switch err := <-errs; {
+		case errors.Is(err, store.ErrLastAdmin):
+			refused++
+		case err != nil:
+			t.Fatal(err)
+		}
+	}
+
+	if refused != 1 {
+		t.Errorf("%d of two administrators leaving at once were refused, want 1", refused)
+	}
+}

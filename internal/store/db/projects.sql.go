@@ -320,6 +320,45 @@ func (q *Queries) ListMyProjects(ctx context.Context, principalID int64) ([]List
 	return items, nil
 }
 
+const lockProject = `-- name: LockProject :exec
+SELECT  id
+FROM    projects
+WHERE   id = $1
+FOR NO KEY UPDATE
+`
+
+// Locks a project's row, so changes to who administers it apply one at a time.
+func (q *Queries) LockProject(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, lockProject, id)
+	return err
+}
+
+const otherAdmins = `-- name: OtherAdmins :one
+SELECT  COUNT(*)
+FROM    memberships m
+JOIN    principals  p   ON  p.id = m.principal_id
+WHERE   m.project_id = $1
+        AND m.principal_id <> $2  -- 🤮
+        AND m.role = 'admin'
+        AND m.removed_at IS NULL
+        AND p.disabled_at IS NULL
+        AND p.kind = 'user'
+`
+
+type OtherAdminsParams struct {
+	ProjectID int64
+	UserID    int64
+}
+
+// How many active administrators a project has besides one user. Disabled users
+// count as gone, since they can't sign in to administer it.
+func (q *Queries) OtherAdmins(ctx context.Context, arg OtherAdminsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, otherAdmins, arg.ProjectID, arg.UserID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const removeMembership = `-- name: RemoveMembership :execrows
 UPDATE  memberships
 SET     removed_at = NOW()

@@ -89,6 +89,10 @@ type projectPage struct {
 	Project    db.Project
 	Issues     int64
 	Members    []db.ListMembersRow
+
+	// Admins counts the active administrators, so the page can keep the last
+	// one from leaving or stepping down.
+	Admins int
 }
 
 func (w *Web) project(rw http.ResponseWriter, r *http.Request) {
@@ -110,6 +114,12 @@ func (w *Web) project(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	page := projectPage{Membership: row.Membership, Project: row.Project, Members: members}
+
+	for _, m := range members {
+		if m.Membership.Role == store.RoleAdmin && m.Principal.DisabledAt == nil {
+			page.Admins++
+		}
+	}
 
 	for _, p := range mine {
 		if p.Project.ID == row.Project.ID {
@@ -166,11 +176,11 @@ func (w *Web) addMember(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.addMemberTo(rw, r, row.Project.ID, "/projects/"+row.Membership.Key)
+	w.addMemberTo(rw, r, row.Project, "/projects/"+row.Membership.Key)
 }
 
 // addMemberTo adds a user by username, for project and site administrators.
-func (w *Web) addMemberTo(rw http.ResponseWriter, r *http.Request, projectID int64, back string) {
+func (w *Web) addMemberTo(rw http.ResponseWriter, r *http.Request, project db.Project, back string) {
 	ctx := r.Context()
 	username := strings.TrimSpace(r.PostFormValue("username"))
 
@@ -190,7 +200,12 @@ func (w *Web) addMemberTo(rw http.ResponseWriter, r *http.Request, projectID int
 		role = store.RoleAdmin
 	}
 
-	key, err := w.Store.AddMember(ctx, projectID, user.ID, role)
+	key, err := w.Store.AddMember(ctx, project.ID, user.ID, role)
+	if errors.Is(err, store.ErrLastAdmin) {
+		w.redirectError(rw, r, back, lastAdmin(user.Username, project.Name))
+		return
+	}
+
 	if err != nil {
 		w.serverError(rw, r, err)
 		return
@@ -237,9 +252,14 @@ func (w *Web) changeMember(rw http.ResponseWriter, r *http.Request) {
 			role = store.RoleAdmin
 		}
 
-		_, err = w.Store.SetMembershipRole(ctx, db.SetMembershipRoleParams{ProjectID: row.Project.ID, UserID: user.ID, Role: role})
+		err = w.Store.SetMemberRole(ctx, row.Project.ID, user.ID, role)
 	default:
 		w.notFound(rw, r)
+		return
+	}
+
+	if errors.Is(err, store.ErrLastAdmin) {
+		w.redirectError(rw, r, "/projects/"+row.Membership.Key, lastAdmin(user.Username, row.Project.Name))
 		return
 	}
 
@@ -268,4 +288,10 @@ func (w *Web) deleteProject(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	w.redirect(rw, r, "/projects", "Deleted "+row.Project.Name+".")
+}
+
+// lastAdmin says why a project's last administrator can't leave or step down.
+func lastAdmin(username, project string) string {
+	return username + " is the only administrator of " + project +
+		". Make someone else an administrator first, so the project isn't left with nobody to manage it."
 }

@@ -35,6 +35,10 @@ var (
 	// ErrInvalidUsername is returned for a username that doesn't fit the pattern.
 	ErrInvalidUsername = errors.New("a username starts with a lowercase letter and has only lowercase letters, digits, '.', '_', and '-', up to 64 characters")
 
+	// ErrLastAdmin is returned for removing or demoting a project's last active
+	// administrator, which would leave nobody to manage it.
+	ErrLastAdmin = errors.New("the project needs another administrator first, since nobody else could manage it")
+
 	// ErrUsernameTaken is returned when a user already has a username, or an
 	// owner already has an agent with a name.
 	ErrUsernameTaken = errors.New("that name is taken")
@@ -129,8 +133,7 @@ func addMember(ctx context.Context, q *db.Queries, project db.Project, userID in
 
 	existing, err := q.GetMembership(ctx, db.GetMembershipParams{ProjectID: project.ID, PrincipalID: userID})
 	if err == nil {
-		_, err = q.SetMembershipRole(ctx, db.SetMembershipRoleParams{ProjectID: project.ID, UserID: userID, Role: role})
-		return existing.Key, err
+		return existing.Key, setRole(ctx, q, project.ID, userID, role)
 	}
 
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -156,15 +159,73 @@ func addMember(ctx context.Context, q *db.Queries, project db.Project, userID in
 }
 
 // RemoveMember removes a user and their agents from a project. Everything that
-// references their memberships stays.
+// references their memberships stays. It refuses to remove the last
+// administrator with ErrLastAdmin.
 func (s *Store) RemoveMember(ctx context.Context, projectID, userID int64) error {
 	return s.InTx(ctx, func(q *db.Queries, _ pgx.Tx) error {
+		if err := keepAnAdmin(ctx, q, projectID, userID); err != nil {
+			return err
+		}
+
 		if _, err := q.RemoveMembership(ctx, db.RemoveMembershipParams{ProjectID: projectID, UserID: userID}); err != nil {
 			return err
 		}
 
 		return q.SyncAgentMemberships(ctx, db.SyncAgentMembershipsParams{UserID: userID, ProjectID: &projectID})
 	})
+}
+
+// SetMemberRole changes a member's role. It refuses to demote the last
+// administrator with ErrLastAdmin.
+func (s *Store) SetMemberRole(ctx context.Context, projectID, userID int64, role string) error {
+	if role != RoleAdmin && role != RoleMember {
+		return fmt.Errorf("unknown role %q", role)
+	}
+
+	return s.InTx(ctx, func(q *db.Queries, _ pgx.Tx) error {
+		return setRole(ctx, q, projectID, userID, role)
+	})
+}
+
+func setRole(ctx context.Context, q *db.Queries, projectID, userID int64, role string) error {
+	if role != RoleAdmin {
+		if err := keepAnAdmin(ctx, q, projectID, userID); err != nil {
+			return err
+		}
+	}
+
+	_, err := q.SetMembershipRole(ctx, db.SetMembershipRoleParams{ProjectID: projectID, UserID: userID, Role: role})
+
+	return err
+}
+
+// keepAnAdmin returns ErrLastAdmin if a user is a project's administrator and
+// no other active user is. It locks the project first, so two administrators
+// leaving at once can't each count the other.
+func keepAnAdmin(ctx context.Context, q *db.Queries, projectID, userID int64) error {
+	if err := q.LockProject(ctx, projectID); err != nil {
+		return err
+	}
+
+	membership, err := q.GetMembership(ctx, db.GetMembershipParams{ProjectID: projectID, PrincipalID: userID})
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && membership.Role != RoleAdmin) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	others, err := q.OtherAdmins(ctx, db.OtherAdminsParams{ProjectID: projectID, UserID: userID})
+	if err != nil {
+		return err
+	}
+
+	if others == 0 {
+		return ErrLastAdmin
+	}
+
+	return nil
 }
 
 // SetMemberKey changes the key a user and their agents see a project under.

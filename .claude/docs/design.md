@@ -70,6 +70,8 @@ Users are members of projects, with one of two roles.
 - A project administrator can also rename the project, add or remove members, and delete the project.
 
 Any user can create a project and becomes its first administrator.
+A project always keeps an administrator: the last active one can't leave or become a member until someone else is an administrator.
+A lock on the project makes two administrators leaving at once count each other correctly.
 
 ### Choosing people and recording actions
 

@@ -132,6 +132,10 @@ a:not(.button, .brand):hover {
   color: var(--muted-foreground);
 }
 
+span.small {
+  font-size: var(--text-8);
+}
+
 /* Forms */
 
 form.stack {

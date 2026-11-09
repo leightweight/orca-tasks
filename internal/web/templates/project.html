@@ -8,11 +8,12 @@
     <thead><tr><th>Username</th><th>Display name</th><th>Role</th><th></th></tr></thead>
     <tbody>
     {{range .Data.Members}}
+      {{$last := and (eq .Membership.Role "admin") (le $.Data.Admins 1)}}
       <tr>
         <td>{{.Principal.Username}}</td>
         <td>{{.Principal.DisplayName}}</td>
         <td>
-          {{if $admin}}
+          {{if and $admin (not $last)}}
           <form method="post" action="/projects/{{$.Data.Membership.Key}}/members/{{.Principal.Username}}/role" class="inline">
             <select name="role" aria-label="Role">
               <option value="member"{{if eq .Membership.Role "member"}} selected{{end}}>member</option>
@@ -22,7 +23,9 @@
           {{else}}{{template "role" .Membership.Role}}{{end}}
         </td>
         <td class="actions">
-          {{if or $admin (eq .Principal.ID $.User.ID)}}
+          {{if $last}}
+          <span class="text-light small">Only administrator</span>
+          {{else if or $admin (eq .Principal.ID $.User.ID)}}
           <form method="post" action="/projects/{{$.Data.Membership.Key}}/members/{{.Principal.Username}}/remove">
             <button class="small outline" data-variant="danger">{{if eq .Principal.ID $.User.ID}}Leave{{else}}Remove{{end}}</button>
           </form>
@@ -33,6 +36,7 @@
     </tbody>
   </table>
   </div>
+  {{if and $admin (le .Data.Admins 1)}}<p class="mt-4">A project needs an administrator, so the last one can't leave or become a member. Make someone else an administrator first.</p>{{end}}
   {{if $admin}}
   <form method="post" action="/projects/{{.Data.Membership.Key}}/members" class="inline">
     <label>Username <input name="username" required></label>
