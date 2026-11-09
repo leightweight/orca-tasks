@@ -5,13 +5,22 @@
 <div class="split">
   <div class="split-main">
     <section class="card markdown">{{with .Data.Description}}{{.}}{{else}}<p class="text-light">No description. <a href="/browse/{{$key}}/edit">Add one</a>.</p>{{end}}</section>
-    {{with .Data.Children}}
-    <section class="card">
-      <h2>Child tasks</h2>
+    {{if or .Data.ChildOpen .Data.ChildDone}}
+    {{$filter := .Data.ChildFilter}}
+    <section class="card" id="children">
+      <header class="card-header">
+        <h2>Child tasks</h2>
+        <nav class="filter" aria-label="Which child tasks">
+          <a href="?children=open#children"{{if eq $filter "open"}} aria-current="page"{{end}}>Open {{.Data.ChildOpen}}</a>
+          <a href="?children=done#children"{{if eq $filter "done"}} aria-current="page"{{end}}>Done {{.Data.ChildDone}}</a>
+          <a href="?#children"{{if eq $filter "all"}} aria-current="page"{{end}}>All {{add .Data.ChildOpen .Data.ChildDone}}</a>
+        </nav>
+      </header>
       <div class="table">
       <table>
         <tbody>
-        {{range .}}<tr><td class="nowrap"><a href="/browse/{{.Key}}">{{.Key}}</a></td><td class="wrap">{{.Summary}}</td><td class="actions">{{template "status" .}}</td></tr>{{end}}
+        {{range .Data.Children}}<tr><td class="nowrap"><a href="/browse/{{.Key}}">{{.Key}}</a></td><td class="wrap">{{.Summary}}</td><td class="actions">{{template "status" .}}</td></tr>
+        {{else}}<tr><td colspan="3" class="empty">{{if eq $filter "open"}}Every child task is done.{{else}}No child task is done yet.{{end}}</td></tr>{{end}}
         </tbody>
       </table>
       </div>

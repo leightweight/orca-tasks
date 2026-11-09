@@ -15,6 +15,7 @@ import (
 	"github.com/yuin/goldmark/v2/parser"
 	"github.com/yuin/goldmark/v2/renderer/html"
 
+	"github.com/leightweight/orca-tasks/internal/store"
 	"github.com/leightweight/orca-tasks/internal/store/db"
 )
 
@@ -39,6 +40,12 @@ type issuePage struct {
 	Updated     time.Time
 	Parent      *issueLink
 	Children    []issueLink
+
+	// ChildFilter is which child tasks show: open, done, or all. The counts
+	// are of all the children, for the filter's tabs.
+	ChildFilter string
+	ChildOpen   int
+	ChildDone   int
 	Description template.HTML
 	Attachments []attachmentLink
 	Comments    []commentView
@@ -195,8 +202,25 @@ func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
 
 	slices.SortFunc(children, func(a, b db.VisibleIssuesRow) int { return cmp.Compare(a.Issue.Number, b.Issue.Number) })
 
+	page.ChildFilter = r.URL.Query().Get("children")
+	if page.ChildFilter != "open" && page.ChildFilter != "done" {
+		page.ChildFilter = "all"
+	}
+
 	for _, c := range children {
 		childStatus := w.Catalog.StatusByID(c.Issue.StatusID)
+
+		done := childStatus.Category == store.CategoryDone
+		if done {
+			page.ChildDone++
+		} else {
+			page.ChildOpen++
+		}
+
+		if (page.ChildFilter == "open" && done) || (page.ChildFilter == "done" && !done) {
+			continue
+		}
+
 		page.Children = append(page.Children, issueLink{
 			Key:      fmt.Sprintf("%s-%d", c.ProjectKey, c.Issue.Number),
 			Summary:  c.Issue.Summary,

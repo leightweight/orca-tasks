@@ -647,3 +647,32 @@ func TestTheBoard(t *testing.T) {
 		t.Errorf("after a move from the board: %.3000s", body)
 	}
 }
+
+func TestFilteringChildTasks(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}}), "/projects/OPS/tasks")
+	epic := createIssue(t, s, "Rotate every credential", "To Do", nil)
+	createIssue(t, s, "Rotate the keys", "In Progress", &epic)
+	createIssue(t, s, "Renew the certificates", "Done", &epic)
+
+	for query, want := range map[string]string{"": "OPS-2 OPS-3", "?children=open": "OPS-2", "?children=done": "OPS-3"} {
+		body := alice.get("/browse/OPS-1" + query).body
+		matches := regexpFor(`<td class="nowrap"><a href="/browse/(OPS-\d+)">`).FindAllStringSubmatch(body, -1)
+
+		got := make([]string, 0, len(matches))
+		for _, m := range matches {
+			got = append(got, m[1])
+		}
+
+		if strings.Join(got, " ") != want {
+			t.Errorf("%q listed %v, want %s", query, got, want)
+		}
+
+		if !strings.Contains(body, ">Open 1<") || !strings.Contains(body, ">Done 1<") {
+			t.Errorf("%q doesn't count both children: %.3000s", query, body)
+		}
+	}
+}
