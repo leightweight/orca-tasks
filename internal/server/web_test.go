@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/leightweight/orca-tasks/internal/auth"
+	"github.com/leightweight/orca-tasks/internal/store"
+	"github.com/leightweight/orca-tasks/internal/store/db"
 	"github.com/leightweight/orca-tasks/internal/testutil"
 )
 
@@ -258,4 +260,67 @@ func TestAUserHasAnAdministrationPage(t *testing.T) {
 	}
 
 	alice.expectRedirect(alice.post(page+"/reset", nil), page)
+}
+
+// createIssue adds an issue to alice's OPS project through the store, in a
+// status and under a parent if given.
+func createIssue(t *testing.T, s *site, summary, status string, parent *db.Issue) db.Issue {
+	t.Helper()
+
+	ctx := testutil.Context(t)
+
+	alice, err := s.store.GetPrincipalByUsername(ctx, "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	row, err := s.store.GetMembershipByKey(ctx, db.GetMembershipByKeyParams{PrincipalID: alice.ID, Key: "OPS"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	catalog, err := s.store.LoadCatalog(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	st, err := catalog.Status(status)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	n := store.NewIssue{
+		ProjectID: row.Project.ID, Summary: summary, StatusID: st.ID, TypeID: catalog.IssueTypes[0].ID, Reporter: row.Membership.ID,
+	}
+	if parent != nil {
+		n.Parent = &store.Parent{ID: parent.ID, Number: parent.Number}
+	}
+
+	issue, err := s.store.CreateIssue(ctx, n)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return issue
+}
+
+func TestAProjectListsItsIssues(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}, "name": {"Operations"}}), "/projects/OPS")
+
+	epic := createIssue(t, s, "Rotate every credential", "To Do", nil)
+	createIssue(t, s, "Rotate the keys", "In Progress", &epic)
+	createIssue(t, s, "Renew the certificates", "Done", &epic)
+
+	open := alice.get("/projects/OPS").body
+	if !strings.Contains(open, `href="/browse/OPS-2">OPS-2</a>`) || !strings.Contains(open, "in OPS-1") || strings.Contains(open, "OPS-3") {
+		t.Errorf("the open issues: %.3000s", open)
+	}
+
+	if all := alice.get("/projects/OPS?show=all").body; !strings.Contains(all, `href="/browse/OPS-3">OPS-3</a>`) {
+		t.Errorf("all issues leaves out the done one: %.3000s", all)
+	}
 }

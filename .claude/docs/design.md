@@ -9,7 +9,7 @@ A CLI calls the same API, so Claude Code agents can read and change the same tas
 Several people share one server.
 Each has their own login, agents, and API keys, and sees only the projects they belong to.
 
-The web interface manages accounts, projects, and access.
+The web interface manages accounts, projects, and access, and lists each project's issues read-only.
 It is not a task board.
 People work with tasks in Orca, and agents work with them through the CLI.
 
@@ -298,7 +298,7 @@ Revoking a key, removing or leaving a member, disabling an agent or user, and ch
 | `/account/keys` | Users | Create and revoke the user's API keys. |
 | `/account/agents` | Users | Create and manage agents and their API keys. |
 | `/projects` | Users | List the user's projects and create a project. |
-| `/projects/{key}` | Project members | Show counts, change the key the user sees the project under, and let administrators rename the project, manage members, and delete it. |
+| `/projects/{key}` | Project members | List the project's open or all issues, change the key the user sees the project under, and let administrators rename the project, manage members, and delete it. |
 | `/admin/users` | Site administrators | List users with their counts and create users. |
 | `/admin/users/{id}` | Site administrators | Show one user's projects and counts, disable or enable them, grant administration, and generate a reset link. |
 | `/admin/projects` | Site administrators | List every project with counts and members. |

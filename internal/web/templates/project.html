@@ -2,6 +2,34 @@
 {{define "content"}}
 {{$admin := eq .Data.Membership.Role "admin"}}
 <section class="card">
+  <header class="card-header">
+    <h2>Issues</h2>
+    <nav class="filter" aria-label="Which issues">
+      <a href="?"{{if not .Data.All}} aria-current="page"{{end}}>Open {{.Data.Open}}</a>
+      <a href="?show=all"{{if .Data.All}} aria-current="page"{{end}}>All {{.Data.Issues}}</a>
+    </nav>
+  </header>
+  <div class="table">
+  <table>
+    <thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Type</th><th>Assignee</th><th>Updated</th></tr></thead>
+    <tbody>
+    {{range .Data.List}}
+      <tr>
+        <td class="nowrap"><a href="/browse/{{.Key}}">{{.Key}}</a></td>
+        <td>{{.Summary}}{{with .Parent}} <span class="text-light small">in {{.}}</span>{{end}}</td>
+        <td class="nowrap">{{template "status" .}}</td>
+        <td>{{.Type}}</td>
+        <td>{{or .Assignee "Unassigned"}}</td>
+        <td class="nowrap">{{ago .Updated}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="6" class="empty">{{if .Data.All}}No issues yet. Create them in Orca or with <code>orca-tasks task create</code>.{{else}}No open issues.{{end}}</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</section>
+<section class="card">
   <h2>Members</h2>
   <div class="table">
   <table>

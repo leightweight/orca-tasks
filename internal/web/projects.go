@@ -2,8 +2,11 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -90,6 +93,12 @@ type projectPage struct {
 	Issues     int64
 	Members    []db.ListMembersRow
 
+	// List is the issues to show, newest change first: the open ones, or all of
+	// them when All is set. Open counts the open ones.
+	List []issueRow
+	All  bool
+	Open int
+
 	// Admins counts the active administrators, so the page can keep the last
 	// one from leaving or stepping down.
 	Admins int
@@ -113,7 +122,26 @@ func (w *Web) project(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page := projectPage{Membership: row.Membership, Project: row.Project, Members: members}
+	page := projectPage{Membership: row.Membership, Project: row.Project, Members: members, All: r.URL.Query().Get("show") == "all"}
+
+	issues, err := w.Store.VisibleIssues(r.Context(), db.VisibleIssuesParams{PrincipalID: currentUser(r.Context()).ID, Key: &row.Membership.Key})
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
+	slices.SortFunc(issues, func(a, b db.VisibleIssuesRow) int { return b.Issue.UpdatedAt.Compare(a.Issue.UpdatedAt) })
+
+	for _, i := range issues {
+		item := w.issueRow(i)
+		if item.Category != store.CategoryDone {
+			page.Open++
+		} else if !page.All {
+			continue
+		}
+
+		page.List = append(page.List, item)
+	}
 
 	for _, m := range members {
 		if m.Membership.Role == store.RoleAdmin && m.Principal.DisabledAt == nil {
@@ -300,4 +328,37 @@ func (w *Web) deleteProject(rw http.ResponseWriter, r *http.Request) {
 func lastAdmin(username, project string) string {
 	return username + " is the only administrator of " + project +
 		". Make someone else an administrator first, so the project isn't left with nobody to manage it."
+}
+
+// issueRow is an issue as a list shows it.
+type issueRow struct {
+	issueLink
+
+	Type     string
+	Assignee string
+	Parent   string
+	Updated  time.Time
+}
+
+func (w *Web) issueRow(i db.VisibleIssuesRow) issueRow {
+	status := w.Catalog.StatusByID(i.Issue.StatusID)
+
+	item := issueRow{
+		Key:      fmt.Sprintf("%s-%d", i.ProjectKey, i.Issue.Number),
+		Summary:  i.Issue.Summary,
+		Status:   status.Name,
+		Category: status.Category,
+		Type:     w.Catalog.IssueTypeByID(i.Issue.TypeID).Name,
+		Updated:  i.Issue.UpdatedAt,
+	}
+
+	if i.AssigneeName != nil {
+		item.Assignee = *i.AssigneeName
+	}
+
+	if i.ParentNumber != nil {
+		item.Parent = fmt.Sprintf("%s-%d", i.ProjectKey, *i.ParentNumber)
+	}
+
+	return item
 }
