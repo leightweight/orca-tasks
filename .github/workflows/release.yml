@@ -21,7 +21,7 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          version: 2026.11.2
+          version: 2026.11.3
           cache: false
       - run: mise run lint
       - name: Check the plugin version matches the tag
@@ -49,7 +49,7 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          version: 2026.11.2
+          version: 2026.11.3
           cache: false
       - run: mise run test
 
@@ -73,7 +73,7 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          version: 2026.11.2
+          version: 2026.11.3
           # Tag builds can read caches that runs on main wrote, so a poisoned cache could put files into a signed release.
           cache: false
           # Only what this job runs. It holds write and signing permissions, so it
