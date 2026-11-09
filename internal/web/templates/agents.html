@@ -17,9 +17,11 @@
         </td>
         <td>{{if .DisabledAt}}<span class="badge" data-variant="secondary">Disabled</span>{{else}}<span class="badge" data-variant="success">Active</span>{{end}}</td>
         <td class="actions">
-          <form method="post" action="/account/agents/{{.ID}}/{{if .DisabledAt}}enable{{else}}disable{{end}}">
-            <button class="small outline"{{if not .DisabledAt}} data-variant="danger"{{end}}>{{if .DisabledAt}}Enable{{else}}Disable{{end}}</button>
-          </form>
+          {{if .DisabledAt}}
+          <form method="post" action="/account/agents/{{.ID}}/enable"><button class="small outline">Enable</button></form>
+          {{else}}
+          <a class="button small outline" data-variant="danger" href="/account/agents/{{.ID}}/disable">Disable</a>
+          {{end}}
         </td>
       </tr>
     {{else}}

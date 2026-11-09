@@ -15,7 +15,7 @@
         <td>{{ago .ApiKey.CreatedAt}}</td>
         <td>{{if .ApiKey.LastUsedAt}}{{ago .ApiKey.LastUsedAt}}{{else}}Never{{end}}</td>
         <td>{{if .ApiKey.RevokedAt}}<span class="badge" data-variant="danger">Revoked</span>{{else if .ApiKey.ExpiresAt}}{{ago .ApiKey.ExpiresAt}}{{else}}Never{{end}}</td>
-        <td class="actions">{{if not .ApiKey.RevokedAt}}<form method="post" action="/account/keys/{{.ApiKey.ID}}/revoke"><button class="small outline" data-variant="danger">Revoke</button></form>{{end}}</td>
+        <td class="actions">{{if not .ApiKey.RevokedAt}}<a class="button small outline" data-variant="danger" href="/account/keys/{{.ApiKey.ID}}/revoke">Revoke</a>{{end}}</td>
       </tr>
     {{else}}
       <tr><td colspan="8" class="empty">No API keys yet. Create one below to connect Orca or the CLI.</td></tr>

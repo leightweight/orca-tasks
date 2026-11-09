@@ -1,0 +1,7 @@
+{{define "intro"}}<p>{{.Data.Detail}}</p>{{end}}
+{{define "content"}}
+<form method="post" action="{{.Data.Action}}" class="buttons">
+  <button data-variant="danger">{{.Data.Button}}</button>
+  <a class="button outline" href="{{.Data.Cancel}}">Cancel</a>
+</form>
+{{end}}

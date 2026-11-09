@@ -222,8 +222,14 @@ td.actions form {
   margin: 0;
 }
 
-td.actions form + form {
+td.actions > * + * {
   margin-inline-start: var(--space-2);
+}
+
+form.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
 }
 
 tr.muted td {

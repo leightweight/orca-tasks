@@ -77,7 +77,7 @@ func TestDisablingAndResettingEndSessions(t *testing.T) {
 		t.Errorf("a used link: status %d, want 404", r.status)
 	}
 
-	bobID := find(t, regexpFor(`action="/admin/users/(\d+)/disable"`), alice.get("/admin/users").body)
+	bobID := find(t, regexpFor(`href="/admin/users/(\d+)/disable"`), alice.get("/admin/users").body)
 
 	// A reset ends bob's session, since it sets new credentials.
 	alice.expectRedirect(alice.post("/admin/users/"+bobID+"/reset", nil), "/admin/users")
@@ -166,5 +166,31 @@ func TestFailedFormsShowAnError(t *testing.T) {
 	// The message shows once.
 	if strings.Contains(alice.get("/projects").body, `data-variant="danger"`) {
 		t.Error("the error shows again on the next page")
+	}
+}
+
+func TestRiskyActionsAskFirst(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}, "name": {"Operations"}}), "/projects/OPS")
+
+	// Following the Leave link asks, and changes nothing.
+	page := alice.get("/projects/OPS/members/alice/remove")
+	if page.status != http.StatusOK || !strings.Contains(page.body, "Leave Operations?") ||
+		!strings.Contains(page.body, `<form method="post" action="/projects/OPS/members/alice/remove"`) {
+		t.Errorf("the leave confirmation: status %d: %.1500s", page.status, page.body)
+	}
+
+	if r := alice.get("/projects/OPS"); r.status != http.StatusOK {
+		t.Errorf("asking to leave left the project: status %d", r.status)
+	}
+
+	// Nobody is asked about something they can't do.
+	for _, path := range []string{"/account/keys/1/revoke", "/account/agents/1/disable", "/projects/OPS/members/nobody/remove"} {
+		if r := alice.get(path); r.status != http.StatusNotFound {
+			t.Errorf("%s: status %d, want 404", path, r.status)
+		}
 	}
 }

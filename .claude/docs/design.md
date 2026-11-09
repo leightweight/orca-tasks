@@ -288,6 +288,7 @@ The web interface is server-rendered `html/template` pages embedded in the binar
 The binary embeds a pinned copy of Oat in `internal/web/static/oat/`, so pages load nothing from another site and work in local mode without a network.
 `mise run oat:update [version]` replaces it.
 Forms post and redirect.
+Revoking a key, removing or leaving a member, disabling an agent or user, and changing site administration link to a page that says what will happen, and its button posts the change.
 
 | Page | Who | Purpose |
 | --- | --- | --- |

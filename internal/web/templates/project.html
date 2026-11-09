@@ -26,9 +26,7 @@
           {{if $last}}
           <span class="text-light small">Only administrator</span>
           {{else if or $admin (eq .Principal.ID $.User.ID)}}
-          <form method="post" action="/projects/{{$.Data.Membership.Key}}/members/{{.Principal.Username}}/remove">
-            <button class="small outline" data-variant="danger">{{if eq .Principal.ID $.User.ID}}Leave{{else}}Remove{{end}}</button>
-          </form>
+          <a class="button small outline" data-variant="danger" href="/projects/{{$.Data.Membership.Key}}/members/{{.Principal.Username}}/remove">{{if eq .Principal.ID $.User.ID}}Leave{{else}}Remove{{end}}</a>
           {{end}}
         </td>
       </tr>
