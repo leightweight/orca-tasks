@@ -324,3 +324,16 @@ func TestAProjectListsItsIssues(t *testing.T) {
 		t.Errorf("all issues leaves out the done one: %.3000s", all)
 	}
 }
+
+func TestAnIssueLinksBackToItsProject(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}, "name": {"Operations"}}), "/projects/OPS")
+	createIssue(t, s, "Rotate the keys", "To Do", nil)
+
+	if body := alice.get("/browse/OPS-1").body; !strings.Contains(body, `<a class="crumbs" href="/projects/OPS">Operations</a>`) {
+		t.Errorf("the issue page doesn't link to its project: %.1500s", body)
+	}
+}

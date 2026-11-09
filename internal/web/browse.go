@@ -19,6 +19,8 @@ import (
 )
 
 type issuePage struct {
+	ProjectKey  string
+	ProjectName string
 	Status      string
 	Category    string
 	Type        string
@@ -121,6 +123,8 @@ func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
 	status := w.Catalog.StatusByID(i.StatusID)
 
 	page := issuePage{
+		ProjectKey:  row.ProjectKey,
+		ProjectName: row.ProjectName,
 		Status:      status.Name,
 		Category:    status.Category,
 		Type:        w.Catalog.IssueTypeByID(i.TypeID).Name,
