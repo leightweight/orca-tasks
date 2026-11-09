@@ -6,11 +6,8 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
-	"path"
 	"strconv"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 
@@ -104,9 +101,7 @@ func (s *Server) uploadAttachments(w http.ResponseWriter, r *http.Request, c *Ca
 }
 
 func (s *Server) saveAttachment(r *http.Request, actor int64, issue db.Issue, part *multipart.Part) (db.Attachment, error) {
-	name := cleanFilename(part.FileName())
-
-	upload, err := s.Files.Receive(part, part.Header.Get("Content-Type"), s.MaxUpload)
+	attachment, err := s.Files.Save(r.Context(), s.Store, actor, issue, part.FileName(), part, part.Header.Get("Content-Type"), s.MaxUpload)
 	if errors.Is(err, attachments.ErrTooLarge) {
 		return db.Attachment{}, &httpError{status: http.StatusRequestEntityTooLarge, message: "The file is over the upload limit."}
 	}
@@ -115,31 +110,7 @@ func (s *Server) saveAttachment(r *http.Request, actor int64, issue db.Issue, pa
 		return db.Attachment{}, errRequestTooLarge
 	}
 
-	if err != nil {
-		return db.Attachment{}, err
-	}
-
-	attachment, err := s.Store.AddAttachment(r.Context(), actor, issue, db.InsertAttachmentParams{
-		Filename: name,
-		MimeType: upload.MIMEType,
-		Size:     upload.Size,
-		Sha256:   upload.SHA256,
-	})
-	if err != nil {
-		s.Files.Discard(upload)
-		return db.Attachment{}, err
-	}
-
-	if err := s.Files.Keep(upload, attachment.ID); err != nil {
-		s.Files.Discard(upload)
-		// The sweep would remove the row's missing file anyway; the row goes
-		// now so the issue doesn't list an attachment that isn't there.
-		_ = s.Store.DeleteAttachment(r.Context(), attachment.ID)
-
-		return db.Attachment{}, err
-	}
-
-	return attachment, nil
+	return attachment, err
 }
 
 // errRequestTooLarge is an upload whose files together pass the request's cap.
@@ -153,39 +124,6 @@ var errRequestTooLarge = &httpError{
 func tooLarge(err error) bool {
 	var maxBytes *http.MaxBytesError
 	return errors.As(err, &maxBytes)
-}
-
-// maxFilename is the longest filename kept, in bytes.
-const maxFilename = 255
-
-// cleanFilename keeps the last path element and drops control characters, so
-// a filename is safe to show and to put in a header.
-func cleanFilename(name string) string {
-	name = path.Base(strings.ReplaceAll(strings.ToValidUTF8(name, ""), `\`, "/"))
-	name = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || r == '"' {
-			return -1
-		}
-
-		return r
-	}, name)
-
-	if name == "" || name == "." || name == "/" {
-		name = "attachment"
-	}
-
-	// Keep the last 255 bytes, which hold the extension, starting on a
-	// character so a multibyte one isn't split.
-	if len(name) > maxFilename {
-		start := len(name) - maxFilename
-		for start < len(name) && !utf8.RuneStart(name[start]) {
-			start++
-		}
-
-		name = name[start:]
-	}
-
-	return name
 }
 
 func (s *Server) visibleAttachment(r *http.Request, c *Caller) (db.VisibleAttachmentRow, error) {

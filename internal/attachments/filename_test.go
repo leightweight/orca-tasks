@@ -1,4 +1,4 @@
-package jira
+package attachments
 
 import (
 	"strings"
@@ -18,14 +18,14 @@ func TestCleanFilename(t *testing.T) {
 	}
 
 	for in, want := range tests {
-		if got := cleanFilename(in); got != want {
-			t.Errorf("cleanFilename(%q) = %q, want %q", in, got, want)
+		if got := CleanFilename(in); got != want {
+			t.Errorf("CleanFilename(%q) = %q, want %q", in, got, want)
 		}
 	}
 
 	// 100 three-byte characters are 300 bytes, so the cut lands inside one.
-	long := cleanFilename(strings.Repeat("漢", 100) + ".png")
-	if !utf8.ValidString(long) || len(long) > maxFilename || !strings.HasSuffix(long, ".png") {
+	long := CleanFilename(strings.Repeat("漢", 100) + ".png")
+	if !utf8.ValidString(long) || len(long) > MaxFilename || !strings.HasSuffix(long, ".png") {
 		t.Errorf("a long name became %d bytes, valid %v: %q", len(long), utf8.ValidString(long), long)
 	}
 }
