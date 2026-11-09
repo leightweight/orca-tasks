@@ -575,10 +575,6 @@ ul.files li {
   .split {
     grid-template-columns: 1fr;
   }
-
-  .split-side {
-    order: -1;
-  }
 }
 
 dl.fields {
