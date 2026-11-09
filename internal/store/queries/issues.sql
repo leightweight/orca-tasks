@@ -1,6 +1,7 @@
 -- name: VisibleIssues :many
 -- The issues a principal can see, under its keys for their projects, with
--- their people resolved. A key limited to some projects passes their IDs; a
+-- their people and parents resolved. A parent is always in the issue's
+-- project, so the caller can see it too. A key limited to some projects passes their IDs; a
 -- null array means every project. The other filters narrow it to one issue.
 SELECT   sqlc.embed(i)
         ,m.key                                                      AS  project_key
@@ -13,6 +14,10 @@ SELECT   sqlc.embed(i)
         ,a.display_name                                             AS  assignee_name
         ,a.email                                                    AS  assignee_email
         ,(am.removed_at IS NULL AND a.disabled_at IS NULL)::BOOLEAN AS  assignee_active
+        ,pi.number                                                  AS  parent_number
+        ,pi.summary                                                 AS  parent_summary
+        ,pi.status_id                                               AS  parent_status_id
+        ,pi.type_id                                                 AS  parent_type_id
 FROM        memberships m
 JOIN        projects    p   ON  p.id = m.project_id
 JOIN        issues      i   ON  i.project_id = m.project_id
@@ -20,6 +25,7 @@ JOIN        memberships rm  ON  rm.id = i.reporter_id
 JOIN        principals  r   ON  r.id = rm.principal_id
 LEFT JOIN   memberships am  ON  am.id = i.assignee_id
 LEFT JOIN   principals  a   ON  a.id = am.principal_id
+LEFT JOIN   issues      pi  ON  pi.id = i.parent_id
 WHERE   m.principal_id = @principal_id
         AND m.removed_at IS NULL
         AND (
@@ -37,6 +43,10 @@ WHERE   m.principal_id = @principal_id
         AND (
             sqlc.narg(issue_id)::BIGINT IS NULL
             OR  i.id = sqlc.narg(issue_id)::BIGINT
+        )
+        AND (
+            sqlc.narg(parent_id)::BIGINT IS NULL
+            OR  i.parent_id = sqlc.narg(parent_id)::BIGINT
         );
 
 -- name: NextIssueNumber :one
@@ -57,6 +67,7 @@ INSERT INTO issues
     ,priority_id
     ,reporter_id
     ,assignee_id
+    ,parent_id
     ,labels)
 VALUES
     (@project_id
@@ -68,6 +79,7 @@ VALUES
     ,@priority_id
     ,@reporter_id
     ,@assignee_id
+    ,@parent_id
     ,@labels)
 RETURNING
     *;
@@ -80,6 +92,7 @@ SET      summary        = @summary
         ,type_id        = @type_id
         ,priority_id    = @priority_id
         ,assignee_id    = @assignee_id
+        ,parent_id      = @parent_id
         ,labels         = @labels
         ,updated_at     = NOW()
 WHERE   id = @id;
@@ -157,13 +170,46 @@ ORDER BY u.username
 LIMIT   @max_results;
 
 -- name: LockIssue :one
--- An issue and its assignee's username, locked until the transaction ends, so
+-- An issue, its assignee's username, and its parent's number, locked until the transaction ends, so
 -- concurrent edits apply one after the other instead of overwriting each
 -- other.
 SELECT   sqlc.embed(i)
         ,a.username AS  assignee_username
+        ,pi.number  AS  parent_number
 FROM        issues      i
 LEFT JOIN   memberships am  ON  am.id = i.assignee_id
 LEFT JOIN   principals  a   ON  a.id = am.principal_id
+LEFT JOIN   issues      pi  ON  pi.id = i.parent_id
 WHERE   i.id = @id
 FOR UPDATE OF i;
+
+-- name: LockIssueProject :exec
+-- Locks an issue's project, so changes to parents in it apply one at a time
+-- and two of them can't make a cycle together. It takes the lock that
+-- numbering a new issue does, so callers take it before locking any issue.
+SELECT  p.id
+FROM    projects p
+WHERE   p.id = (
+            SELECT  i.project_id
+            FROM    issues i
+            WHERE   i.id = @issue_id
+        )
+FOR NO KEY UPDATE;
+
+-- name: IssueAncestors :many
+-- An issue's ID and the IDs of its parent, its parent's parent, and so on.
+WITH RECURSIVE ancestors AS (
+        SELECT   i.id
+                ,i.parent_id
+        FROM    issues  i
+        WHERE   i.id = @id
+
+        UNION
+
+        SELECT   i.id
+                ,i.parent_id
+        FROM    issues      i
+        JOIN    ancestors   a   ON  a.parent_id = i.id
+    )
+SELECT  id
+FROM    ancestors;

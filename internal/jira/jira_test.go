@@ -415,6 +415,76 @@ func TestCreateUpdateAndTransition(t *testing.T) {
 	}
 }
 
+func TestParents(t *testing.T) {
+	t.Parallel()
+
+	a := newAPI(t)
+
+	epic := a.create(a.alice, "OPS", "Rotate every credential")
+	a.mustCall(a.alice, "PUT", "/rest/api/2/issue/"+epic, `{"fields":{"issuetype":{"name":"Epic"}}}`, nil)
+
+	var created struct {
+		Key string `json:"key"`
+	}
+
+	a.mustCall(a.claude, "POST", "/rest/api/2/issue", `{"fields":{"project":{"key":"OPS"},"summary":"Rotate the keys","parent":{"key":"OPS-1"}}}`, &created)
+
+	second := a.create(a.bob, "OPS", "Rotate the passwords")
+	a.mustCall(a.bob, "PUT", "/rest/api/2/issue/"+second, `{"fields":{"parent":{"key":"ops-1"}}}`, nil)
+
+	var issue struct {
+		Fields struct {
+			Parent *struct {
+				Key    string `json:"key"`
+				Fields struct {
+					Summary   string `json:"summary"`
+					IssueType struct {
+						Name string `json:"name"`
+					} `json:"issuetype"`
+				} `json:"fields"`
+			} `json:"parent"`
+		} `json:"fields"`
+	}
+
+	a.mustCall(a.alice, "GET", "/rest/api/2/issue/"+created.Key, "", &issue)
+
+	if p := issue.Fields.Parent; p == nil || p.Key != epic || p.Fields.Summary != "Rotate every credential" || p.Fields.IssueType.Name != "Epic" {
+		t.Errorf("parent = %+v", p)
+	}
+
+	if result := a.search(a.alice, "parent = OPS-1 ORDER BY key"); result.Total != 2 || result.Issues[0].Key != created.Key || result.Issues[1].Key != second {
+		t.Errorf("children = %+v", result.Issues)
+	}
+
+	if result := a.search(a.alice, "parent IS EMPTY"); result.Total != 1 || result.Issues[0].Key != epic {
+		t.Errorf("issues without a parent = %+v", result.Issues)
+	}
+
+	a.create(a.alice, "PRIVATE", "Elsewhere")
+
+	for name, body := range map[string]string{
+		"itself":           `{"fields":{"parent":{"key":"OPS-1"}}}`,
+		"its own child":    `{"fields":{"parent":{"key":"OPS-2"}}}`,
+		"another project":  `{"fields":{"parent":{"key":"PRIVATE-1"}}}`,
+		"a missing parent": `{"fields":{"parent":{"key":"OPS-99"}}}`,
+	} {
+		if status := a.call(a.alice, "PUT", "/rest/api/2/issue/"+epic, body, nil); status != http.StatusBadRequest {
+			t.Errorf("a parent that's %s: status %d, want 400", name, status)
+		}
+	}
+
+	hidden := `{"fields":{"project":{"key":"OPS"},"summary":"x","parent":{"key":"PRIVATE-1"}}}`
+	if status := a.call(a.bob, "POST", "/rest/api/2/issue", hidden, nil); status != http.StatusBadRequest {
+		t.Errorf("a parent the caller can't see: status %d, want 400", status)
+	}
+
+	a.mustCall(a.bob, "PUT", "/rest/api/2/issue/"+second, `{"fields":{"parent":null}}`, nil)
+
+	if result := a.search(a.alice, "parent = OPS-1"); result.Total != 1 {
+		t.Errorf("after clearing a parent, %d children, want 1", result.Total)
+	}
+}
+
 func TestRemovedAssigneeIsInactive(t *testing.T) {
 	t.Parallel()
 

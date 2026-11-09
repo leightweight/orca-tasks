@@ -228,6 +228,7 @@ type summary struct {
 	Type     string    `json:"type"`
 	Priority string    `json:"priority"`
 	Assignee string    `json:"assignee"`
+	Parent   string    `json:"parent"`
 	Labels   []string  `json:"labels"`
 	Updated  time.Time `json:"updated"`
 }
@@ -250,6 +251,10 @@ func summarize(i client.Issue) summary {
 		s.Assignee = i.Fields.Assignee.Name
 	}
 
+	if i.Fields.Parent != nil {
+		s.Parent = i.Fields.Parent.Key
+	}
+
 	if s.Labels == nil {
 		s.Labels = []string{}
 	}
@@ -257,20 +262,31 @@ func summarize(i client.Issue) summary {
 	return s
 }
 
-func (f *Flags) renderIssues(env *Env, issues []client.Issue) error {
+func summarizeAll(issues []client.Issue) []summary {
 	rows := make([]summary, 0, len(issues))
 	for _, i := range issues {
 		rows = append(rows, summarize(i))
 	}
 
+	return rows
+}
+
+func issueTable(rows []summary) table.Writer {
 	t := table.NewWriter()
-	t.AppendHeader(table.Row{"Key", "Summary", "Status", "Type", "Priority", "Assignee", "Labels", "Updated"})
+	t.AppendHeader(table.Row{"Key", "Summary", "Status", "Type", "Priority", "Assignee", "Parent", "Labels", "Updated"})
 
 	for _, s := range rows {
-		t.AppendRow(table.Row{s.Key, s.Summary, s.Status, s.Type, s.Priority, s.Assignee, strings.Join(s.Labels, ", "), s.Updated.Local().Format(time.DateTime)})
+		t.AppendRow(table.Row{
+			s.Key, s.Summary, s.Status, s.Type, s.Priority, s.Assignee, s.Parent, strings.Join(s.Labels, ", "), s.Updated.Local().Format(time.DateTime),
+		})
 	}
 
-	return f.render(env, rows, t)
+	return t
+}
+
+func (f *Flags) renderIssues(env *Env, issues []client.Issue) error {
+	rows := summarizeAll(issues)
+	return f.render(env, rows, issueTable(rows))
 }
 
 // TaskList lists tasks.
@@ -310,6 +326,7 @@ type detail struct {
 	Reporter    string             `json:"reporter"`
 	Created     time.Time          `json:"created"`
 	Description string             `json:"description"`
+	Children    []summary          `json:"children"`
 	Comments    []commentDetail    `json:"comments"`
 	Attachments []attachmentDetail `json:"attachments"`
 }
@@ -328,7 +345,8 @@ type attachmentDetail struct {
 	URL      string `json:"url"`
 }
 
-// Run shows the task's fields, description, comments, and attachments.
+// Run shows the task's fields, description, child tasks, comments, and
+// attachments.
 func (c *TaskShow) Run(ctx context.Context, env *Env) error {
 	api, err := c.client()
 	if err != nil {
@@ -345,12 +363,18 @@ func (c *TaskShow) Run(ctx context.Context, env *Env) error {
 		return err
 	}
 
+	children, err := api.Search(ctx, fmt.Sprintf("parent = %q ORDER BY key", issue.Key))
+	if err != nil {
+		return err
+	}
+
 	d := detail{
 		summary:     summarize(*issue),
 		Project:     issue.Fields.Project.Key,
 		Category:    issue.Fields.Status.StatusCategory.Key,
 		Created:     client.Time(issue.Fields.Created),
 		Description: issue.Fields.Description,
+		Children:    summarizeAll(children),
 		Comments:    []commentDetail{},
 		Attachments: []attachmentDetail{},
 	}
@@ -376,6 +400,11 @@ func (c *TaskShow) Run(ctx context.Context, env *Env) error {
 		return c.render(env, d, nil)
 	}
 
+	parent := d.Parent
+	if p := issue.Fields.Parent; p != nil {
+		parent = p.Key + " " + p.Fields.Summary
+	}
+
 	fields := table.NewWriter()
 	fields.SetTitle(d.Key)
 	fields.AppendRows([]table.Row{
@@ -385,6 +414,7 @@ func (c *TaskShow) Run(ctx context.Context, env *Env) error {
 		{"Priority", d.Priority},
 		{"Assignee", d.Assignee},
 		{"Reporter", d.Reporter},
+		{"Parent", parent},
 		{"Labels", strings.Join(d.Labels, ", ")},
 		{"Created", d.Created.Local().Format(time.DateTime)},
 		{"Updated", d.Updated.Local().Format(time.DateTime)},
@@ -393,6 +423,15 @@ func (c *TaskShow) Run(ctx context.Context, env *Env) error {
 
 	if err := c.render(env, d, fields); err != nil {
 		return err
+	}
+
+	if len(d.Children) > 0 {
+		list := issueTable(d.Children)
+		list.SetTitle("Child tasks")
+
+		if err := c.render(env, d, list); err != nil {
+			return err
+		}
 	}
 
 	if len(d.Attachments) > 0 {
@@ -436,6 +475,7 @@ type TaskCreate struct {
 	Priority    string   `help:"Priority. Defaults to none."`
 	Assignee    string   `xor:"assignee" help:"Username of the person to assign it to. Agents can't be assignees. Defaults to nobody."`
 	AssignToMe  bool     `xor:"assignee" help:"Assign it to you, or, with an agent's key, to the agent's owner."`
+	Parent      string   `help:"Key of the task it belongs to, such as an epic, in the same project. Defaults to none."`
 	Label       []string `help:"Label to add. Repeatable."`
 }
 
@@ -461,6 +501,10 @@ func (c *TaskCreate) Run(ctx context.Context, env *Env) error {
 		if strings.TrimSpace(value) != "" {
 			fields[field] = map[string]string{"name": value}
 		}
+	}
+
+	if strings.TrimSpace(c.Parent) != "" {
+		fields["parent"] = map[string]string{"key": c.Parent}
 	}
 
 	if c.AssignToMe {
@@ -506,6 +550,7 @@ type TaskEdit struct {
 	Priority    *string  `help:"New priority. Empty clears it."`
 	Assignee    *string  `xor:"assignee" help:"Username of the person to assign it to. Empty unassigns it."`
 	AssignToMe  bool     `xor:"assignee" help:"Assign it to you, or, with an agent's key, to the agent's owner."`
+	Parent      *string  `help:"Key of the task it belongs to, such as an epic, in the same project. Empty removes the parent."`
 	AddLabel    []string `help:"Label to add. Repeatable."`
 	RemoveLabel []string `help:"Label to remove. Repeatable."`
 }
@@ -548,6 +593,14 @@ func (c *TaskEdit) Run(ctx context.Context, env *Env) error {
 			fields[field] = nil
 		} else {
 			fields[field] = map[string]string{"name": *value}
+		}
+	}
+
+	if c.Parent != nil {
+		if strings.TrimSpace(*c.Parent) == "" {
+			fields["parent"] = nil
+		} else {
+			fields["parent"] = map[string]string{"key": *c.Parent}
 		}
 	}
 

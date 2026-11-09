@@ -2,7 +2,9 @@ package store
 
 import (
 	"context"
+	"errors"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -17,6 +19,17 @@ type Person struct {
 	Username     string
 }
 
+// Parent is an issue another issue belongs to, such as an epic, with its
+// number for recording what the parent was.
+type Parent struct {
+	ID     int64
+	Number int32
+}
+
+// ErrParentCycle is setting an issue's parent to the issue itself or to one of
+// the issues under it.
+var ErrParentCycle = errors.New("an issue can't be its own parent or the parent of an issue above it")
+
 // NewIssue is what creating an issue takes.
 type NewIssue struct {
 	ProjectID   int64
@@ -27,6 +40,7 @@ type NewIssue struct {
 	PriorityID  *int32
 	Reporter    int64
 	Assignee    *Person
+	Parent      *Parent
 	Labels      []string
 }
 
@@ -40,9 +54,13 @@ func (s *Store) CreateIssue(ctx context.Context, n NewIssue) (db.Issue, error) {
 			return err
 		}
 
-		var assignee *int64
+		var assignee, parent *int64
 		if n.Assignee != nil {
 			assignee = &n.Assignee.MembershipID
+		}
+
+		if n.Parent != nil {
+			parent = &n.Parent.ID
 		}
 
 		issue, err = q.InsertIssue(ctx, db.InsertIssueParams{
@@ -55,6 +73,7 @@ func (s *Store) CreateIssue(ctx context.Context, n NewIssue) (db.Issue, error) {
 			PriorityID:  n.PriorityID,
 			ReporterID:  n.Reporter,
 			AssigneeID:  assignee,
+			ParentID:    parent,
 			Labels:      CleanLabels(n.Labels),
 		})
 		if err != nil {
@@ -86,6 +105,11 @@ type IssueChange struct {
 	SetAssignee bool
 	Assignee    *Person
 
+	// SetParent applies Parent, which nil clears. The parent must be in the
+	// issue's project.
+	SetParent bool
+	Parent    *Parent
+
 	// Labels replaces the labels. AddLabels and RemoveLabels then edit them.
 	Labels       *[]string
 	AddLabels    []string
@@ -97,9 +121,16 @@ type IssueChange struct {
 
 // UpdateIssue applies a change and records each field it changed. It locks
 // the issue and applies the change to the row as it is then, so two edits at
-// once both land instead of the later one undoing the earlier.
+// once both land instead of the later one undoing the earlier. A change of
+// parent that would make a cycle fails with ErrParentCycle.
 func (s *Store) UpdateIssue(ctx context.Context, catalog *Catalog, actor, issueID int64, change IssueChange) error {
 	return s.InTx(ctx, func(q *db.Queries, _ pgx.Tx) error {
+		if change.SetParent {
+			if err := q.LockIssueProject(ctx, issueID); err != nil {
+				return err
+			}
+		}
+
 		locked, err := q.LockIssue(ctx, issueID)
 		if err != nil {
 			return err
@@ -126,6 +157,7 @@ func (s *Store) UpdateIssue(ctx context.Context, catalog *Catalog, actor, issueI
 			TypeID:      i.TypeID,
 			PriorityID:  i.PriorityID,
 			AssigneeID:  i.AssigneeID,
+			ParentID:    i.ParentID,
 			Labels:      i.Labels,
 		}
 
@@ -165,6 +197,33 @@ func (s *Store) UpdateIssue(ctx context.Context, catalog *Catalog, actor, issueI
 			}
 
 			record("assignee", locked.AssigneeUsername, username)
+		}
+
+		if change.SetParent {
+			var number *string
+
+			next.ParentID = nil
+
+			if change.Parent != nil {
+				ancestors, err := q.IssueAncestors(ctx, change.Parent.ID)
+				if err != nil {
+					return err
+				}
+
+				if slices.Contains(ancestors, i.ID) {
+					return ErrParentCycle
+				}
+
+				number = new(strconv.Itoa(int(change.Parent.Number)))
+				next.ParentID = &change.Parent.ID
+			}
+
+			var oldNumber *string
+			if locked.ParentNumber != nil {
+				oldNumber = new(strconv.Itoa(int(*locked.ParentNumber)))
+			}
+
+			record("parent", oldNumber, number)
 		}
 
 		if change.Labels != nil || len(change.AddLabels) > 0 || len(change.RemoveLabels) > 0 {

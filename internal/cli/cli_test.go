@@ -180,6 +180,45 @@ func TestTaskLifecycle(t *testing.T) {
 	}
 }
 
+func TestParents(t *testing.T) {
+	t.Parallel()
+
+	base, key := newServer(t)
+
+	mustRun(t, base, key, "", "task", "create", "OPS", "Rotate every credential", "--type", "Epic")
+	mustRun(t, base, key, "", "task", "create", "OPS", "Rotate the keys", "--parent", "OPS-1")
+	mustRun(t, base, key, "", "task", "create", "OPS", "Rotate the passwords")
+
+	if out := mustRun(t, base, key, "", "task", "edit", "OPS-3", "--parent", "ops-1"); !strings.Contains(out, "OPS-1") {
+		t.Errorf("edit printed %q", out)
+	}
+
+	var epic struct {
+		Children []struct {
+			Key    string `json:"key"`
+			Parent string `json:"parent"`
+		} `json:"children"`
+	}
+
+	if err := json.Unmarshal([]byte(mustRun(t, base, key, "", "task", "show", "OPS-1", "-f", "json")), &epic); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(epic.Children) != 2 || epic.Children[0].Key != "OPS-2" || epic.Children[1].Key != "OPS-3" || epic.Children[0].Parent != "OPS-1" {
+		t.Errorf("children = %+v", epic.Children)
+	}
+
+	if _, err := run(t, base, key, "", "task", "edit", "OPS-1", "--parent", "OPS-2"); !errors.As(err, new(cli.UsageError)) {
+		t.Errorf("a cycle: %v, want a usage error", err)
+	}
+
+	mustRun(t, base, key, "", "task", "edit", "OPS-3", "--parent", "")
+
+	if out := mustRun(t, base, key, "", "task", "list", "parent = OPS-1"); strings.Contains(out, "OPS-3") {
+		t.Errorf("after removing the parent, list printed %q", out)
+	}
+}
+
 func TestBadInputExitsWithUsage(t *testing.T) {
 	t.Parallel()
 

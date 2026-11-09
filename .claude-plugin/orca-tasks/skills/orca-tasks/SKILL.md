@@ -20,11 +20,12 @@ Don't ask for the key in the conversation, and never print it.
 ```sh
 orca-tasks catalog                    # projects, statuses, types, priorities, users
 orca-tasks task list 'project = OPS AND statusCategory != Done ORDER BY updated DESC'
-orca-tasks task show OPS-12 -f json  # fields, Markdown description, comments, and attachments
+orca-tasks task show OPS-12 -f json  # fields, Markdown description, child tasks, comments, and attachments
 ```
 
 `task list` takes JQL: `AND`, `OR`, `NOT`, `=`, `!=`, `~` (contains), `IN (...)`, `IS EMPTY`, `currentUser()`, `-7d`-style dates, and `ORDER BY`.
 `currentUser()` matches you and the user you work for, so `assignee = currentUser()` finds the user's tasks.
+`parent = OPS-3` finds the tasks under OPS-3.
 Add `-f json` to any command for output to parse.
 Don't create projects; they're managed in the server's web interface.
 Ask the user which project to use if `catalog` doesn't make it obvious.
@@ -32,7 +33,7 @@ Ask the user which project to use if `catalog` doesn't make it obvious.
 ## Change things
 
 ```sh
-orca-tasks task create OPS "Rotate the API keys" --type Task --priority High --label security
+orca-tasks task create OPS "Rotate the API keys" --type Task --priority High --label security --parent OPS-3
 orca-tasks task edit OPS-12 --summary "..." --add-label blocked --remove-label security
 orca-tasks task move OPS-12 "In Progress" --assign-to-me --comment "Starting on the key rotation."
 orca-tasks task comment OPS-12 "Rotated staging. Production is next."
@@ -46,6 +47,9 @@ orca-tasks task move OPS-12 Done --comment "All environments rotated; old keys r
   Run `show` first if you mean to add to it.
 - Don't assign tasks when you create them, and don't reassign anyone's; leave that to the user.
   When you start an unassigned task, `--assign-to-me` assigns it to the user you work for.
+- `--parent` on `create` and `edit` puts a task under another one in the same project, such as an epic.
+  Use it to group an epic's tasks rather than listing their keys in the epic's description.
+  `edit --parent ""` removes the parent.
 - `edit --priority ""` clears the priority.
 - `attach` prints the Markdown that shows the file.
   Put it in a description or comment, and Orca shows images inline.

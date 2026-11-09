@@ -5,10 +5,17 @@
   <dt>Priority</dt><dd>{{or .Data.Priority "None"}}</dd>
   <dt>Assignee</dt><dd>{{or .Data.Assignee "Unassigned"}}</dd>
   <dt>Reporter</dt><dd>{{.Data.Reporter}}</dd>
+  {{with .Data.Parent}}<dt>Parent</dt><dd><a href="/browse/{{.Key}}">{{.Key}}</a> {{.Summary}} ({{.Status}})</dd>{{end}}
   {{with .Data.Labels}}<dt>Labels</dt><dd>{{join . ", "}}</dd>{{end}}
   <dt>Updated</dt><dd>{{ago .Data.Updated}}</dd>
 </dl>
 {{with .Data.Description}}<section class="markdown">{{.}}</section>{{end}}
+{{with .Data.Children}}
+<section>
+  <h2>Child issues</h2>
+  <ul>{{range .}}<li><a href="/browse/{{.Key}}">{{.Key}}</a> {{.Summary}} ({{.Status}})</li>{{end}}</ul>
+</section>
+{{end}}
 {{with .Data.Attachments}}
 <section>
   <h2>Attachments</h2>

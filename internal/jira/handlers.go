@@ -1,7 +1,9 @@
 package jira
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -370,6 +372,10 @@ func (s *Server) createIssue(w http.ResponseWriter, r *http.Request, c *Caller) 
 		return err
 	}
 
+	if issue.Parent, err = s.parent(ctx, c, project.ID, decodeReference(request.Fields["parent"])); err != nil {
+		return err
+	}
+
 	created, err := s.Store.CreateIssue(ctx, issue)
 	if err != nil {
 		return err
@@ -447,6 +453,14 @@ func (s *Server) updateIssue(w http.ResponseWriter, r *http.Request, c *Caller) 
 		}
 	}
 
+	if raw, ok := request.Fields["parent"]; ok {
+		// null clears the parent.
+		change.SetParent = true
+		if change.Parent, err = s.parent(ctx, c, row.Issue.ProjectID, decodeReference(raw)); err != nil {
+			return err
+		}
+	}
+
 	if ref := decodeReference(request.Fields["issuetype"]); ref != "" {
 		t, err := s.Catalog.IssueType(ref)
 		if err != nil {
@@ -456,13 +470,35 @@ func (s *Server) updateIssue(w http.ResponseWriter, r *http.Request, c *Caller) 
 		change.TypeID = &t.ID
 	}
 
-	if err := s.apply(r, c, row, change); err != nil {
+	if err := s.apply(r, c, row, change); errors.Is(err, store.ErrParentCycle) {
+		return badRequest("%s can't be the parent of %s, because it's %s or an issue under it.",
+			decodeReference(request.Fields["parent"]), issueKey(row), issueKey(row))
+	} else if err != nil {
 		return err
 	}
 
 	writeJSON(w, http.StatusNoContent, nil)
 
 	return nil
+}
+
+// parent finds the issue a key or ID names, to be the parent of an issue in a
+// project. An empty reference is no parent.
+func (s *Server) parent(ctx context.Context, c *Caller, projectID int64, ref string) (*store.Parent, error) {
+	if ref == "" {
+		return nil, nil
+	}
+
+	row, err := s.issue(ctx, c, ref)
+	if err != nil {
+		return nil, badRequest("Parent %s doesn't exist or you can't see it.", ref)
+	}
+
+	if row.Issue.ProjectID != projectID {
+		return nil, badRequest("Parent %s is in another project. An issue's parent must be in its project.", issueKey(row))
+	}
+
+	return &store.Parent{ID: row.Issue.ID, Number: row.Issue.Number}, nil
 }
 
 func (s *Server) apply(r *http.Request, c *Caller, row db.VisibleIssuesRow, change store.IssueChange) error {

@@ -115,7 +115,7 @@ Changing a membership key also changes that user's issue keys, so Orca worktrees
 
 ### Issues and comments
 
-An issue has a summary, a Markdown description, a status, a type, an optional priority, an optional assignee, a reporter, labels, and created and updated times.
+An issue has a summary, a Markdown description, a status, a type, an optional priority, an optional assignee, an optional parent, a reporter, labels, and created and updated times.
 A comment has a Markdown body, an author, and created and updated times.
 
 Statuses, issue types, and priorities are shared by every project and seeded on first start.
@@ -131,6 +131,14 @@ Priorities are Highest, High, Medium, Low, and Lowest.
 
 Issues can't be deleted.
 Moving one to Cancelled is the way to drop it.
+
+### Parents
+
+An issue's parent is another issue in the same project, such as the epic a task belongs to.
+Any type can be a parent, and parents nest to any depth.
+An issue can't be its own parent or the parent of an issue above it.
+The server checks for cycles under a lock on the project, so two edits at once can't make one between them.
+Its history entries record the parent's issue number, which is the same for every member, unlike its key.
 
 ### History
 
@@ -288,7 +296,7 @@ Forms post and redirect.
 | `/admin/users` | Site administrators | List users with their counts, create users, disable or enable them, grant administration, and generate reset links. |
 | `/admin/projects` | Site administrators | List every project with counts and members, add members, and delete projects. |
 | `/admin/proxy` | Site administrators | Show the connecting address, the forwarding headers, which hops are trusted, and the client address the server resolved. |
-| `/browse/{key}` | Project members | Show one issue with its description, comments, and attachments, read-only. |
+| `/browse/{key}` | Project members | Show one issue with its parent, description, child issues, comments, and attachments, read-only. |
 
 Orca links each issue to `{site}/browse/{KEY}`, which is why the read-only issue page exists.
 
@@ -322,6 +330,11 @@ Version 2 sends descriptions and comments as plain text, so Markdown reaches Orc
 
 An issue's `renderedFields.description` is its Markdown rendered to HTML by goldmark, with raw HTML dropped.
 Orca finds the attachments to download in it.
+
+An issue's `parent` field has the parent's ID, key, summary, status, and type, as Jira Cloud sends it.
+Orca shows the key, summary, and type.
+Creating or editing an issue sets the parent from `{"key": ...}` or `{"id": ...}`, and editing it to `null` removes it.
+A parent the caller can't see, or one in another project, gets HTTP 400.
 
 ### Authentication
 
@@ -357,6 +370,7 @@ A field outside the ones issues have is an error, so a typo doesn't match every 
 `sprint` is known but has no values, so Orca's `sprint in openSprints()` matches nothing.
 `issue` is another name for `key`, and `id` is the issue's numeric ID.
 `project = OPS` means the project the caller sees as `OPS`.
+`parent = OPS-3` finds the issues under OPS-3, and `parent IS EMPTY` the ones without a parent.
 
 The server loads the issues the caller can see and evaluates the query in Go.
 `alecthomas/participle` parses the query.
@@ -383,7 +397,7 @@ orca-tasks catalog
 orca-tasks project list
 orca-tasks task list 'project = OPS AND statusCategory != Done ORDER BY updated DESC'
 orca-tasks task show OPS-12
-orca-tasks task create OPS "Rotate the API keys" --type Task --priority High --label security
+orca-tasks task create OPS "Rotate the API keys" --type Task --priority High --label security --parent OPS-3
 orca-tasks task edit OPS-12 --summary "..." --add-label blocked --remove-label security
 orca-tasks task move OPS-12 "In Progress" --comment "Starting on the key rotation."
 orca-tasks task comment OPS-12 -
@@ -392,9 +406,10 @@ orca-tasks task attach OPS-12 diagram.png
 
 `catalog` lists the projects, statuses, issue types, priorities, and users the other commands accept.
 `task list` takes JQL.
-`task show` prints the fields, the Markdown description, the comments, and the attachments.
+`task show` prints the fields, the Markdown description, the child tasks, the comments, and the attachments.
 `task create`, `task edit`, and `task move` print the task: a table row, or with `-f json` one object with the same fields as a `task list` row.
-`task edit --priority ""` clears the priority, and `--assignee ""` unassigns.
+`task edit --priority ""` clears the priority, `--assignee ""` unassigns, and `--parent ""` removes the parent.
+`--parent` on `create` and `edit` takes the key of an issue in the same project.
 `--assignee` takes a user.
 `--assign-to-me` on `create`, `edit`, and `move` assigns the caller's user, which with an agent's key is the agent's owner.
 `task attach` uploads a file and prints the Markdown that embeds it, to paste into a description or comment.
@@ -491,7 +506,8 @@ Tables:
 - `memberships`: the project, the principal, the role, the user's key for the project, and `removed_at`.
   It is unique on project and principal, and on principal and key among active rows.
 - `statuses`, `issue_types`, and `priorities`, seeded by a migration.
-- `issues`, unique on project ID and number, with labels as `text[]`, and the reporter and assignee as memberships.
+- `issues`, unique on project ID and number, with labels as `text[]`, the reporter and assignee as memberships, and `parent_id`.
+  A composite foreign key on the project ID keeps a parent in its child's project.
 - `comments` and `attachments`, with the author or uploader as a membership.
   The `attachments` table holds metadata only.
 - `issue_history`: one row per changed field.
@@ -659,7 +675,7 @@ Renovate opens dependency updates weekly.
 - Email, including emailed password resets.
 - Single sign-on through OIDC.
 - WebAuthn and passkeys as a second factor.
-- Watchers, issue links, and editing or deleting comments.
+- Watchers, issue links other than parents, and editing or deleting comments.
 - Saved filters.
 - Translating JQL to SQL.
 

@@ -62,6 +62,7 @@ type Issue struct {
 	Labels      []string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	ParentID    *int64
 }
 
 type IssueHistory struct {

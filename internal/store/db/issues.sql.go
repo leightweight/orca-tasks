@@ -54,6 +54,7 @@ INSERT INTO issues
     ,priority_id
     ,reporter_id
     ,assignee_id
+    ,parent_id
     ,labels)
 VALUES
     ($1
@@ -65,9 +66,10 @@ VALUES
     ,$7
     ,$8
     ,$9
-    ,$10)
+    ,$10
+    ,$11)
 RETURNING
-    id, project_id, number, summary, description, status_id, type_id, priority_id, reporter_id, assignee_id, labels, created_at, updated_at
+    id, project_id, number, summary, description, status_id, type_id, priority_id, reporter_id, assignee_id, labels, created_at, updated_at, parent_id
 `
 
 type InsertIssueParams struct {
@@ -80,6 +82,7 @@ type InsertIssueParams struct {
 	PriorityID  *int32
 	ReporterID  int64
 	AssigneeID  *int64
+	ParentID    *int64
 	Labels      []string
 }
 
@@ -94,6 +97,7 @@ func (q *Queries) InsertIssue(ctx context.Context, arg InsertIssueParams) (Issue
 		arg.PriorityID,
 		arg.ReporterID,
 		arg.AssigneeID,
+		arg.ParentID,
 		arg.Labels,
 	)
 	var i Issue
@@ -111,8 +115,48 @@ func (q *Queries) InsertIssue(ctx context.Context, arg InsertIssueParams) (Issue
 		&i.Labels,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentID,
 	)
 	return i, err
+}
+
+const issueAncestors = `-- name: IssueAncestors :many
+WITH RECURSIVE ancestors AS (
+        SELECT   i.id
+                ,i.parent_id
+        FROM    issues  i
+        WHERE   i.id = $1
+
+        UNION
+
+        SELECT   i.id
+                ,i.parent_id
+        FROM    issues      i
+        JOIN    ancestors   a   ON  a.parent_id = i.id
+    )
+SELECT  id
+FROM    ancestors
+`
+
+// An issue's ID and the IDs of its parent, its parent's parent, and so on.
+func (q *Queries) IssueAncestors(ctx context.Context, id int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, issueAncestors, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listHistory = `-- name: ListHistory :many
@@ -153,11 +197,13 @@ func (q *Queries) ListHistory(ctx context.Context, issueID int64) ([]IssueHistor
 }
 
 const lockIssue = `-- name: LockIssue :one
-SELECT   i.id, i.project_id, i.number, i.summary, i.description, i.status_id, i.type_id, i.priority_id, i.reporter_id, i.assignee_id, i.labels, i.created_at, i.updated_at
+SELECT   i.id, i.project_id, i.number, i.summary, i.description, i.status_id, i.type_id, i.priority_id, i.reporter_id, i.assignee_id, i.labels, i.created_at, i.updated_at, i.parent_id
         ,a.username AS  assignee_username
+        ,pi.number  AS  parent_number
 FROM        issues      i
 LEFT JOIN   memberships am  ON  am.id = i.assignee_id
 LEFT JOIN   principals  a   ON  a.id = am.principal_id
+LEFT JOIN   issues      pi  ON  pi.id = i.parent_id
 WHERE   i.id = $1
 FOR UPDATE OF i
 `
@@ -165,9 +211,10 @@ FOR UPDATE OF i
 type LockIssueRow struct {
 	Issue            Issue
 	AssigneeUsername *string
+	ParentNumber     *int32
 }
 
-// An issue and its assignee's username, locked until the transaction ends, so
+// An issue, its assignee's username, and its parent's number, locked until the transaction ends, so
 // concurrent edits apply one after the other instead of overwriting each
 // other.
 func (q *Queries) LockIssue(ctx context.Context, id int64) (LockIssueRow, error) {
@@ -187,9 +234,30 @@ func (q *Queries) LockIssue(ctx context.Context, id int64) (LockIssueRow, error)
 		&i.Issue.Labels,
 		&i.Issue.CreatedAt,
 		&i.Issue.UpdatedAt,
+		&i.Issue.ParentID,
 		&i.AssigneeUsername,
+		&i.ParentNumber,
 	)
 	return i, err
+}
+
+const lockIssueProject = `-- name: LockIssueProject :exec
+SELECT  p.id
+FROM    projects p
+WHERE   p.id = (
+            SELECT  i.project_id
+            FROM    issues i
+            WHERE   i.id = $1
+        )
+FOR NO KEY UPDATE
+`
+
+// Locks an issue's project, so changes to parents in it apply one at a time
+// and two of them can't make a cycle together. It takes the lock that
+// numbering a new issue does, so callers take it before locking any issue.
+func (q *Queries) LockIssueProject(ctx context.Context, issueID int64) error {
+	_, err := q.db.Exec(ctx, lockIssueProject, issueID)
+	return err
 }
 
 const nextIssueNumber = `-- name: NextIssueNumber :one
@@ -299,9 +367,10 @@ SET      summary        = $1
         ,type_id        = $4
         ,priority_id    = $5
         ,assignee_id    = $6
-        ,labels         = $7
+        ,parent_id      = $7
+        ,labels         = $8
         ,updated_at     = NOW()
-WHERE   id = $8
+WHERE   id = $9
 `
 
 type UpdateIssueParams struct {
@@ -311,6 +380,7 @@ type UpdateIssueParams struct {
 	TypeID      int32
 	PriorityID  *int32
 	AssigneeID  *int64
+	ParentID    *int64
 	Labels      []string
 	ID          int64
 }
@@ -323,6 +393,7 @@ func (q *Queries) UpdateIssue(ctx context.Context, arg UpdateIssueParams) error 
 		arg.TypeID,
 		arg.PriorityID,
 		arg.AssigneeID,
+		arg.ParentID,
 		arg.Labels,
 		arg.ID,
 	)
@@ -330,7 +401,7 @@ func (q *Queries) UpdateIssue(ctx context.Context, arg UpdateIssueParams) error 
 }
 
 const visibleIssues = `-- name: VisibleIssues :many
-SELECT   i.id, i.project_id, i.number, i.summary, i.description, i.status_id, i.type_id, i.priority_id, i.reporter_id, i.assignee_id, i.labels, i.created_at, i.updated_at
+SELECT   i.id, i.project_id, i.number, i.summary, i.description, i.status_id, i.type_id, i.priority_id, i.reporter_id, i.assignee_id, i.labels, i.created_at, i.updated_at, i.parent_id
         ,m.key                                                      AS  project_key
         ,p.name                                                     AS  project_name
         ,r.username                                                 AS  reporter_username
@@ -341,6 +412,10 @@ SELECT   i.id, i.project_id, i.number, i.summary, i.description, i.status_id, i.
         ,a.display_name                                             AS  assignee_name
         ,a.email                                                    AS  assignee_email
         ,(am.removed_at IS NULL AND a.disabled_at IS NULL)::BOOLEAN AS  assignee_active
+        ,pi.number                                                  AS  parent_number
+        ,pi.summary                                                 AS  parent_summary
+        ,pi.status_id                                               AS  parent_status_id
+        ,pi.type_id                                                 AS  parent_type_id
 FROM        memberships m
 JOIN        projects    p   ON  p.id = m.project_id
 JOIN        issues      i   ON  i.project_id = m.project_id
@@ -348,6 +423,7 @@ JOIN        memberships rm  ON  rm.id = i.reporter_id
 JOIN        principals  r   ON  r.id = rm.principal_id
 LEFT JOIN   memberships am  ON  am.id = i.assignee_id
 LEFT JOIN   principals  a   ON  a.id = am.principal_id
+LEFT JOIN   issues      pi  ON  pi.id = i.parent_id
 WHERE   m.principal_id = $1
         AND m.removed_at IS NULL
         AND (
@@ -366,6 +442,10 @@ WHERE   m.principal_id = $1
             $5::BIGINT IS NULL
             OR  i.id = $5::BIGINT
         )
+        AND (
+            $6::BIGINT IS NULL
+            OR  i.parent_id = $6::BIGINT
+        )
 `
 
 type VisibleIssuesParams struct {
@@ -374,6 +454,7 @@ type VisibleIssuesParams struct {
 	Key         *string
 	Number      *int32
 	IssueID     *int64
+	ParentID    *int64
 }
 
 type VisibleIssuesRow struct {
@@ -388,10 +469,15 @@ type VisibleIssuesRow struct {
 	AssigneeName     *string
 	AssigneeEmail    *string
 	AssigneeActive   bool
+	ParentNumber     *int32
+	ParentSummary    *string
+	ParentStatusID   *int32
+	ParentTypeID     *int32
 }
 
 // The issues a principal can see, under its keys for their projects, with
-// their people resolved. A key limited to some projects passes their IDs; a
+// their people and parents resolved. A parent is always in the issue's
+// project, so the caller can see it too. A key limited to some projects passes their IDs; a
 // null array means every project. The other filters narrow it to one issue.
 func (q *Queries) VisibleIssues(ctx context.Context, arg VisibleIssuesParams) ([]VisibleIssuesRow, error) {
 	rows, err := q.db.Query(ctx, visibleIssues,
@@ -400,6 +486,7 @@ func (q *Queries) VisibleIssues(ctx context.Context, arg VisibleIssuesParams) ([
 		arg.Key,
 		arg.Number,
 		arg.IssueID,
+		arg.ParentID,
 	)
 	if err != nil {
 		return nil, err
@@ -422,6 +509,7 @@ func (q *Queries) VisibleIssues(ctx context.Context, arg VisibleIssuesParams) ([
 			&i.Issue.Labels,
 			&i.Issue.CreatedAt,
 			&i.Issue.UpdatedAt,
+			&i.Issue.ParentID,
 			&i.ProjectKey,
 			&i.ProjectName,
 			&i.ReporterUsername,
@@ -432,6 +520,10 @@ func (q *Queries) VisibleIssues(ctx context.Context, arg VisibleIssuesParams) ([
 			&i.AssigneeName,
 			&i.AssigneeEmail,
 			&i.AssigneeActive,
+			&i.ParentNumber,
+			&i.ParentSummary,
+			&i.ParentStatusID,
+			&i.ParentTypeID,
 		); err != nil {
 			return nil, err
 		}

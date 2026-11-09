@@ -82,6 +82,16 @@ func issueKey(row db.VisibleIssuesRow) string {
 	return fmt.Sprintf("%s-%d", row.ProjectKey, row.Issue.Number)
 }
 
+// parentKey is the key of an issue's parent, which is in the same project, or
+// empty without one.
+func parentKey(row db.VisibleIssuesRow) string {
+	if row.ParentNumber == nil {
+		return ""
+	}
+
+	return fmt.Sprintf("%s-%d", row.ProjectKey, *row.ParentNumber)
+}
+
 func reporter(row db.VisibleIssuesRow) *person {
 	return &person{row.ReporterUsername, row.ReporterName, row.ReporterEmail, row.ReporterActive}
 }
@@ -126,6 +136,19 @@ func (s *Server) mapIssue(row db.VisibleIssuesRow, withDescription bool, attachm
 
 	if withDescription {
 		fields.Description = i.Description
+	}
+
+	if i.ParentID != nil && row.ParentNumber != nil {
+		fields.Parent = &parentPayload{
+			ID:   id(*i.ParentID),
+			Key:  parentKey(row),
+			Self: fmt.Sprintf("%s/rest/api/2/issue/%s", s.BaseURL, id(*i.ParentID)),
+			Fields: parentFields{
+				Summary:   deref(row.ParentSummary),
+				Status:    mapStatus(s.Catalog.StatusByID(*row.ParentStatusID)),
+				IssueType: mapIssueType(s.Catalog.IssueTypeByID(*row.ParentTypeID)),
+			},
+		}
 	}
 
 	return issuePayload{
@@ -182,6 +205,7 @@ var jqlFields = map[string]bool{
 	"key": true, "id": true, "summary": true, "description": true, "text": true, "project": true,
 	"status": true, "statuscategory": true, "type": true, "priority": true, "assignee": true,
 	"reporter": true, "labels": true, "resolution": true, "created": true, "updated": true, "sprint": true,
+	"parent": true,
 }
 
 // issueRecord adapts an issue to the JQL evaluator.
@@ -224,6 +248,12 @@ func (r issueRecord) Field(name string) []string {
 		return aliases(assignee(r.row))
 	case "reporter":
 		return aliases(reporter(r.row))
+	case "parent":
+		if i.ParentID == nil {
+			return nil
+		}
+
+		return []string{parentKey(r.row), id(*i.ParentID)}
 	case "labels":
 		return i.Labels
 	case "resolution":

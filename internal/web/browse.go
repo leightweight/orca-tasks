@@ -2,10 +2,12 @@ package web
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -24,9 +26,17 @@ type issuePage struct {
 	Reporter    string
 	Labels      []string
 	Updated     time.Time
+	Parent      *issueLink
+	Children    []issueLink
 	Description template.HTML
 	Attachments []attachmentLink
 	Comments    []commentView
+}
+
+type issueLink struct {
+	Key     string
+	Summary string
+	Status  string
 }
 
 type attachmentLink struct {
@@ -91,6 +101,15 @@ func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	children, err := w.Store.VisibleIssues(ctx, db.VisibleIssuesParams{
+		PrincipalID: currentUser(ctx).ID,
+		ParentID:    &i.ID,
+	})
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
 	files, err := w.Store.ListAttachments(ctx, []int64{i.ID})
 	if err != nil {
 		w.serverError(rw, r, err)
@@ -112,6 +131,24 @@ func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
 
 	if row.AssigneeName != nil {
 		page.Assignee = *row.AssigneeName
+	}
+
+	if row.ParentNumber != nil {
+		page.Parent = &issueLink{
+			Key:     fmt.Sprintf("%s-%d", row.ProjectKey, *row.ParentNumber),
+			Summary: *row.ParentSummary,
+			Status:  w.Catalog.StatusByID(*row.ParentStatusID).Name,
+		}
+	}
+
+	slices.SortFunc(children, func(a, b db.VisibleIssuesRow) int { return cmp.Compare(a.Issue.Number, b.Issue.Number) })
+
+	for _, c := range children {
+		page.Children = append(page.Children, issueLink{
+			Key:     fmt.Sprintf("%s-%d", c.ProjectKey, c.Issue.Number),
+			Summary: c.Issue.Summary,
+			Status:  w.Catalog.StatusByID(c.Issue.StatusID).Name,
+		})
 	}
 
 	for _, f := range files {

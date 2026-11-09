@@ -210,7 +210,16 @@ type Issue struct {
 		Created     string       `json:"created"`
 		Updated     string       `json:"updated"`
 		Project     Project      `json:"project"`
+		Parent      *Parent      `json:"parent"`
 		Attachment  []Attachment `json:"attachment"`
+	} `json:"fields"`
+}
+
+// Parent is the issue an issue belongs to, such as an epic.
+type Parent struct {
+	Key    string `json:"key"`
+	Fields struct {
+		Summary string `json:"summary"`
 	} `json:"fields"`
 }
 

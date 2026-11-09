@@ -74,7 +74,24 @@ type issueFields struct {
 	Updated     string             `json:"updated"`
 	Resolution  *resolutionPayload `json:"resolution"`
 
+	// Parent is the issue this one belongs to, such as an epic. Orca shows its
+	// key, summary, and type.
+	Parent *parentPayload `json:"parent,omitempty"`
+
 	Attachment []attachmentPayload `json:"attachment"`
+}
+
+type parentPayload struct {
+	ID     string       `json:"id"`
+	Key    string       `json:"key"`
+	Self   string       `json:"self"`
+	Fields parentFields `json:"fields"`
+}
+
+type parentFields struct {
+	Summary   string           `json:"summary"`
+	Status    statusPayload    `json:"status"`
+	IssueType issueTypePayload `json:"issuetype"`
 }
 
 type issuePayload struct {

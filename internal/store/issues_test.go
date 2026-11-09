@@ -182,6 +182,13 @@ func TestDeletingAProjectDeletesItsIssues(t *testing.T) {
 	f := newFixture(t)
 	issue := f.createIssue(t, f.ops, f.bob, "Rotate the keys")
 
+	if _, err := f.s.CreateIssue(testutil.Context(t), store.NewIssue{
+		ProjectID: f.ops.ID, Summary: "A child", StatusID: f.catalog.Statuses[0].ID, TypeID: f.catalog.IssueTypes[0].ID,
+		Reporter: f.membership(t, f.ops, f.bob), Parent: &store.Parent{ID: issue.ID, Number: issue.Number},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
 	if _, err := f.s.AddComment(testutil.Context(t), f.membership(t, f.ops, f.bob), issue, "On it."); err != nil {
 		t.Fatal(err)
 	}
