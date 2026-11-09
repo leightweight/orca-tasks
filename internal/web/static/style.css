@@ -285,26 +285,25 @@ form.filters input[type="search"] {
   width: 12rem;
 }
 
-details.advanced {
-  margin-block-start: var(--space-4);
+form.filters,
+form.jql-bar {
+  margin-block-end: var(--space-4);
+}
+
+form.jql-bar {
+  display: flex;
+  gap: var(--space-2);
+}
+
+form.jql-bar input[name="jql"] {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-mono);
   font-size: var(--text-7);
 }
 
-details.advanced summary {
-  color: var(--muted-foreground);
-  cursor: pointer;
-}
-
-details.advanced form {
-  margin-block-start: var(--space-3);
-}
-
-details.advanced form label {
-  max-width: none;
-}
-
-details.advanced input[name="jql"] {
-  font-family: var(--font-mono);
+.jql-hint {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
 }
 
 .badge.small {
@@ -542,14 +541,32 @@ section.danger-zone {
   margin: var(--space-5) 0;
 }
 
-details.move-comment summary {
-  font-size: var(--text-8);
-  color: var(--muted-foreground);
-  cursor: pointer;
+/* A plain disclosure, without the bordered box Oat gives <details>. */
+details.move-comment {
+  border: none;
+  border-radius: 0;
+  overflow: visible;
 }
 
-details.move-comment textarea {
-  margin-block-start: var(--space-2);
+details.move-comment summary {
+  justify-content: flex-start;
+  padding: 0;
+  font-size: var(--text-8);
+  font-weight: var(--font-normal);
+  color: var(--muted-foreground);
+}
+
+details.move-comment summary:hover {
+  background: none;
+  color: var(--foreground);
+}
+
+details.move-comment[open] summary {
+  border-bottom: none;
+}
+
+details.move-comment > textarea {
+  margin: var(--space-2) 0 0;
   min-height: 4rem;
 }
 

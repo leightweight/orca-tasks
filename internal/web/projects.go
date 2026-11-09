@@ -140,6 +140,10 @@ type boardColumn struct {
 	Tasks  []issueRow
 }
 
+// JQLMode reports whether the page filters with a JQL query in place of the
+// filter bar.
+func (l taskList) JQLMode() bool { return l.Filters.Get("mode") == "jql" || l.Filters.Get("jql") != "" }
+
 // Board reports whether the page shows the tasks as a board.
 func (l taskList) Board() bool { return l.Filters.Get("view") == "board" }
 

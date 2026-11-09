@@ -5,48 +5,66 @@
 {{$f := .Data.Filters}}
 <section class="card">
   <header class="card-header">
-    <nav class="filter" aria-label="View">
-      <a href="{{$d.Link "view" ""}}"{{if not $d.Board}} aria-current="page"{{end}}>List</a>
-      <a href="{{$d.Link "view" "board"}}"{{if $d.Board}} aria-current="page"{{end}}>Board</a>
-    </nav>
+    <div class="hstack gap-2">
+      <nav class="filter" aria-label="View">
+        <a href="{{$d.Link "view" ""}}"{{if not $d.Board}} aria-current="page"{{end}}>List</a>
+        <a href="{{$d.Link "view" "board"}}"{{if $d.Board}} aria-current="page"{{end}}>Board</a>
+      </nav>
+      <nav class="filter" aria-label="How to filter">
+        <a href="{{$d.Link "mode" ""}}"{{if not $d.JQLMode}} aria-current="page"{{end}}>Filters</a>
+        <a href="{{$d.Link "mode" "jql"}}"{{if $d.JQLMode}} aria-current="page"{{end}}>JQL</a>
+      </nav>
+    </div>
+    {{if not $d.JQLMode}}
     <nav class="filter" aria-label="Which tasks">
       <a href="{{$d.Link "show" "open"}}"{{if eq $d.Show "open"}} aria-current="page"{{end}}>Open {{$d.Open}}</a>
       <a href="{{$d.Link "show" "done"}}"{{if eq $d.Show "done"}} aria-current="page"{{end}}>Done {{$d.Done}}</a>
       <a href="{{$d.Link "show" "all"}}"{{if eq $d.Show "all"}} aria-current="page"{{end}}>All {{$d.Total}}</a>
     </nav>
-    <form method="get" class="filters" role="search">
-      {{with $f.Get "show"}}<input type="hidden" name="show" value="{{.}}">{{end}}
-      {{with $f.Get "view"}}<input type="hidden" name="view" value="{{.}}">{{end}}
-      <input type="search" name="q" value="{{$f.Get "q"}}" placeholder="Search" aria-label="Search summaries, descriptions, and labels">
-      <select name="assignee" aria-label="Assignee">
-        <option value="">Anyone</option>
-        <option value="me"{{if eq ($f.Get "assignee") "me"}} selected{{end}}>Me</option>
-        <option value="none"{{if eq ($f.Get "assignee") "none"}} selected{{end}}>Unassigned</option>
-      </select>
-      <select name="type" aria-label="Type">
-        <option value="">Any type</option>
-        {{range $d.Catalog.IssueTypes}}<option{{if eq ($f.Get "type") .Name}} selected{{end}}>{{.Name}}</option>{{end}}
-      </select>
-      <select name="priority" aria-label="Priority">
-        <option value="">Any priority</option>
-        {{range $d.Catalog.Priorities}}<option{{if eq ($f.Get "priority") .Name}} selected{{end}}>{{.Name}}</option>{{end}}
-      </select>
-      {{with $d.Labels}}
-      <select name="labels" aria-label="Label">
-        <option value="">Any label</option>
-        {{range .}}<option{{if eq ($f.Get "labels") .}} selected{{end}}>{{.}}</option>{{end}}
-      </select>
-      {{end}}
-      <select name="sort" aria-label="Sort by">
-        {{$s := $f.Get "sort"}}
-        <option value="">Recently updated</option>
-        <option value="created"{{if eq $s "created"}} selected{{end}}>Newest</option>
-        <option value="priority"{{if eq $s "priority"}} selected{{end}}>Priority</option>
-        <option value="key"{{if eq $s "key"}} selected{{end}}>Key</option>
-      </select>
-      <button class="small" data-variant="secondary">Filter</button>
-    </form>
+    {{end}}
   </header>
+  {{if $d.JQLMode}}
+  <form method="get" class="jql-bar" role="search">
+    {{with $f.Get "view"}}<input type="hidden" name="view" value="{{.}}">{{end}}
+    <input type="hidden" name="mode" value="jql">
+    <input name="jql" value="{{$d.JQL}}" spellcheck="false" aria-label="JQL query" autofocus>
+    <button class="small" data-variant="secondary">Run</button>
+  </form>
+  <p class="text-light small jql-hint">The same query works in <code>orca-tasks task list</code> and Orca's Tasks page, with <code>project = {{$d.Membership.Key}} AND</code> in front.</p>
+  {{else}}
+  <form method="get" class="filters" role="search">
+    {{with $f.Get "show"}}<input type="hidden" name="show" value="{{.}}">{{end}}
+    {{with $f.Get "view"}}<input type="hidden" name="view" value="{{.}}">{{end}}
+    <input type="search" name="q" value="{{$f.Get "q"}}" placeholder="Search" aria-label="Search summaries, descriptions, and labels">
+    <select name="assignee" aria-label="Assignee">
+      <option value="">Anyone</option>
+      <option value="me"{{if eq ($f.Get "assignee") "me"}} selected{{end}}>Me</option>
+      <option value="none"{{if eq ($f.Get "assignee") "none"}} selected{{end}}>Unassigned</option>
+    </select>
+    <select name="type" aria-label="Type">
+      <option value="">Any type</option>
+      {{range $d.Catalog.IssueTypes}}<option{{if eq ($f.Get "type") .Name}} selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+    <select name="priority" aria-label="Priority">
+      <option value="">Any priority</option>
+      {{range $d.Catalog.Priorities}}<option{{if eq ($f.Get "priority") .Name}} selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+    {{with $d.Labels}}
+    <select name="labels" aria-label="Label">
+      <option value="">Any label</option>
+      {{range .}}<option{{if eq ($f.Get "labels") .}} selected{{end}}>{{.}}</option>{{end}}
+    </select>
+    {{end}}
+    <select name="sort" aria-label="Sort by">
+      {{$s := $f.Get "sort"}}
+      <option value="">Recently updated</option>
+      <option value="created"{{if eq $s "created"}} selected{{end}}>Newest</option>
+      <option value="priority"{{if eq $s "priority"}} selected{{end}}>Priority</option>
+      <option value="key"{{if eq $s "key"}} selected{{end}}>Key</option>
+    </select>
+    <button class="small" data-variant="secondary">Filter</button>
+  </form>
+  {{end}}
   {{with $d.Problem}}<div role="alert" data-variant="danger" class="mb-4">{{.}}</div>{{end}}
   {{if $d.Board}}
   <div class="board" data-board>
@@ -91,14 +109,5 @@
   </table>
   </div>
   {{end}}
-  <details class="advanced"{{if $f.Get "jql"}} open{{end}}>
-    <summary>Advanced: filter with JQL</summary>
-    <form method="get" class="inline">
-      <label>JQL <input name="jql" value="{{$d.JQL}}" spellcheck="false"></label>
-      <button class="small" data-variant="secondary">Run</button>
-      {{if $f.Get "jql"}}<a class="button small outline" href="?">Clear</a>{{end}}
-    </form>
-    <small data-hint>The same query works in <code>orca-tasks task list</code> and Orca's Tasks page, with <code>project = {{$d.Membership.Key}} AND</code> in front.</small>
-  </details>
 </section>
 {{end}}

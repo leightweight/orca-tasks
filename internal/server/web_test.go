@@ -585,6 +585,12 @@ func TestFilteringTheTaskList(t *testing.T) {
 		}
 	}
 
+	// Switching to JQL starts from the query the filters make.
+	if body := alice.get("/projects/OPS/tasks?assignee=me&mode=jql").body; !strings.Contains(body,
+		`value="statusCategory != Done AND assignee = currentUser() ORDER BY updated DESC"`) {
+		t.Errorf("the JQL box doesn't start with the filters' query: %.3000s", body)
+	}
+
 	if body := alice.get("/projects/OPS/tasks?jql=status+%3D").body; !strings.Contains(body, "Invalid JQL syntax") {
 		t.Errorf("a broken query doesn't say so: %.2000s", body)
 	}
