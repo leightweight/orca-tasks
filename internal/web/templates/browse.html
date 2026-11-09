@@ -1,4 +1,5 @@
-{{define "crumbs"}}<a class="crumbs" href="/projects/{{.Data.ProjectKey}}/tasks">{{.Data.ProjectName}}</a>{{end}}
+{{define "crumbs"}}<a class="crumbs" href="/projects/{{.Data.ProjectKey}}/tasks">Tasks</a>{{end}}
+{{define "actions"}}<div class="buttons"><a class="button outline" href="/projects/{{.Data.ProjectKey}}/tasks/new?parent={{.Data.Key}}">New child task</a><a class="button" href="/browse/{{.Data.Key}}/edit">Edit</a></div>{{end}}
 {{define "content"}}
 <div class="split">
   <div class="split-main">

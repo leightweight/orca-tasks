@@ -315,9 +315,10 @@ Revoking a key, removing or leaving a member, disabling an agent or user, and ch
 | `/admin/projects` | Site administrators | List every project with counts and members. |
 | `/admin/projects/{id}` | Site administrators | Show one project's members and delete the project. `/admin/projects/{id}/members/new` adds a member. |
 | `/admin/proxy` | Site administrators | Show the connecting address, the forwarding headers, which hops are trusted, and the client address the server resolved. |
-| `/browse/{key}` | Project members | Show one task with its parent, description, child tasks, comments, and attachments, read-only, under its project in the sidebar. |
+| `/browse/{key}` | Project members | Show one task with its parent, description, child tasks, comments, and attachments, under its project in the sidebar. `/browse/{key}/edit` edits it. |
 
-Orca links each issue to `{site}/browse/{KEY}`, which is why the read-only issue page exists.
+Orca links each issue to `{site}/browse/{KEY}`, so a task's page lives at that path.
+The edit form sends each field as it was when the form opened, and saving changes only the fields that differ, so a change someone made in Orca meanwhile stays.
 
 For each user, the user's page shows their projects, agents, active API keys, issues reported, issues assigned, comments, and attachments.
 It also shows the bytes of description, comment, and attachment data from the user and their agents, the last sign-in, and the last API key use.

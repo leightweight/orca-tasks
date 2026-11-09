@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -23,6 +24,10 @@ type taskForm struct {
 	Catalog *store.Catalog
 	Members []db.ListMembersRow
 	Parents []issueRow
+
+	// Former is the task's assignee when they're no longer an active member,
+	// so the form can keep them rather than unassign the task.
+	Former string
 }
 
 // loadTaskForm gathers a project's assignable members and the tasks that can
@@ -73,8 +78,10 @@ type taskFields struct {
 }
 
 // parse checks the form's values, returning the first problem as a sentence
-// for the form to show.
-func (page taskForm) parse(issues []db.VisibleIssuesRow) (taskFields, string) {
+// for the form to show. An assignee that isn't being changed isn't checked,
+// so editing a task assigned to someone who has since left the project
+// doesn't fail.
+func (page taskForm) parse(issues []db.VisibleIssuesRow, checkAssignee bool) (taskFields, string) {
 	form := page.Form
 
 	f := taskFields{
@@ -110,7 +117,7 @@ func (page taskForm) parse(issues []db.VisibleIssuesRow) (taskFields, string) {
 		f.PriorityID = &p.ID
 	}
 
-	if value := form.Get("assignee"); value != "" {
+	if value := form.Get("assignee"); value != "" && checkAssignee {
 		i := slices.IndexFunc(page.Members, func(m db.ListMembersRow) bool { return m.Principal.Username == value })
 		if i < 0 {
 			return f, value + " isn't a member of the project, so the task can't be assigned to them."
@@ -169,6 +176,11 @@ func (w *Web) renderTaskForm(rw http.ResponseWriter, r *http.Request, status int
 		return
 	}
 
+	if was := form.Get("was_assignee"); was != "" &&
+		!slices.ContainsFunc(page.Members, func(m db.ListMembersRow) bool { return m.Principal.Username == was }) {
+		page.Former = was
+	}
+
 	page.Action = "/projects/" + projectKey + "/tasks"
 	page.Cancel = page.Action
 	page.Submit = "Create task"
@@ -222,7 +234,7 @@ func (w *Web) createTask(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fields, problem := page.parse(issues)
+	fields, problem := page.parse(issues, true)
 	if problem != "" {
 		w.renderTaskForm(rw, r, http.StatusBadRequest, row.Membership.Key, "New task", problem, form)
 		return
@@ -247,4 +259,158 @@ func (w *Web) createTask(rw http.ResponseWriter, r *http.Request) {
 
 	key := fmt.Sprintf("%s-%d", row.Membership.Key, created.Number)
 	w.redirect(rw, r, "/browse/"+key, "Created "+key+".")
+}
+
+// taskValues are a task's fields as the form sends them.
+func (w *Web) taskValues(row db.VisibleIssuesRow) url.Values {
+	i := row.Issue
+
+	form := url.Values{
+		"key":         {issueKey(row)},
+		"id":          {strconv.FormatInt(i.ID, 10)},
+		"summary":     {i.Summary},
+		"description": {i.Description},
+		"status":      {strconv.Itoa(int(i.StatusID))},
+		"type":        {strconv.Itoa(int(i.TypeID))},
+		"labels":      {strings.Join(i.Labels, ", ")},
+	}
+
+	if i.PriorityID != nil {
+		form.Set("priority", strconv.Itoa(int(*i.PriorityID)))
+	}
+
+	if row.AssigneeUsername != nil {
+		form.Set("assignee", *row.AssigneeUsername)
+	}
+
+	if row.ParentNumber != nil {
+		form.Set("parent", fmt.Sprintf("%s-%d", row.ProjectKey, *row.ParentNumber))
+	}
+
+	return form
+}
+
+// editedFields are the fields an edit form can change.
+var editedFields = []string{"summary", "description", "status", "type", "priority", "assignee", "parent", "labels"}
+
+func (w *Web) editTaskForm(rw http.ResponseWriter, r *http.Request) {
+	row, ok := w.visibleIssue(rw, r)
+	if !ok {
+		return
+	}
+
+	// The form carries each field as it was, so saving changes only the
+	// fields this person changed, not ones someone else changed meanwhile.
+	form := w.taskValues(row)
+	for _, field := range editedFields {
+		form.Set("was_"+field, form.Get(field))
+	}
+
+	w.renderTaskForm(rw, r, http.StatusOK, row.ProjectKey, "Edit "+issueKey(row), "", form)
+}
+
+func (w *Web) updateTask(rw http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	row, ok := w.visibleIssue(rw, r)
+	if !ok {
+		return
+	}
+
+	key := issueKey(row)
+	title := "Edit " + key
+
+	if err := r.ParseForm(); err != nil {
+		w.redirectError(rw, r, "/browse/"+key+"/edit", "The form didn't arrive whole. Try again.")
+		return
+	}
+
+	form := r.PostForm
+	form.Set("key", key)
+	form.Set("id", strconv.FormatInt(row.Issue.ID, 10))
+
+	changed := func(field string) bool {
+		if field == "description" {
+			return strings.ReplaceAll(form.Get(field), "\r\n", "\n") != strings.ReplaceAll(form.Get("was_"+field), "\r\n", "\n")
+		}
+
+		if field == "labels" {
+			return !slices.Equal(splitLabels(form.Get(field)), splitLabels(form.Get("was_"+field)))
+		}
+
+		return form.Get(field) != form.Get("was_"+field)
+	}
+
+	page, err := w.loadTaskForm(r, row.ProjectKey, form, row.Issue.ID)
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
+	issues, err := w.Store.VisibleIssues(ctx, db.VisibleIssuesParams{PrincipalID: currentUser(ctx).ID, Key: &row.ProjectKey})
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
+	fields, problem := page.parse(issues, changed("assignee"))
+	if problem != "" {
+		w.renderTaskForm(rw, r, http.StatusBadRequest, row.ProjectKey, title, problem, form)
+		return
+	}
+
+	var change store.IssueChange
+
+	if changed("summary") {
+		change.Summary = &fields.Summary
+	}
+
+	if changed("description") {
+		change.Description = &fields.Description
+	}
+
+	if changed("status") {
+		change.StatusID = &fields.StatusID
+	}
+
+	if changed("type") {
+		change.TypeID = &fields.TypeID
+	}
+
+	if changed("priority") {
+		change.SetPriority, change.PriorityID = true, fields.PriorityID
+	}
+
+	if changed("assignee") {
+		change.SetAssignee, change.Assignee = true, fields.Assignee
+	}
+
+	if changed("parent") {
+		change.SetParent, change.Parent = true, fields.Parent
+	}
+
+	if changed("labels") {
+		change.Labels = &fields.Labels
+	}
+
+	actor, err := w.Store.GetMembershipByKey(ctx, db.GetMembershipByKeyParams{PrincipalID: currentUser(ctx).ID, Key: row.ProjectKey})
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
+	err = w.Store.UpdateIssue(ctx, w.Catalog, actor.Membership.ID, row.Issue.ID, change)
+	if errors.Is(err, store.ErrParentCycle) {
+		w.renderTaskForm(rw, r, http.StatusBadRequest, row.ProjectKey, title,
+			form.Get("parent")+" is "+key+" or one of the tasks under it, so it can't be "+key+"'s parent.", form)
+
+		return
+	}
+
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
+	w.redirect(rw, r, "/browse/"+key, "Saved "+key+".")
 }

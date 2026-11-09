@@ -2,7 +2,7 @@
 {{define "content"}}
 {{$f := .Data.Form}}
 <form method="post" action="{{.Data.Action}}" class="split task-form">
-  {{with $f.Get "key"}}<input type="hidden" name="key" value="{{.}}"><input type="hidden" name="id" value="{{$f.Get "id"}}">{{end}}
+  {{if $f.Get "key"}}{{range $field := list "summary" "description" "status" "type" "priority" "assignee" "parent" "labels"}}<input type="hidden" name="was_{{$field}}" value="{{$f.Get (print "was_" $field)}}">{{end}}{{end}}
   <div class="split-main">
     <section class="card">
       <div class="stack-fields">
@@ -29,6 +29,7 @@
       <label>Assignee
         <select name="assignee">
           <option value="">Unassigned</option>
+          {{with .Data.Former}}<option value="{{.}}"{{if eq ($f.Get "assignee") .}} selected{{end}}>{{.}} (no longer a member)</option>{{end}}
           {{range .Data.Members}}<option value="{{.Principal.Username}}"{{if eq ($f.Get "assignee") .Principal.Username}} selected{{end}}>{{.Principal.DisplayName}}{{if eq .Principal.ID $.User.ID}} (you){{end}}</option>{{end}}
         </select>
       </label>

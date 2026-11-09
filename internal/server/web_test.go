@@ -346,7 +346,7 @@ func TestAnIssueLinksBackToItsProject(t *testing.T) {
 	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}, "name": {"Operations"}}), "/projects/OPS")
 	createIssue(t, s, "Rotate the keys", "To Do", nil)
 
-	if body := alice.get("/browse/OPS-1").body; !strings.Contains(body, `<a class="crumbs" href="/projects/OPS/tasks">Operations</a>`) {
+	if body := alice.get("/browse/OPS-1").body; !strings.Contains(body, `<a class="crumbs" href="/projects/OPS/tasks">Tasks</a>`) {
 		t.Errorf("the issue page doesn't link to its project: %.1500s", body)
 	}
 }
@@ -422,4 +422,78 @@ func TestCreatingATaskInTheBrowser(t *testing.T) {
 	if r := mallory.post("/projects/OPS/tasks", url.Values{"summary": {"x"}, "status": {status}, "type": {bug}}); r.status != http.StatusNotFound {
 		t.Errorf("a non-member creating a task: status %d, want 404", r.status)
 	}
+}
+
+func TestEditingATaskKeepsOtherPeoplesChanges(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}}), "/projects/OPS/tasks")
+	epic := createIssue(t, s, "Rotate every credential", "To Do", nil)
+	task := createIssue(t, s, "Rotate the keys", "To Do", &epic)
+
+	// alice opens the edit form, and then the task moves to Done elsewhere.
+	page := alice.get("/browse/OPS-2/edit").body
+	form := url.Values{}
+
+	for _, m := range regexpFor(`<input type="hidden" name="(was_\w+)" value="([^"]*)">`).FindAllStringSubmatch(page, -1) {
+		form.Set(m[1], m[2])
+		form.Set(strings.TrimPrefix(m[1], "was_"), m[2])
+	}
+
+	ctx := testutil.Context(t)
+
+	catalog, err := s.store.LoadCatalog(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done, err := catalog.Status("Done")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.store.UpdateIssue(ctx, catalog, task.ReporterID, task.ID, store.IssueChange{StatusID: &done.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Saving her summary change leaves the status alone.
+	form.Set("summary", "Rotate every key")
+	alice.expectRedirect(alice.post("/browse/OPS-2/edit", form), "/browse/OPS-2")
+
+	body := alice.get("/browse/OPS-2").body
+	if !strings.Contains(body, "Rotate every key") || !strings.Contains(body, ">Done<") {
+		t.Errorf("the edit undid the status change or lost the summary: %.2500s", body)
+	}
+
+	history, err := s.store.ListHistory(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if last := history[len(history)-1]; last.Field != "summary" || deref(last.NewValue) != "Rotate every key" {
+		t.Errorf("the last history entry is %s = %q, want the summary", last.Field, deref(last.NewValue))
+	}
+
+	// A parent that would make a cycle is refused on the form.
+	epicForm := url.Values{}
+	for _, m := range regexpFor(`<input type="hidden" name="(was_\w+)" value="([^"]*)">`).FindAllStringSubmatch(alice.get("/browse/OPS-1/edit").body, -1) {
+		epicForm.Set(m[1], m[2])
+		epicForm.Set(strings.TrimPrefix(m[1], "was_"), m[2])
+	}
+
+	epicForm.Set("parent", "OPS-2")
+
+	if r := alice.post("/browse/OPS-1/edit", epicForm); r.status != http.StatusBadRequest || !strings.Contains(r.body, "can&#39;t be OPS-1&#39;s parent") {
+		t.Errorf("a parent cycle: status %d: %.2000s", r.status, r.body)
+	}
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+
+	return *s
 }

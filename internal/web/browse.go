@@ -19,6 +19,7 @@ import (
 )
 
 type issuePage struct {
+	Key         string
 	ProjectKey  string
 	ProjectName string
 	Status      string
@@ -69,17 +70,17 @@ func markdown(text string) template.HTML {
 	return template.HTML(out.String())
 }
 
-// browse shows an issue read-only. Orca links each issue here.
-func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
+// visibleIssue finds the task the path's key names among those the signed-in
+// user can see, showing a 404 if there isn't one.
+func (w *Web) visibleIssue(rw http.ResponseWriter, r *http.Request) (db.VisibleIssuesRow, bool) {
 	ctx := r.Context()
-	key := r.PathValue("key")
 
-	project, numberText, _ := strings.Cut(key, "-")
+	project, numberText, _ := strings.Cut(r.PathValue("key"), "-")
 
 	number, err := strconv.ParseInt(numberText, 10, 32)
 	if err != nil {
 		w.notFound(rw, r)
-		return
+		return db.VisibleIssuesRow{}, false
 	}
 
 	rows, err := w.Store.VisibleIssues(ctx, db.VisibleIssuesParams{
@@ -89,15 +90,26 @@ func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		w.serverError(rw, r, err)
-		return
+		return db.VisibleIssuesRow{}, false
 	}
 
 	if len(rows) != 1 {
 		w.notFound(rw, r)
+		return db.VisibleIssuesRow{}, false
+	}
+
+	return rows[0], true
+}
+
+// browse shows a task. Orca links each task here.
+func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	row, ok := w.visibleIssue(rw, r)
+	if !ok {
 		return
 	}
 
-	row := rows[0]
 	i := row.Issue
 
 	comments, err := w.Store.ListComments(ctx, i.ID)
@@ -124,6 +136,7 @@ func (w *Web) browse(rw http.ResponseWriter, r *http.Request) {
 	status := w.Catalog.StatusByID(i.StatusID)
 
 	page := issuePage{
+		Key:         issueKey(row),
 		ProjectKey:  row.ProjectKey,
 		ProjectName: row.ProjectName,
 		Status:      status.Name,

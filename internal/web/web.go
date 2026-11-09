@@ -196,6 +196,8 @@ func (w *Web) Register(mux *http.ServeMux) error {
 	page("GET /admin/proxy", w.admin(w.proxy))
 
 	page("GET /browse/{key}", w.signedIn(w.browse))
+	page("GET /browse/{key}/edit", w.signedIn(w.editTaskForm))
+	page("POST /browse/{key}/edit", w.signedIn(w.updateTask))
 
 	return nil
 }
@@ -215,6 +217,7 @@ func (w *Web) parseTemplates() error {
 		"join":      strings.Join,
 		"hasPrefix": strings.HasPrefix,
 		"formHas":   formHas,
+		"list":      func(values ...string) []string { return values },
 		// lastSeen is the later of a sign-in and an API key use, or nil for
 		// neither. A key that was never used reports the epoch.
 		"lastSeen": func(signIn *time.Time, keyUse time.Time) *time.Time {
