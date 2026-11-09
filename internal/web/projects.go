@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/leightweight/orca-tasks/internal/jira"
 	"github.com/leightweight/orca-tasks/internal/store"
 	"github.com/leightweight/orca-tasks/internal/store/db"
 )
@@ -92,13 +94,6 @@ type projectPage struct {
 	Project    db.Project
 	Members    []db.ListMembersRow
 
-	// List is the issues to show, newest change first: the open ones, or all of
-	// them when All is set. Open and Total count the open ones and all of them.
-	List  []issueRow
-	All   bool
-	Open  int
-	Total int
-
 	// Admins counts the active administrators, so the page can keep the last
 	// one from leaving or stepping down.
 	Admins int
@@ -114,33 +109,166 @@ func (w *Web) project(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// taskList is a project's tasks with the filters that chose them.
+type taskList struct {
+	projectPage
+
+	// Filters are the query's parameters, JQL the query they make, or the
+	// one typed in the advanced box, and Problem why that query failed.
+	Filters url.Values
+	JQL     string
+	Problem string
+
+	// List is the tasks the query matched. Open, Done, and Total count the
+	// project's tasks for the tabs.
+	List  []issueRow
+	Open  int
+	Done  int
+	Total int
+
+	// The choices the filters offer.
+	Catalog *store.Catalog
+	Labels  []string
+}
+
+// Show is which tasks the tabs select: open, done, or all.
+func (l taskList) Show() string {
+	switch show := l.Filters.Get("show"); show {
+	case "done", "all":
+		return show
+	default:
+		return "open"
+	}
+}
+
+// Link is the list's address with one filter changed, keeping the others.
+func (l taskList) Link(key, value string) string {
+	query := url.Values{}
+
+	for k, v := range l.Filters {
+		if k != "jql" && len(v) > 0 && v[0] != "" {
+			query.Set(k, v[0])
+		}
+	}
+
+	if value == "" {
+		query.Del(key)
+	} else {
+		query.Set(key, value)
+	}
+
+	if len(query) == 0 {
+		return "?"
+	}
+
+	return "?" + query.Encode()
+}
+
+// filterJQL turns the list's filters into a JQL query over a project's tasks.
+func filterJQL(filters url.Values) string {
+	var clauses []string
+
+	switch filters.Get("show") {
+	case "done":
+		clauses = append(clauses, "statusCategory = Done")
+	case "all":
+	default:
+		clauses = append(clauses, "statusCategory != Done")
+	}
+
+	switch assignee := filters.Get("assignee"); assignee {
+	case "":
+	case "me":
+		clauses = append(clauses, "assignee = currentUser()")
+	case "none":
+		clauses = append(clauses, "assignee IS EMPTY")
+	default:
+		clauses = append(clauses, "assignee = "+jqlString(assignee))
+	}
+
+	for _, field := range []string{"type", "priority", "labels"} {
+		if value := filters.Get(field); value != "" {
+			clauses = append(clauses, field+" = "+jqlString(value))
+		}
+	}
+
+	if text := strings.TrimSpace(filters.Get("q")); text != "" {
+		clauses = append(clauses, "text ~ "+jqlString(text))
+	}
+
+	order := map[string]string{
+		"created":  "created DESC",
+		"priority": "priority DESC, updated DESC",
+		"key":      "key ASC",
+	}[filters.Get("sort")]
+	if order == "" {
+		order = "updated DESC"
+	}
+
+	return strings.TrimPrefix(strings.Join(clauses, " AND ")+" ORDER BY "+order, " ")
+}
+
+// jqlString quotes a value for JQL.
+func jqlString(value string) string {
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value) + `"`
+}
+
 func (w *Web) projectTasks(rw http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := currentUser(ctx)
+
 	row, ok := w.membership(rw, r)
 	if !ok {
 		return
 	}
 
-	page := projectPage{Membership: row.Membership, Project: row.Project, All: r.URL.Query().Get("show") == "all"}
+	page := taskList{
+		Membership: row.Membership, Project: row.Project,
+		Filters: r.URL.Query(),
+		Catalog: w.Catalog,
+	}
 
-	issues, err := w.Store.VisibleIssues(r.Context(), db.VisibleIssuesParams{PrincipalID: currentUser(r.Context()).ID, Key: &row.Membership.Key})
+	issues, err := w.Store.VisibleIssues(ctx, db.VisibleIssuesParams{PrincipalID: user.ID, Key: &row.Membership.Key})
 	if err != nil {
 		w.serverError(rw, r, err)
 		return
 	}
 
-	slices.SortFunc(issues, func(a, b db.VisibleIssuesRow) int { return b.Issue.UpdatedAt.Compare(a.Issue.UpdatedAt) })
-
 	page.Total = len(issues)
 
 	for _, i := range issues {
-		item := w.issueRow(i)
-		if item.Category != store.CategoryDone {
+		if w.Catalog.StatusByID(i.Issue.StatusID).Category == store.CategoryDone {
+			page.Done++
+		} else {
 			page.Open++
-		} else if !page.All {
-			continue
 		}
 
-		page.List = append(page.List, item)
+		for _, label := range i.Issue.Labels {
+			if !slices.Contains(page.Labels, label) {
+				page.Labels = append(page.Labels, label)
+			}
+		}
+	}
+
+	slices.Sort(page.Labels)
+
+	// The advanced box takes JQL as it is, and the filters stand in for it
+	// otherwise, so the box shows the query the filters make.
+	page.JQL = strings.TrimSpace(page.Filters.Get("jql"))
+	if page.JQL == "" {
+		page.JQL = filterJQL(page.Filters)
+	}
+
+	query, err := jira.ParseJQL(page.JQL)
+	if err != nil {
+		page.Problem = capitalize(err.Error()) + "."
+		w.render(rw, r, http.StatusOK, "project_tasks", "Tasks", page)
+
+		return
+	}
+
+	for _, i := range jira.Filter(query, issues, w.Catalog, []string{user.Username}, w.Now()) {
+		page.List = append(page.List, w.issueRow(i))
 	}
 
 	w.render(rw, r, http.StatusOK, "project_tasks", "Tasks", page)
@@ -357,8 +485,10 @@ type issueRow struct {
 	issueLink
 
 	Type     string
+	Priority string
 	Assignee string
 	Parent   string
+	Labels   []string
 	Updated  time.Time
 }
 
@@ -371,7 +501,12 @@ func (w *Web) issueRow(i db.VisibleIssuesRow) issueRow {
 		Status:   status.Name,
 		Category: status.Category,
 		Type:     w.Catalog.IssueTypeByID(i.Issue.TypeID).Name,
+		Labels:   i.Issue.Labels,
 		Updated:  i.Issue.UpdatedAt,
+	}
+
+	if p := w.Catalog.PriorityByID(i.Issue.PriorityID); p != nil {
+		item.Priority = p.Name
 	}
 
 	if i.AssigneeName != nil {

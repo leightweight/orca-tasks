@@ -307,7 +307,7 @@ Revoking a key, removing or leaving a member, disabling an agent or user, and ch
 | `/account/keys` | Users | List and revoke the user's API keys. `/account/keys/new` creates one. |
 | `/account/agents` | Users | List, rename, disable, and enable agents. `/account/agents/new` creates one. |
 | `/projects` | Users | List the user's projects. `/projects/new` creates one. |
-| `/projects/{key}/tasks` | Project members | List the project's open or all tasks. `/projects/{key}` leads here, and `/projects/{key}/tasks/new` creates a task. |
+| `/projects/{key}/tasks` | Project members | List the project's tasks, filtered and sorted. `/projects/{key}` leads here, and `/projects/{key}/tasks/new` creates a task. |
 | `/projects/{key}/members` | Project members | List members, and let administrators remove them and change roles. `/projects/{key}/members/new` adds one. |
 | `/projects/{key}/settings` | Project members | Change the key the user sees the project under, and let administrators rename and delete it. |
 | `/admin/users` | Site administrators | List users with their counts. `/admin/users/new` creates one. |
@@ -318,6 +318,8 @@ Revoking a key, removing or leaving a member, disabling an agent or user, and ch
 | `/browse/{key}` | Project members | Show one task with its parent, description, child tasks, comments, and attachments, under its project in the sidebar, and move it, assign it, comment, and attach files. `/browse/{key}/edit` edits it. |
 
 Orca links each issue to `{site}/browse/{KEY}`, so a task's page lives at that path.
+The task list's filters are URL parameters, so a view can be bookmarked: `show` (open, done, or all), `assignee` (me, none, or a username), `type`, `priority`, `labels`, `q` for text, and `sort` (created, priority, or key, else most recently updated).
+The page turns them into JQL and filters with the same code as search, so a filter matches the same tasks in Orca, and an advanced box takes JQL directly.
 Attaching a file on a task's page shows the Markdown that embeds it, to paste into the description or a comment, as `task attach` prints it.
 The edit form sends each field as it was when the form opened, and saving changes only the fields that differ, so a change someone made in Orca meanwhile stays.
 

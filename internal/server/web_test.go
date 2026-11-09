@@ -553,3 +553,39 @@ func TestWorkingOnATaskFromItsPage(t *testing.T) {
 		t.Errorf("%d comments, %v; want the move's and the comment", len(comments), err)
 	}
 }
+
+func TestFilteringTheTaskList(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}}), "/projects/OPS/tasks")
+	createIssue(t, s, "Rotate the keys", "To Do", nil)
+	createIssue(t, s, "Renew the certificates", "Done", nil)
+	createIssue(t, s, "Write the runbook", "In Progress", nil)
+
+	for query, want := range map[string][]string{
+		"?sort=key":          {"OPS-1", "OPS-3"},
+		"?show=done":         {"OPS-2"},
+		"?show=all&q=rotate": {"OPS-1"},
+		"?show=all&sort=key": {"OPS-1", "OPS-2", "OPS-3"},
+		"?jql=" + url.QueryEscape(`status = "In Progress"`): {"OPS-3"},
+	} {
+		body := alice.get("/projects/OPS/tasks" + query).body
+
+		matches := regexpFor(`<td class="nowrap"><a href="/browse/(OPS-\d+)">`).FindAllStringSubmatch(body, -1)
+
+		got := make([]string, 0, len(matches))
+		for _, m := range matches {
+			got = append(got, m[1])
+		}
+
+		if strings.Join(got, " ") != strings.Join(want, " ") {
+			t.Errorf("%q listed %v, want %v", query, got, want)
+		}
+	}
+
+	if body := alice.get("/projects/OPS/tasks?jql=status+%3D").body; !strings.Contains(body, "Invalid JQL syntax") {
+		t.Errorf("a broken query doesn't say so: %.2000s", body)
+	}
+}
