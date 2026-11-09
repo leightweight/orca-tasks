@@ -1,6 +1,6 @@
 # Builds the image from source, for development and trying changes on a
 # cluster. Releases use Dockerfile.release, which copies goreleaser's binary.
-ARG BASE_IMAGE=golang:1.27@sha256:0c050feb47802ae436b9030833694a0b80160d08e3b3049ad30bf7c9e724e09d
+ARG BASE_IMAGE=golang:1.27@sha256:e519d3b0a5b285e5aa53ab9eef02bc6bbb9cb04608389b743a136a9ce75f0d1e
 FROM ${BASE_IMAGE} AS builder
 ARG TARGETOS
 ARG TARGETARCH
