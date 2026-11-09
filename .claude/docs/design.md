@@ -9,9 +9,8 @@ A CLI calls the same API, so Claude Code agents can read and change the same tas
 Several people share one server.
 Each has their own login, agents, and API keys, and sees only the projects they belong to.
 
-The web interface manages accounts, projects, and access, and lists each project's issues read-only.
-It is not a task board.
-People work with tasks in Orca, and agents work with them through the CLI.
+The web interface manages accounts, projects, and access, and is a task manager of its own.
+People work with tasks in Orca or the browser, and agents work with them through the CLI.
 
 ## Project
 
@@ -308,7 +307,7 @@ Revoking a key, removing or leaving a member, disabling an agent or user, and ch
 | `/account/keys` | Users | List and revoke the user's API keys. `/account/keys/new` creates one. |
 | `/account/agents` | Users | List, rename, disable, and enable agents. `/account/agents/new` creates one. |
 | `/projects` | Users | List the user's projects. `/projects/new` creates one. |
-| `/projects/{key}/tasks` | Project members | List the project's open or all tasks. `/projects/{key}` leads here. |
+| `/projects/{key}/tasks` | Project members | List the project's open or all tasks. `/projects/{key}` leads here, and `/projects/{key}/tasks/new` creates a task. |
 | `/projects/{key}/members` | Project members | List members, and let administrators remove them and change roles. `/projects/{key}/members/new` adds one. |
 | `/projects/{key}/settings` | Project members | Change the key the user sees the project under, and let administrators rename and delete it. |
 | `/admin/users` | Site administrators | List users with their counts. `/admin/users/new` creates one. |

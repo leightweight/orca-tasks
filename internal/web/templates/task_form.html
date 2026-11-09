@@ -1,0 +1,47 @@
+{{define "crumbs"}}<a class="crumbs" href="{{.Data.Cancel}}">{{with .Data.Form.Get "key"}}{{.}}{{else}}Tasks{{end}}</a>{{end}}
+{{define "content"}}
+{{$f := .Data.Form}}
+<form method="post" action="{{.Data.Action}}" class="split task-form">
+  {{with $f.Get "key"}}<input type="hidden" name="key" value="{{.}}"><input type="hidden" name="id" value="{{$f.Get "id"}}">{{end}}
+  <div class="split-main">
+    <section class="card">
+      <div class="stack-fields">
+        <label>Summary <input name="summary" required value="{{$f.Get "summary"}}" placeholder="Rotate the API keys" autofocus></label>
+        <label>Description
+          <textarea name="description" rows="14" placeholder="What needs doing, and how you'll know it's done.">{{$f.Get "description"}}</textarea>
+          <small data-hint>Markdown. Attach images on the task's page, then paste the Markdown it gives you here.</small>
+        </label>
+      </div>
+      <div class="buttons mt-6"><button>{{.Data.Submit}}</button><a class="button outline" href="{{.Data.Cancel}}">Cancel</a></div>
+    </section>
+  </div>
+  <aside class="card split-side">
+    <div class="stack-fields">
+      <label>Status
+        <select name="status">{{range .Data.Catalog.Statuses}}<option value="{{.ID}}"{{if eq ($f.Get "status") (print .ID)}} selected{{end}}>{{.Name}}</option>{{end}}</select>
+      </label>
+      <label>Type
+        <select name="type">{{range .Data.Catalog.IssueTypes}}<option value="{{.ID}}"{{if eq ($f.Get "type") (print .ID)}} selected{{end}}>{{.Name}}</option>{{end}}</select>
+      </label>
+      <label>Priority
+        <select name="priority"><option value="">None</option>{{range .Data.Catalog.Priorities}}<option value="{{.ID}}"{{if eq ($f.Get "priority") (print .ID)}} selected{{end}}>{{.Name}}</option>{{end}}</select>
+      </label>
+      <label>Assignee
+        <select name="assignee">
+          <option value="">Unassigned</option>
+          {{range .Data.Members}}<option value="{{.Principal.Username}}"{{if eq ($f.Get "assignee") .Principal.Username}} selected{{end}}>{{.Principal.DisplayName}}{{if eq .Principal.ID $.User.ID}} (you){{end}}</option>{{end}}
+        </select>
+      </label>
+      <label>Parent
+        <select name="parent">
+          <option value="">None</option>
+          {{range .Data.Parents}}<option value="{{.Key}}"{{if eq ($f.Get "parent") .Key}} selected{{end}}>{{.Key}} {{.Summary}}</option>{{end}}
+        </select>
+      </label>
+      <label>Labels <input name="labels" value="{{$f.Get "labels"}}" placeholder="security, backend">
+        <small data-hint>Separate them with commas or spaces.</small>
+      </label>
+    </div>
+  </aside>
+</form>
+{{end}}

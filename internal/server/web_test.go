@@ -380,3 +380,46 @@ func TestHomeOpensTheLastProject(t *testing.T) {
 
 	alice.expectRedirect(alice.get("/"), "/projects/OPS/tasks")
 }
+
+func TestCreatingATaskInTheBrowser(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}, "name": {"Operations"}}), "/projects/OPS/tasks")
+	createIssue(t, s, "Rotate every credential", "To Do", nil)
+
+	form := alice.get("/projects/OPS/tasks/new").body
+	status := find(t, regexpFor(`<option value="(\d+)">In Progress<`), form)
+	bug := find(t, regexpFor(`<option value="(\d+)">Bug<`), form)
+
+	alice.expectRedirect(alice.post("/projects/OPS/tasks", url.Values{
+		"summary": {"Rotate the keys"}, "description": {"Use **the** vault."}, "status": {status}, "type": {bug},
+		"assignee": {"alice"}, "parent": {"OPS-1"}, "labels": {"security, tls security"},
+	}), "/browse/OPS-2")
+
+	page := alice.get("/browse/OPS-2").body
+	for _, want := range []string{"In Progress", "Bug", "<strong>the</strong>", `href="/browse/OPS-1">OPS-1</a>`, ">security<", ">tls<"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the new task's page has no %s: %.3000s", want, page)
+		}
+	}
+
+	// A mistake shows the form again with what was typed.
+	r := alice.post("/projects/OPS/tasks", url.Values{"summary": {"Orphan"}, "status": {status}, "type": {bug}, "parent": {"OPS-99"}})
+	if r.status != http.StatusBadRequest || !strings.Contains(r.body, "The parent must be a task in this project.") ||
+		!strings.Contains(r.body, `value="Orphan"`) {
+		t.Errorf("a missing parent: status %d: %.2000s", r.status, r.body)
+	}
+
+	// Someone outside the project can't create tasks in it.
+	alice.expectRedirect(alice.post("/admin/users", url.Values{"username": {"mallory"}}), "/admin/users/")
+	link := find(t, linkPattern, alice.get("/admin/users").body)
+	mallory := s.browser()
+	mallory.expectRedirect(mallory.post(link, url.Values{"password": {"mallory's long password"}, "confirm": {"mallory's long password"}}), "/enroll")
+	mallory.enroll()
+
+	if r := mallory.post("/projects/OPS/tasks", url.Values{"summary": {"x"}, "status": {status}, "type": {bug}}); r.status != http.StatusNotFound {
+		t.Errorf("a non-member creating a task: status %d, want 404", r.status)
+	}
+}

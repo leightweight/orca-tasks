@@ -377,6 +377,22 @@ table form.inline :is(input, select) {
   margin-block-start: 0;
 }
 
+.stack-fields {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.task-form input[name="summary"] {
+  font-size: var(--text-5);
+  font-weight: var(--font-medium);
+}
+
+.task-form textarea {
+  font-family: var(--font-mono);
+  font-size: var(--text-7);
+  min-height: 18rem;
+}
+
 label.indent {
   margin-inline-start: var(--space-6);
 }

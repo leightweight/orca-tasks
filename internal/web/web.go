@@ -170,6 +170,8 @@ func (w *Web) Register(mux *http.ServeMux) error {
 	page("POST /projects", w.signedIn(w.createProject))
 	page("GET /projects/{key}", w.signedIn(w.project))
 	page("GET /projects/{key}/tasks", w.signedIn(w.projectTasks))
+	page("GET /projects/{key}/tasks/new", w.signedIn(w.newTaskForm))
+	page("POST /projects/{key}/tasks", w.signedIn(w.createTask))
 	page("GET /projects/{key}/members", w.signedIn(w.projectMembers))
 	page("GET /projects/{key}/settings", w.signedIn(w.projectSettings))
 	page("POST /projects/{key}/key", w.signedIn(w.changeKey))
