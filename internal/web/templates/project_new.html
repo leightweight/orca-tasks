@@ -1,0 +1,13 @@
+{{define "crumbs"}}<a class="crumbs" href="/projects">Your projects</a>{{end}}
+{{define "intro"}}<p>You'll be its administrator, and can add members once it exists.</p>{{end}}
+{{define "content"}}
+<section class="card narrow">
+  <form method="post" action="/projects" class="stack">
+    <label>Name <input name="name" placeholder="Operations" value="{{.Data.Form.Get "name"}}" autofocus></label>
+    <label>Key <input name="key" required placeholder="OPS" pattern="[A-Za-z][A-Za-z0-9_]*" maxlength="20" value="{{.Data.Form.Get "key"}}">
+      <small data-hint>Task keys start with it, such as OPS-12. A letter, then letters, digits, and underscores, up to 20.</small>
+    </label>
+    <div class="buttons"><button>Create project</button><a class="button outline" href="/projects">Cancel</a></div>
+  </form>
+</section>
+{{end}}

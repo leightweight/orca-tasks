@@ -1,0 +1,14 @@
+{{define "crumbs"}}<a class="crumbs" href="{{.Data.Cancel}}">{{if hasPrefix .Data.Cancel "/admin/"}}{{.Data.Project.Name}}{{else}}Members{{end}}</a>{{end}}
+{{define "intro"}}<p>Add a user to {{.Data.Project.Name}}. Their agents join with them.</p>{{end}}
+{{define "content"}}
+<section class="card narrow">
+  <form method="post" action="{{.Data.Action}}" class="stack">
+    <label>Username <input name="username" required value="{{.Data.Form.Get "username"}}" autofocus></label>
+    <label>Role
+      <select name="role"><option value="member">member</option><option value="admin"{{if eq (.Data.Form.Get "role") "admin"}} selected{{end}}>admin</option></select>
+      <small data-hint>Administrators also manage members and the project's settings.</small>
+    </label>
+    <div class="buttons"><button>Add member</button><a class="button outline" href="{{.Data.Cancel}}">Cancel</a></div>
+  </form>
+</section>
+{{end}}

@@ -175,19 +175,29 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 	user := currentUser(ctx)
 
 	if err := r.ParseForm(); err != nil {
-		w.redirectError(rw, r, "/account/keys", "The form didn't arrive whole. Try again.")
+		w.redirectError(rw, r, "/account/keys/new", "The form didn't arrive whole. Try again.")
 		return
+	}
+
+	again := func(problem string) {
+		page, err := w.keyForm(r, r.PostForm)
+		if err != nil {
+			w.serverError(rw, r, err)
+			return
+		}
+
+		w.fail(rw, r, "key_new", "New API key", problem, page)
 	}
 
 	name := strings.TrimSpace(r.PostFormValue("name"))
 	if name == "" {
-		w.redirectError(rw, r, "/account/keys", "A key needs a name.")
+		again("A key needs a name.")
 		return
 	}
 
 	principal, err := strconv.ParseInt(r.PostFormValue("principal"), 10, 64)
 	if err != nil {
-		w.redirectError(rw, r, "/account/keys", "Choose who the key is for.")
+		again("Choose who the key is for.")
 		return
 	}
 
@@ -202,7 +212,7 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 
 		i := slices.IndexFunc(agents, func(a db.Principal) bool { return a.ID == principal && a.DisabledAt == nil })
 		if i < 0 {
-			w.redirectError(rw, r, "/account/keys", "You can only create keys for yourself and your active agents.")
+			again("You can only create keys for yourself and your active agents.")
 			return
 		}
 
@@ -227,7 +237,7 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(projects) == 0 {
-			w.redirectError(rw, r, "/account/keys", "Choose at least one project, or all of them.")
+			again("Choose at least one project, or all of them.")
 			return
 		}
 	}
@@ -244,7 +254,7 @@ func (w *Web) createKey(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.redirectError(rw, r, "/account/keys", "No key was created: "+err.Error()+".")
+		again("No key was created: " + err.Error() + ".")
 		return
 	}
 
@@ -320,7 +330,7 @@ func (w *Web) createAgent(rw http.ResponseWriter, r *http.Request) {
 
 	agent, err := w.Store.CreateAgent(r.Context(), user.ID, r.PostFormValue("username"), r.PostFormValue("display_name"))
 	if errors.Is(err, store.ErrInvalidUsername) || errors.Is(err, store.ErrUsernameTaken) {
-		w.redirectError(rw, r, "/account/agents", capitalize(err.Error())+".")
+		w.fail(rw, r, "agent_new", "New agent", capitalize(err.Error())+".", formPage{Form: r.PostForm})
 		return
 	}
 

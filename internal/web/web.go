@@ -155,15 +155,18 @@ func (w *Web) Register(mux *http.ServeMux) error {
 	page("POST /account/password", w.signedIn(w.changePassword))
 	page("POST /account/recovery-codes", w.signedIn(w.newRecoveryCodes))
 	page("GET /account/keys", w.signedIn(w.keys))
+	page("GET /account/keys/new", w.signedIn(w.newKeyForm))
 	page("POST /account/keys", w.signedIn(w.createKey))
 	page("GET /account/keys/{id}/revoke", w.signedIn(w.confirmRevokeKey))
 	page("POST /account/keys/{id}/revoke", w.signedIn(w.revokeKey))
 	page("GET /account/agents", w.signedIn(w.agents))
+	page("GET /account/agents/new", w.signedIn(w.newAgentForm))
 	page("POST /account/agents", w.signedIn(w.createAgent))
 	page("GET /account/agents/{id}/disable", w.signedIn(w.confirmDisableAgent))
 	page("POST /account/agents/{id}/{action}", w.signedIn(w.changeAgent))
 
 	page("GET /projects", w.signedIn(w.projects))
+	page("GET /projects/new", w.signedIn(w.newProjectForm))
 	page("POST /projects", w.signedIn(w.createProject))
 	page("GET /projects/{key}", w.signedIn(w.project))
 	page("GET /projects/{key}/tasks", w.signedIn(w.projectTasks))
@@ -171,18 +174,21 @@ func (w *Web) Register(mux *http.ServeMux) error {
 	page("GET /projects/{key}/settings", w.signedIn(w.projectSettings))
 	page("POST /projects/{key}/key", w.signedIn(w.changeKey))
 	page("POST /projects/{key}/rename", w.signedIn(w.renameProject))
+	page("GET /projects/{key}/members/new", w.signedIn(w.newMemberForm))
 	page("POST /projects/{key}/members", w.signedIn(w.addMember))
 	page("GET /projects/{key}/members/{username}/remove", w.signedIn(w.confirmRemoveMember))
 	page("POST /projects/{key}/members/{username}/{action}", w.signedIn(w.changeMember))
 	page("POST /projects/{key}/delete", w.signedIn(w.deleteProject))
 
 	page("GET /admin/users", w.admin(w.users))
+	page("GET /admin/users/new", w.admin(w.newUserForm))
 	page("POST /admin/users", w.admin(w.createUser))
 	page("GET /admin/users/{id}", w.admin(w.adminUser))
 	page("GET /admin/users/{id}/{action}", w.admin(w.confirmUserChange))
 	page("POST /admin/users/{id}/{action}", w.admin(w.changeUser))
 	page("GET /admin/projects", w.admin(w.allProjects))
 	page("GET /admin/projects/{id}", w.admin(w.adminProjectDetail))
+	page("GET /admin/projects/{id}/members/new", w.admin(w.adminNewMemberForm))
 	page("POST /admin/projects/{id}/members", w.admin(w.adminAddMember))
 	page("POST /admin/projects/{id}/delete", w.admin(w.adminDeleteProject))
 	page("GET /admin/proxy", w.admin(w.proxy))
@@ -206,6 +212,7 @@ func (w *Web) parseTemplates() error {
 	funcs := template.FuncMap{
 		"join":      strings.Join,
 		"hasPrefix": strings.HasPrefix,
+		"formHas":   formHas,
 		// lastSeen is the later of a sign-in and an API key use, or nil for
 		// neither. A key that was never used reports the epoch.
 		"lastSeen": func(signIn *time.Time, keyUse time.Time) *time.Time {
@@ -413,8 +420,12 @@ func (w *Web) loadNavigation(r *http.Request, v *view) {
 // or /browse/OPS-12, or empty for a page outside a project.
 func pageProjectKey(path string) string {
 	if rest, ok := strings.CutPrefix(path, "/projects/"); ok {
-		key, _, _ := strings.Cut(rest, "/")
-		return key
+		// /projects/new is a page for no project yet.
+		if key, _, _ := strings.Cut(rest, "/"); key != "new" {
+			return key
+		}
+
+		return ""
 	}
 
 	if rest, ok := strings.CutPrefix(path, "/browse/"); ok {

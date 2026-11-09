@@ -34,7 +34,7 @@ func (w *Web) createProject(rw http.ResponseWriter, r *http.Request) {
 
 	project, err := w.Store.CreateProject(ctx, user.ID, r.PostFormValue("key"), r.PostFormValue("name"))
 	if errors.Is(err, store.ErrInvalidKey) {
-		w.redirectError(rw, r, "/projects", capitalize(err.Error())+".")
+		w.fail(rw, r, "project_new", "New project", capitalize(err.Error())+".", formPage{Form: r.PostForm})
 		return
 	}
 
@@ -227,17 +227,22 @@ func (w *Web) addMember(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.addMemberTo(rw, r, row.Project, "/projects/"+row.Membership.Key+"/members")
+	back := "/projects/" + row.Membership.Key + "/members"
+	w.addMemberTo(rw, r, formPage{Action: back, Cancel: back, Project: row.Project})
 }
 
 // addMemberTo adds a user by username, for project and site administrators.
-func (w *Web) addMemberTo(rw http.ResponseWriter, r *http.Request, project db.Project, back string) {
+// The page's form says where the form posted and where to return.
+func (w *Web) addMemberTo(rw http.ResponseWriter, r *http.Request, page formPage) {
 	ctx := r.Context()
 	username := strings.TrimSpace(r.PostFormValue("username"))
+	project := page.Project
+	back := page.Cancel
+	page.Form = r.PostForm
 
 	user, err := w.Store.GetPrincipalByUsername(ctx, username)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && user.Kind != "user") {
-		w.redirectError(rw, r, back, "There's no user named "+username+". Agents join with their owner.")
+		w.fail(rw, r, "member_new", "Add a member", "There's no user named "+username+". Agents join with their owner.", page)
 		return
 	}
 
@@ -253,7 +258,7 @@ func (w *Web) addMemberTo(rw http.ResponseWriter, r *http.Request, project db.Pr
 
 	key, err := w.Store.AddMember(ctx, project.ID, user.ID, role)
 	if errors.Is(err, store.ErrLastAdmin) {
-		w.redirectError(rw, r, back, lastAdmin(user.Username, project.Name))
+		w.fail(rw, r, "member_new", "Add a member", lastAdmin(user.Username, project.Name), page)
 		return
 	}
 

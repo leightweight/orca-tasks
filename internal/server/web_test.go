@@ -162,15 +162,24 @@ func TestFailedFormsShowAnError(t *testing.T) {
 	s := newSite(t)
 	alice, _ := signUp(t, s)
 
-	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"1BAD"}}), "/projects")
+	// A create form shows the problem with what was typed still in it.
+	r := alice.post("/projects", url.Values{"key": {"1BAD"}, "name": {"Operations"}})
+	if r.status != http.StatusBadRequest || !strings.Contains(r.body, `<div role="alert" data-variant="danger">`) ||
+		!strings.Contains(r.body, `value="Operations"`) {
+		t.Errorf("an invalid key: status %d: %.2000s", r.status, r.body)
+	}
 
-	body := alice.get("/projects").body
+	// A form on a page of settings redirects back to it with the problem, once.
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}}), "/projects/OPS/tasks")
+	alice.get("/projects/OPS/tasks")
+	alice.expectRedirect(alice.post("/projects/OPS/key", url.Values{"key": {"1BAD"}}), "/projects/OPS/settings")
+
+	body := alice.get("/projects/OPS/settings").body
 	if !strings.Contains(body, `<div role="alert" data-variant="danger">`) || strings.Contains(body, `data-variant="success"`) {
 		t.Errorf("an invalid key isn't shown as an error: %.1500s", body)
 	}
 
-	// The message shows once.
-	if strings.Contains(alice.get("/projects").body, `data-variant="danger"`) {
+	if strings.Contains(alice.get("/projects/OPS/settings").body, `<div role="alert"`) {
 		t.Error("the error shows again on the next page")
 	}
 }

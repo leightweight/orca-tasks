@@ -288,6 +288,8 @@ The web interface is server-rendered `html/template` pages embedded in the binar
 The binary embeds a pinned copy of Oat in `internal/web/static/oat/`, so pages load nothing from another site and work in local mode without a network.
 `mise run oat:update [version]` replaces it.
 Every page works with scripts blocked, since menus are native popovers and forms post and redirect.
+Forms that create something have a page of their own, at the list's path followed by `/new`, linked from a button in the list's header.
+A form that fails shows again with the problem and what was typed.
 
 Pages are organized around projects.
 A sidebar has a project selector, then Tasks, Members, and Settings for the selected project, and, for site administrators, the administration pages at its foot.
@@ -303,16 +305,16 @@ Revoking a key, removing or leaving a member, disabling an agent or user, and ch
 | `/login`, `/logout` | Users | Sign in and out. |
 | `/` | Users | Open the last project's tasks, or the project list. |
 | `/account` | Users | Change display name, email, and password, and generate recovery codes. |
-| `/account/keys` | Users | Create and revoke the user's API keys. |
-| `/account/agents` | Users | Create and manage agents and their API keys. |
-| `/projects` | Users | List the user's projects and create a project. |
+| `/account/keys` | Users | List and revoke the user's API keys. `/account/keys/new` creates one. |
+| `/account/agents` | Users | List, rename, disable, and enable agents. `/account/agents/new` creates one. |
+| `/projects` | Users | List the user's projects. `/projects/new` creates one. |
 | `/projects/{key}/tasks` | Project members | List the project's open or all tasks. `/projects/{key}` leads here. |
-| `/projects/{key}/members` | Project members | List members, and let administrators add and remove them and change roles. |
+| `/projects/{key}/members` | Project members | List members, and let administrators remove them and change roles. `/projects/{key}/members/new` adds one. |
 | `/projects/{key}/settings` | Project members | Change the key the user sees the project under, and let administrators rename and delete it. |
-| `/admin/users` | Site administrators | List users with their counts and create users. |
+| `/admin/users` | Site administrators | List users with their counts. `/admin/users/new` creates one. |
 | `/admin/users/{id}` | Site administrators | Show one user's projects and counts, disable or enable them, grant administration, and generate a reset link. |
 | `/admin/projects` | Site administrators | List every project with counts and members. |
-| `/admin/projects/{id}` | Site administrators | Show one project's members, add members, and delete the project. |
+| `/admin/projects/{id}` | Site administrators | Show one project's members and delete the project. `/admin/projects/{id}/members/new` adds a member. |
 | `/admin/proxy` | Site administrators | Show the connecting address, the forwarding headers, which hops are trusted, and the client address the server resolved. |
 | `/browse/{key}` | Project members | Show one task with its parent, description, child tasks, comments, and attachments, read-only, under its project in the sidebar. |
 

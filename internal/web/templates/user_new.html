@@ -1,0 +1,13 @@
+{{define "crumbs"}}<a class="crumbs" href="/admin/users">Users</a>{{end}}
+{{define "intro"}}<p>You'll get a link to give them. It lets them choose a password and set up their authenticator, and lasts 24 hours.</p>{{end}}
+{{define "content"}}
+<section class="card narrow">
+  <form method="post" action="/admin/users" class="stack">
+    <label>Username <input name="username" required value="{{.Data.Form.Get "username"}}" autofocus></label>
+    <label>Display name <input name="display_name" value="{{.Data.Form.Get "display_name"}}"></label>
+    <label>Email <input name="email" type="email" value="{{.Data.Form.Get "email"}}"></label>
+    <label><input type="checkbox" name="admin" value="1"{{if eq (.Data.Form.Get "admin") "1"}} checked{{end}}> Site administrator</label>
+    <div class="buttons"><button>Create user</button><a class="button outline" href="/admin/users">Cancel</a></div>
+  </form>
+</section>
+{{end}}

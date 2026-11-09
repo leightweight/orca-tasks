@@ -1,0 +1,13 @@
+{{define "crumbs"}}<a class="crumbs" href="/account/agents">Agents</a>{{end}}
+{{define "intro"}}<p>An agent's name only has to be unique among your agents. Its full username adds yours, as in <code>{{.User.Username}}/claude</code>, and that's what JQL and the API use.</p>{{end}}
+{{define "content"}}
+<section class="card narrow">
+  <form method="post" action="/account/agents" class="stack">
+    <label>Name <input name="username" required placeholder="claude" value="{{.Data.Form.Get "username"}}" autofocus></label>
+    <label>Display name <input name="display_name" placeholder="Claude" value="{{.Data.Form.Get "display_name"}}">
+      <small data-hint>What Orca shows next to its tasks and comments.</small>
+    </label>
+    <div class="buttons"><button>Create agent</button><a class="button outline" href="/account/agents">Cancel</a></div>
+  </form>
+</section>
+{{end}}

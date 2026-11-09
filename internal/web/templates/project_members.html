@@ -1,4 +1,5 @@
 {{define "intro"}}<p>Members see and change every task in {{.Data.Project.Name}}. Administrators also manage members and the project's settings.</p>{{end}}
+{{define "actions"}}{{if .Data.Admin}}<a class="button" href="/projects/{{.Data.Membership.Key}}/members/new">Add member</a>{{end}}{{end}}
 {{define "content"}}
 {{$admin := .Data.Admin}}
 <section class="card">
@@ -34,12 +35,5 @@
   </table>
   </div>
   {{if and $admin (le .Data.Admins 1)}}<p class="mt-4">A project needs an administrator, so the last one can't leave or become a member. Make someone else an administrator first.</p>{{end}}
-  {{if $admin}}
-  <form method="post" action="/projects/{{.Data.Membership.Key}}/members" class="inline">
-    <label>Username <input name="username" required></label>
-    <label>Role <select name="role"><option value="member">member</option><option value="admin">admin</option></select></label>
-    <button>Add member</button>
-  </form>
-  {{end}}
 </section>
 {{end}}

@@ -1,0 +1,38 @@
+{{define "crumbs"}}<a class="crumbs" href="/account/keys">API keys</a>{{end}}
+{{define "intro"}}<p>The key is shown once, after you create it. Copy it into Orca or the CLI then.</p>{{end}}
+{{define "content"}}
+<section class="card narrow">
+  <form method="post" action="/account/keys" class="stack">
+    <label>Name <input name="name" required placeholder="laptop" value="{{.Data.Form.Get "name"}}" autofocus>
+      <small data-hint>Where it's used, so you can tell keys apart.</small>
+    </label>
+    <label>For
+      <select name="principal">
+        <option value="{{.User.ID}}">{{.User.Username}} (you)</option>
+        {{range .Data.Agents}}{{if not .DisabledAt}}<option value="{{.ID}}"{{if eq ($.Data.Form.Get "principal") (print .ID)}} selected{{end}}>{{.Username}} (agent)</option>{{end}}{{end}}
+      </select>
+      <small data-hint>A key for an agent makes its work show under the agent's name.</small>
+    </label>
+    <label>Access
+      <select name="access"><option value="write">Read and write</option><option value="read"{{if eq (.Data.Form.Get "access") "read"}} selected{{end}}>Read only</option></select>
+    </label>
+    <fieldset>
+      <legend>Projects</legend>
+      <label><input type="radio" name="scope" value="all"{{if ne (.Data.Form.Get "scope") "some"}} checked{{end}}> All of them, including ones joined later</label>
+      <label><input type="radio" name="scope" value="some"{{if eq (.Data.Form.Get "scope") "some"}} checked{{end}}> Only these:</label>
+      {{range .Data.Projects}}<label class="indent"><input type="checkbox" name="project" value="{{.Project.ID}}"{{if formHas $.Data.Form "project" (print .Project.ID)}} checked{{end}}> {{.Membership.Key}}: {{.Project.Name}}</label>{{end}}
+    </fieldset>
+    <label>Expires
+      <select name="expires">
+        {{$e := .Data.Form.Get "expires"}}
+        <option value="0">Never</option>
+        <option value="30"{{if eq $e "30"}} selected{{end}}>In 30 days</option>
+        <option value="90"{{if eq $e "90"}} selected{{end}}>In 90 days</option>
+        <option value="365"{{if eq $e "365"}} selected{{end}}>In a year</option>
+      </select>
+    </label>
+    {{if not .PasswordOnly}}<label>Authenticator code <input name="code" required inputmode="numeric" autocomplete="one-time-code"></label>{{end}}
+    <div class="buttons"><button>Create key</button><a class="button outline" href="/account/keys">Cancel</a></div>
+  </form>
+</section>
+{{end}}

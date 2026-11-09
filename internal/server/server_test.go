@@ -246,7 +246,7 @@ func TestEverythingTogether(t *testing.T) {
 	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"ops"}, "name": {"Operations"}}), "/projects/OPS")
 	alice.expectRedirect(alice.post("/account/agents", url.Values{"username": {"claude"}, "display_name": {"Claude"}}), "/account/agents")
 
-	agentID := find(t, regexp.MustCompile(`<option value="(\d+)">alice/claude \(agent\)`), alice.get("/account/keys").body)
+	agentID := find(t, regexp.MustCompile(`<option value="(\d+)">alice/claude \(agent\)`), alice.get("/account/keys/new").body)
 	alice.expectRedirect(alice.post("/account/keys", url.Values{
 		"name": {"laptop"}, "principal": {agentID}, "access": {"write"}, "scope": {"all"}, "expires": {"0"}, "code": {alice.code(aliceSecret)},
 	}), "/account/keys")
@@ -439,7 +439,7 @@ func TestPasswordOnlySignIn(t *testing.T) {
 
 	// Creating a key needs no code.
 	alice.expectRedirect(alice.post("/account/keys", url.Values{
-		"name": {"orca"}, "principal": {find(t, regexp.MustCompile(`<option value="(\d+)">alice \(you\)`), alice.get("/account/keys").body)},
+		"name": {"orca"}, "principal": {find(t, regexp.MustCompile(`<option value="(\d+)">alice \(you\)`), alice.get("/account/keys/new").body)},
 		"access": {"write"}, "scope": {"all"}, "expires": {"0"},
 	}), "/account/keys")
 
@@ -554,7 +554,7 @@ func TestSessionsDontHoldSecretsInPlainText(t *testing.T) {
 	alice.expectRedirect(alice.post("/enroll", url.Values{"code": {alice.code(secret)}}), "/account")
 	alice.get("/account")
 
-	you := find(t, regexp.MustCompile(`<option value="(\d+)">alice \(you\)`), alice.get("/account/keys").body)
+	you := find(t, regexp.MustCompile(`<option value="(\d+)">alice \(you\)`), alice.get("/account/keys/new").body)
 	alice.expectRedirect(alice.post("/account/keys", url.Values{
 		"name": {"orca"}, "principal": {you}, "access": {"write"}, "scope": {"all"}, "expires": {"0"}, "code": {alice.code(secret)},
 	}), "/account/keys")

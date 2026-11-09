@@ -417,7 +417,8 @@ td.actions > * + * {
   margin-inline-start: var(--space-2);
 }
 
-form.buttons {
+form.buttons,
+.buttons {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);

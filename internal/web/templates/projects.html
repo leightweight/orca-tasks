@@ -1,4 +1,5 @@
 {{define "intro"}}<p>Each project's key is yours: other members can see the same project under a different key, and issue keys follow yours, such as <code>OPS-12</code>.</p>{{end}}
+{{define "actions"}}<a class="button" href="/projects/new">New project</a>{{end}}
 {{define "content"}}
 <section class="card">
   <div class="table">
@@ -14,19 +15,10 @@
         <td class="num">{{.Members}}</td>
       </tr>
     {{else}}
-      <tr><td colspan="5" class="empty">You aren't in any projects yet. Create one below, or ask a project's administrator to add you.</td></tr>
+      <tr><td colspan="5" class="empty">You aren't in any projects yet. Create one, or ask a project's administrator to add you.</td></tr>
     {{end}}
     </tbody>
   </table>
   </div>
-</section>
-<section class="card">
-  <h2>Create a project</h2>
-  <p>You'll be its administrator. Keys start with a letter and use uppercase letters, digits, and underscores.</p>
-  <form method="post" class="inline">
-    <label>Key <input name="key" required placeholder="OPS" pattern="[A-Za-z][A-Za-z0-9_]*" maxlength="20"></label>
-    <label>Name <input name="name" placeholder="Operations"></label>
-    <button>Create project</button>
-  </form>
 </section>
 {{end}}

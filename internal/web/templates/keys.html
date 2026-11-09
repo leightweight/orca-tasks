@@ -1,8 +1,8 @@
 {{define "subnav"}}{{template "accountTabs" .}}{{end}}
 {{define "intro"}}<p>Orca and the CLI sign in with an API key. In Orca, open Settings, then Integrations, then Jira. Enter <code>{{.BaseURL}}</code> as the site, choose Server / Data Center, leave the username empty, and paste a key as the token.</p>{{end}}
+{{define "actions"}}<a class="button" href="/account/keys/new">New API key</a>{{end}}
 {{define "content"}}
 <section class="card">
-  <h2>Keys</h2>
   <div class="table">
   <table>
     <thead><tr><th>Name</th><th>For</th><th>Access</th><th>Projects</th><th>Created</th><th>Last used</th><th>Expires</th><th></th></tr></thead>
@@ -19,38 +19,10 @@
         <td class="actions">{{if not .ApiKey.RevokedAt}}<a class="button small outline" data-variant="danger" href="/account/keys/{{.ApiKey.ID}}/revoke">Revoke</a>{{end}}</td>
       </tr>
     {{else}}
-      <tr><td colspan="8" class="empty">No API keys yet. Create one below to connect Orca or the CLI.</td></tr>
+      <tr><td colspan="8" class="empty">No API keys yet. Create one to connect Orca or the CLI.</td></tr>
     {{end}}
     </tbody>
   </table>
   </div>
-</section>
-<section class="card">
-  <h2>Create a key</h2>
-  <form method="post" class="stack">
-    <label>Name <input name="name" required placeholder="laptop">
-      <small data-hint>Where it's used, so you can tell keys apart.</small>
-    </label>
-    <label>For
-      <select name="principal">
-        <option value="{{.User.ID}}">{{.User.Username}} (you)</option>
-        {{range .Data.Agents}}{{if not .DisabledAt}}<option value="{{.ID}}">{{.Username}} (agent)</option>{{end}}{{end}}
-      </select>
-    </label>
-    <label>Access
-      <select name="access"><option value="write">Read and write</option><option value="read">Read only</option></select>
-    </label>
-    <fieldset>
-      <legend>Projects</legend>
-      <label><input type="radio" name="scope" value="all" checked> All of them, including ones joined later</label>
-      <label><input type="radio" name="scope" value="some"> Only these:</label>
-      {{range .Data.Projects}}<label class="indent"><input type="checkbox" name="project" value="{{.Project.ID}}"> {{.Membership.Key}}: {{.Project.Name}}</label>{{end}}
-    </fieldset>
-    <label>Expires
-      <select name="expires"><option value="0">Never</option><option value="30">In 30 days</option><option value="90">In 90 days</option><option value="365">In a year</option></select>
-    </label>
-    {{if not .PasswordOnly}}<label>Authenticator code <input name="code" required inputmode="numeric" autocomplete="one-time-code"></label>{{end}}
-    <button>Create key</button>
-  </form>
 </section>
 {{end}}

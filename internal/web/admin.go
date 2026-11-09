@@ -98,9 +98,13 @@ func (w *Web) revealLink(r *http.Request, username, link string) {
 func (w *Web) createUser(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	again := func(problem string) {
+		w.fail(rw, r, "user_new", "New user", problem, formPage{Form: r.PostForm})
+	}
+
 	username, err := store.NormalizeUsername(r.PostFormValue("username"))
 	if err != nil {
-		w.redirectError(rw, r, "/admin/users", capitalize(err.Error())+".")
+		again(capitalize(err.Error()) + ".")
 		return
 	}
 
@@ -112,7 +116,7 @@ func (w *Web) createUser(rw http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if _, taken := w.Store.GetPrincipalByUsername(ctx, username); taken == nil {
-			w.redirectError(rw, r, "/admin/users", "That username is taken.")
+			again("That username is taken.")
 			return
 		}
 
@@ -128,7 +132,7 @@ func (w *Web) createUser(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	w.revealLink(r, user.Username, link)
-	http.Redirect(rw, r, "/admin/users", http.StatusSeeOther)
+	http.Redirect(rw, r, "/admin/users/"+strconv.FormatInt(user.ID, 10), http.StatusSeeOther)
 }
 
 func (w *Web) changeUser(rw http.ResponseWriter, r *http.Request) {
@@ -257,8 +261,13 @@ func (w *Web) adminProjectDetail(rw http.ResponseWriter, r *http.Request) {
 
 func (w *Web) adminAddMember(rw http.ResponseWriter, r *http.Request) {
 	if project, ok := w.adminProject(rw, r); ok {
-		w.addMemberTo(rw, r, project, "/admin/projects/"+strconv.FormatInt(project.ID, 10))
+		back := adminProjectPath(project)
+		w.addMemberTo(rw, r, formPage{Action: back + "/members", Cancel: back, Project: project})
 	}
+}
+
+func adminProjectPath(project db.Project) string {
+	return "/admin/projects/" + strconv.FormatInt(project.ID, 10)
 }
 
 func (w *Web) adminDeleteProject(rw http.ResponseWriter, r *http.Request) {
