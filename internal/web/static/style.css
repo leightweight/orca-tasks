@@ -102,6 +102,24 @@ header.page p {
   color: var(--muted-foreground);
 }
 
+/* Setup, sign-in, and reset pages are one short form, centered. */
+main.signed-out {
+  max-width: calc(28rem + 2 * var(--container-pad));
+  padding-block-start: var(--space-16);
+}
+
+main.signed-out section.narrow {
+  max-width: none;
+}
+
+main.signed-out form.stack {
+  max-width: none;
+}
+
+main.signed-out form.stack > button {
+  justify-self: stretch;
+}
+
 main > [role="alert"] {
   margin-block-end: var(--space-6);
 }

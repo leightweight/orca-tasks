@@ -31,7 +31,7 @@
   </form>
   {{end}}
 </nav>
-<main class="container">
+<main class="container{{if not .User}} signed-out{{end}}">
   <header class="page">
     <div>
       {{block "crumbs" .}}{{end}}
