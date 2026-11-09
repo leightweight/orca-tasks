@@ -125,3 +125,27 @@ func TestSignInReturnsToThePageYouWanted(t *testing.T) {
 	b.expectRedirect(b.post("/login", url.Values{"username": {"alice"}, "password": {"correct horse battery"}}), "/login/totp")
 	b.expectRedirect(b.post("/login/totp", url.Values{"code": {b.code(secret)}}), "/account/keys")
 }
+
+func TestNavigationMarksTheCurrentPage(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+
+	for path, current := range map[string]string{
+		"/account/keys": "/account/keys",
+		"/account":      "/account",
+		"/admin/proxy":  "/admin/proxy",
+		"/browse/OPS-9": "/projects",
+	} {
+		body := alice.get(path).body
+
+		if want := `href="` + current + `" aria-current="page"`; !strings.Contains(body, want) {
+			t.Errorf("%s doesn't mark %s as current", path, current)
+		}
+
+		if n := strings.Count(body, `aria-current="page"`); n != 1 {
+			t.Errorf("%s marks %d links as current, want 1", path, n)
+		}
+	}
+}

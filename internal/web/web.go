@@ -192,7 +192,17 @@ func origin(baseURL string) string {
 
 func (w *Web) parseTemplates() error {
 	funcs := template.FuncMap{
-		"join":  strings.Join,
+		"join": strings.Join,
+		// current reports whether a page's path is one a navigation link covers.
+		"current": func(path string, prefixes ...string) bool {
+			for _, prefix := range prefixes {
+				if path == prefix || strings.HasPrefix(path, prefix+"/") {
+					return true
+				}
+			}
+
+			return false
+		},
 		"bytes": func(n int64) string { return humanize.IBytes(uint64(max(n, 0))) },
 		"ago": func(t any) string {
 			switch t := t.(type) {
@@ -240,6 +250,10 @@ func (w *Web) parseTemplates() error {
 type view struct {
 	Title string
 
+	// Path is the page's URL path, for marking the current page in the
+	// navigation.
+	Path string
+
 	// PasswordOnly hides the TOTP fields, which a password-only server doesn't
 	// ask for.
 	PasswordOnly bool
@@ -285,6 +299,7 @@ func (w *Web) render(rw http.ResponseWriter, r *http.Request, status int, name, 
 
 	v := view{
 		Title:        title,
+		Path:         r.URL.Path,
 		PasswordOnly: w.PasswordOnly,
 		User:         currentUser(ctx),
 		BaseURL:      w.BaseURL,
@@ -310,7 +325,7 @@ func (w *Web) render(rw http.ResponseWriter, r *http.Request, status int, name, 
 func (w *Web) fail(rw http.ResponseWriter, r *http.Request, name, title, message string, data any) {
 	ctx := r.Context()
 
-	v := view{Title: title, User: currentUser(ctx), BaseURL: w.BaseURL, Error: message, Data: data, PasswordOnly: w.PasswordOnly}
+	v := view{Title: title, Path: r.URL.Path, User: currentUser(ctx), BaseURL: w.BaseURL, Error: message, Data: data, PasswordOnly: w.PasswordOnly}
 
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	rw.WriteHeader(http.StatusBadRequest)

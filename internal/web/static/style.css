@@ -30,10 +30,32 @@ nav[data-topnav] .links {
 
 nav[data-topnav] .links a {
   color: var(--muted-foreground);
+  padding-block: var(--space-1);
+  border-bottom: 2px solid transparent;
 }
 
 nav[data-topnav] .links a:hover {
   color: var(--foreground);
+  text-decoration: none;
+}
+
+nav[data-topnav] .links a[aria-current="page"] {
+  color: var(--foreground);
+  border-bottom-color: var(--foreground);
+}
+
+nav[data-topnav] .links.admin {
+  align-items: center;
+  padding-inline-start: var(--space-5);
+  border-inline-start: 1px solid var(--border);
+}
+
+nav[data-topnav] .links .label {
+  font-size: var(--text-8);
+  font-weight: var(--font-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--faint-foreground);
 }
 
 nav[data-topnav] .signout {

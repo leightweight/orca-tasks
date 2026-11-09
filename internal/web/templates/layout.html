@@ -12,14 +12,21 @@
   <a class="brand" href="/">orca-tasks</a>
   {{with .User}}
   <div class="links">
-    <a href="/projects">Projects</a>
-    <a href="/account">Account</a>
-    <a href="/account/keys">API keys</a>
-    <a href="/account/agents">Agents</a>
-    {{if .SiteAdmin}}<a href="/admin/users">Users</a><a href="/admin/projects">All projects</a>{{end}}
+    <a href="/projects"{{if current $.Path "/projects" "/browse"}} aria-current="page"{{end}}>Projects</a>
+    <a href="/account/keys"{{if current $.Path "/account/keys"}} aria-current="page"{{end}}>API keys</a>
+    <a href="/account/agents"{{if current $.Path "/account/agents"}} aria-current="page"{{end}}>Agents</a>
+    <a href="/account"{{if eq $.Path "/account"}} aria-current="page"{{end}}>Account</a>
   </div>
+  {{if .SiteAdmin}}
+  <div class="links admin" role="group" aria-label="Site administration">
+    <span class="label">Admin</span>
+    <a href="/admin/users"{{if current $.Path "/admin/users"}} aria-current="page"{{end}}>Users</a>
+    <a href="/admin/projects"{{if current $.Path "/admin/projects"}} aria-current="page"{{end}}>All projects</a>
+    <a href="/admin/proxy"{{if current $.Path "/admin/proxy"}} aria-current="page"{{end}}>Proxy check</a>
+  </div>
+  {{end}}
   <form method="post" action="/logout" class="signout">
-    <span class="text-light">{{.Username}}</span>
+    <span class="text-light">Signed in as <strong>{{.Username}}</strong></span>
     <button class="small outline">Sign out</button>
   </form>
   {{end}}
