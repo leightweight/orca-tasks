@@ -37,7 +37,7 @@
           <span aria-hidden="true">▾</span>
         </button>
         <menu popover id="project-menu">
-          {{range .Projects}}<a role="menuitem" href="/projects/{{.Membership.Key}}/tasks"><span class="key">{{.Membership.Key}}</span> {{.Project.Name}}</a>{{end}}
+          {{range .Projects}}<a role="menuitem" href="/projects/{{.Membership.Key}}/tasks"><span class="key">{{.Membership.Key}}</span><span>{{.Project.Name}}</span></a>{{end}}
           {{if .Projects}}<hr>{{end}}
           <a role="menuitem" href="/projects">All your projects</a>
         </menu>

@@ -80,8 +80,23 @@ aside[data-sidebar] .project-picker .key {
   margin-inline-end: var(--space-1);
 }
 
-ot-dropdown menu[popover] .key {
-  min-width: 3.5rem;
+/* The project menu is a grid whose first column is as wide as the longest
+   key, and each project shares its columns, so the names line up. Only the
+   open menu is a grid, since display: none is what hides a closed one. */
+.project-picker menu[popover]:popover-open {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-3);
+}
+
+.project-picker menu[popover] > * {
+  grid-column: 1 / -1;
+}
+
+.project-picker menu[popover] > a:has(.key) {
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: baseline;
 }
 
 aside[data-sidebar] nav a:not(.button) {
