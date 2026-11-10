@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yuin/goldmark/v2/extension"
 	"github.com/yuin/goldmark/v2/parser"
 	"github.com/yuin/goldmark/v2/renderer/html"
 
@@ -71,13 +72,15 @@ type commentView struct {
 	Body    template.HTML
 }
 
-// markdown renders Markdown to HTML. goldmark drops raw HTML unless told
+// markdown renders GitHub-flavored Markdown to HTML, with tables, task
+// lists, strikethrough, and bare links. goldmark drops raw HTML unless told
 // otherwise, so the result is safe to put in a page.
 func markdown(text string) template.HTML {
 	source := []byte(text)
 
 	var out bytes.Buffer
-	if err := html.New().Render(&out, source, parser.New().Parse(source)); err != nil {
+	if err := html.New(html.WithExtensions(extension.NewGFMHTMLRenderer())).
+		Render(&out, source, parser.New(parser.WithExtensions(extension.NewGFMParser())).Parse(source)); err != nil {
 		return template.HTML(template.HTMLEscapeString(text))
 	}
 

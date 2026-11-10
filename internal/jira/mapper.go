@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yuin/goldmark/v2/extension"
 	"github.com/yuin/goldmark/v2/parser"
 	"github.com/yuin/goldmark/v2/renderer/html"
 
@@ -159,13 +160,15 @@ func (s *Server) mapIssue(row db.VisibleIssuesRow, withDescription bool, attachm
 	}
 }
 
-// renderMarkdown converts a description to HTML. goldmark drops raw HTML
+// renderMarkdown converts a description to HTML, with the GitHub-flavored
+// Markdown that the web interface renders. goldmark drops raw HTML
 // unless told otherwise, so the result is safe to show.
 func renderMarkdown(text string) string {
 	source := []byte(text)
 
 	var out bytes.Buffer
-	if err := html.New().Render(&out, source, parser.New().Parse(source)); err != nil {
+	if err := html.New(html.WithExtensions(extension.NewGFMHTMLRenderer())).
+		Render(&out, source, parser.New(parser.WithExtensions(extension.NewGFMParser())).Parse(source)); err != nil {
 		return ""
 	}
 

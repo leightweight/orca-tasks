@@ -607,6 +607,20 @@ func TestPreviewingMarkdown(t *testing.T) {
 		t.Errorf("the preview: status %d: %s", r.status, r.body)
 	}
 
+	gfm := "| Stack | Holds |\n| --- | --- |\n| `s3` | ~~old~~ |\n\n- [ ] Empty it\n- [x] Find it\n"
+	r = alice.post("/preview", url.Values{"text": {gfm}})
+	for _, want := range []string{
+		"<table>",
+		"<td><code>s3</code></td>",
+		"<del>old</del>",
+		`<input disabled="" type="checkbox"`,
+		`<input checked="" disabled="" type="checkbox"`,
+	} {
+		if !strings.Contains(r.body, want) {
+			t.Errorf("the GitHub-flavored preview lacks %s: %s", want, r.body)
+		}
+	}
+
 	s.browser().expectRedirect(s.browser().post("/preview", url.Values{"text": {"x"}}), "/login")
 }
 

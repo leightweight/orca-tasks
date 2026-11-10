@@ -618,6 +618,23 @@ dl.fields dd {
   overflow-wrap: anywhere;
 }
 
+/* A table wider than the card scrolls instead of widening the page. */
+.markdown table {
+  display: block;
+  overflow-x: auto;
+  margin-block: var(--space-4);
+}
+
+/* Task list items show their checkbox in place of the bullet. */
+.markdown li:has(> input[type="checkbox"]) {
+  list-style: none;
+}
+
+.markdown li > input[type="checkbox"] {
+  margin-inline: calc(-1 * var(--space-6)) var(--space-2);
+  vertical-align: middle;
+}
+
 .comment {
   border-top: 1px solid var(--border);
   padding-block: var(--space-4);

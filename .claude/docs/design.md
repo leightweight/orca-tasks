@@ -118,6 +118,7 @@ Changing a membership key also changes that user's issue keys, so Orca worktrees
 
 An issue has a summary, a Markdown description, a status, a type, an optional priority, an optional assignee, an optional parent, a reporter, labels, and created and updated times.
 A comment has a Markdown body, an author, and created and updated times.
+Descriptions and comments are GitHub-flavored Markdown, so tables, task lists, strikethrough, and bare links render.
 
 Statuses, issue types, and priorities are shared by every project and seeded on first start.
 
@@ -355,7 +356,7 @@ Version 2 sends descriptions and comments as plain text, so Markdown reaches Orc
 | `GET /rest/api/2/issue/createmeta/{project}/issuetypes[/{type}]` | Create metadata. |
 | `GET /rest/agile/1.0/board`, `GET /rest/agile/1.0/board/{id}/configuration` | One board per project, with a column per status. |
 
-An issue's `renderedFields.description` is its Markdown rendered to HTML by goldmark, with raw HTML dropped.
+An issue's `renderedFields.description` is its GitHub-flavored Markdown rendered to HTML by goldmark, with raw HTML dropped.
 Orca finds the attachments to download in it.
 
 An issue's `parent` field has the parent's ID, key, summary, status, and type, as Jira Cloud sends it.
