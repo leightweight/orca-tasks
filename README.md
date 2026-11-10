@@ -133,6 +133,39 @@ orca-tasks task list 'assignee = currentUser() AND statusCategory != Done'
 orca-tasks task move OPS-12 "In Progress" --comment "Starting on the key rotation."
 ```
 
+## Update
+
+Update the CLI and the Claude Code plugin together, since the plugin's skill teaches Claude the commands of the CLI from the same release.
+
+Update the CLI with mise:
+
+```sh
+mise up --bump packslip:github.com/leightweight/orca-tasks
+```
+
+`--bump` moves past the version in your mise config and rewrites it, so it works whether you installed `latest` or named a version.
+Without it, `mise up` stays within that version, so a config that says `0.2.0` never moves.
+As with installing, mise skips releases less than a day old.
+
+Update the plugin from a terminal, then restart Claude Code:
+
+```sh
+claude plugin marketplace update orca-tasks
+claude plugin update orca-tasks@orca-tasks
+```
+
+The first command fetches the latest plugin list from this repository, and the second installs the new version from it.
+In a session, `/plugin` opens the same choices under Marketplaces and Installed.
+
+If you run the server in local mode, stop `orca-tasks serve --local` and start it again after updating the CLI, since the server and the CLI are the same binary.
+The server applies any database migrations when it starts.
+
+To update a server you installed with the chart, upgrade the release and keep your settings:
+
+```sh
+helm upgrade orca-tasks oci://ghcr.io/leightweight/charts/orca-tasks --reuse-values
+```
+
 ## Locked out
 
 If the only administrator loses their password and recovery codes, print a reset link from inside the server's container:
