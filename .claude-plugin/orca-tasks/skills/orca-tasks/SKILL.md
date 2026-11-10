@@ -15,6 +15,20 @@ You act for that user: tasks are assigned to people, never to agents.
 If a command says there's no server to talk to, or fails with a 403, stop and ask the user to set it up.
 Don't ask for the key in the conversation, and never print it.
 
+## Link task keys
+
+Whenever you mention a task to the user, link its key to the task's page, which is the server's URL followed by `/browse/` and the key.
+Read the server's URL once with `echo "$ORCA_TASKS_URL"`, and drop any trailing slash.
+If it's empty, the CLI is using a local server, whose address is `http://127.0.0.1:8080`.
+
+```markdown
+Moved [OPS-12](https://tasks.example.com/browse/OPS-12) to In Progress.
+```
+
+Link the key, not the summary, and link every task you mention, including parents, child tasks, and keys in lists or tables.
+Use the key exactly as the CLI prints it.
+Each member can see a project under a different key, and a link only opens with the user's key, which is the one the CLI prints.
+
 ## Look before you write
 
 ```sh
