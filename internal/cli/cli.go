@@ -223,6 +223,7 @@ func (c *ProjectList) Run(ctx context.Context, env *Env) error {
 // summary is an issue as `task list` and the change commands print it.
 type summary struct {
 	Key      string    `json:"key"`
+	URL      string    `json:"url"`
 	Summary  string    `json:"summary"`
 	Status   string    `json:"status"`
 	Type     string    `json:"type"`
@@ -236,6 +237,7 @@ type summary struct {
 func summarize(i client.Issue) summary {
 	s := summary{
 		Key:     i.Key,
+		URL:     i.BrowseURL(),
 		Summary: i.Fields.Summary,
 		Status:  i.Fields.Status.Name,
 		Type:    i.Fields.IssueType.Name,

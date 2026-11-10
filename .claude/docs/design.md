@@ -452,6 +452,8 @@ orca-tasks task delete OPS-12
 `task list` takes JQL.
 `task show` prints the fields, the Markdown description, the child tasks, the comments, and the attachments.
 `task create`, `task edit`, and `task move` print the task: a table row, or with `-f json` one object with the same fields as a `task list` row.
+Each task in JSON output, including child tasks, has a `url`, its page on the server.
+The CLI builds it from the issue's `self` link, which the server makes from its own base URL, so it's right whether the CLI reached the server by URL or by the local socket.
 `task edit --priority ""` clears the priority, `--assignee ""` unassigns, and `--parent ""` removes the parent.
 `--parent` on `create` and `edit` takes the key of an issue in the same project.
 `--assignee` takes a user.

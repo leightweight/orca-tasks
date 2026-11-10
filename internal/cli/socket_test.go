@@ -89,6 +89,7 @@ func TestTheLocalSocketNeedsNoKey(t *testing.T) {
 	mustRun(t, "", "", "", "task", "move", "OPS-1", "In Progress", "--assign-to-me", "--socket", socket)
 
 	var detail struct {
+		URL      string `json:"url"`
 		Reporter string `json:"reporter"`
 		Assignee string `json:"assignee"`
 	}
@@ -99,6 +100,11 @@ func TestTheLocalSocketNeedsNoKey(t *testing.T) {
 
 	if detail.Reporter != "alice/agent" || detail.Assignee != "alice" {
 		t.Errorf("OPS-1 = reporter %s, assignee %s; want alice/agent and alice", detail.Reporter, detail.Assignee)
+	}
+
+	// The link comes from the server's base URL, not the socket.
+	if detail.URL != "http://127.0.0.1:8080/browse/OPS-1" {
+		t.Errorf("OPS-1's url is %q", detail.URL)
 	}
 }
 

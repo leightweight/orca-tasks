@@ -197,6 +197,7 @@ func TestParents(t *testing.T) {
 	var epic struct {
 		Children []struct {
 			Key    string `json:"key"`
+			URL    string `json:"url"`
 			Parent string `json:"parent"`
 		} `json:"children"`
 	}
@@ -205,7 +206,8 @@ func TestParents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(epic.Children) != 2 || epic.Children[0].Key != "OPS-2" || epic.Children[1].Key != "OPS-3" || epic.Children[0].Parent != "OPS-1" {
+	if len(epic.Children) != 2 || epic.Children[0].Key != "OPS-2" || epic.Children[1].Key != "OPS-3" || epic.Children[0].Parent != "OPS-1" ||
+		epic.Children[0].URL != base+"/browse/OPS-2" {
 		t.Errorf("children = %+v", epic.Children)
 	}
 
@@ -256,10 +258,12 @@ func TestChangesPrintOneTaskAsAnObject(t *testing.T) {
 	} {
 		var task struct {
 			Key    string `json:"key"`
+			URL    string `json:"url"`
 			Status string `json:"status"`
 		}
 
-		if err := json.Unmarshal([]byte(mustRun(t, base, key, "", args...)), &task); err != nil || task.Key != "OPS-1" {
+		if err := json.Unmarshal([]byte(mustRun(t, base, key, "", args...)), &task); err != nil || task.Key != "OPS-1" ||
+			task.URL != base+"/browse/OPS-1" {
 			t.Errorf("%q printed %+v, %v; want an object with key OPS-1", args[1], task, err)
 		}
 	}

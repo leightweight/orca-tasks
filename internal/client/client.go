@@ -198,6 +198,7 @@ type Attachment struct {
 type Issue struct {
 	ID     string `json:"id"`
 	Key    string `json:"key"`
+	Self   string `json:"self"`
 	Fields struct {
 		Summary     string       `json:"summary"`
 		Description string       `json:"description"`
@@ -213,6 +214,18 @@ type Issue struct {
 		Parent      *Parent      `json:"parent"`
 		Attachment  []Attachment `json:"attachment"`
 	} `json:"fields"`
+}
+
+// BrowseURL is the issue's page on the server, built from its self link,
+// which the server makes from its own base URL. It is empty if the link isn't
+// one the server makes.
+func (i Issue) BrowseURL() string {
+	base, _, ok := strings.Cut(i.Self, "/rest/api/2/issue/")
+	if !ok || i.Key == "" {
+		return ""
+	}
+
+	return base + "/browse/" + url.PathEscape(i.Key)
 }
 
 // Parent is the issue an issue belongs to, such as an epic.
