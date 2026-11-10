@@ -30,6 +30,13 @@ type Parent struct {
 // the issues under it.
 var ErrParentCycle = errors.New("an issue can't be its own parent or the parent of an issue above it")
 
+// ErrNotReporter is deleting an issue as someone who neither reported it nor
+// administers its project.
+var ErrNotReporter = errors.New("only the reporter or a project administrator can delete a task")
+
+// ErrHasChildren is deleting an issue that other issues belong to.
+var ErrHasChildren = errors.New("a task with child tasks can't be deleted; move its child tasks to another parent or delete them first")
+
 // NewIssue is what creating an issue takes.
 type NewIssue struct {
 	ProjectID   int64
@@ -319,4 +326,38 @@ func deref(s *string) string {
 	}
 
 	return *s
+}
+
+// DeleteIssue deletes an issue that the principal reported or administers the
+// project of, with its comments, attachment rows, and history. The caller has
+// already found the issue among those the principal can see. It locks the
+// project first, as creating an issue and changing a parent do, so no child
+// can appear between the check and the delete.
+func (s *Store) DeleteIssue(ctx context.Context, principalID, issueID int64) error {
+	return s.InTx(ctx, func(q *db.Queries, _ pgx.Tx) error {
+		if err := q.LockIssueProject(ctx, issueID); err != nil {
+			return err
+		}
+
+		d, err := q.IssueDeletion(ctx, db.IssueDeletionParams{IssueID: issueID, PrincipalID: principalID})
+		if err != nil {
+			return err
+		}
+
+		if !MayDelete(d) {
+			return ErrNotReporter
+		}
+
+		if d.HasChildren {
+			return ErrHasChildren
+		}
+
+		return q.DeleteIssue(ctx, issueID)
+	})
+}
+
+// MayDelete is whether the principal IssueDeletion was asked about reported
+// the issue or administers its project, counting an agent as its owner.
+func MayDelete(d db.IssueDeletionRow) bool {
+	return d.ReporterAccount == d.CallerAccount || d.AccountRole == RoleAdmin
 }

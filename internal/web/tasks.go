@@ -25,6 +25,10 @@ type taskForm struct {
 	Members []db.ListMembersRow
 	Parents []issueRow
 
+	// Delete links to the page that deletes the task being edited, when the
+	// signed-in user may delete it.
+	Delete string
+
 	// Former is the task's assignee when they're no longer an active member,
 	// so the form can keep them rather than unassign the task.
 	Former string
@@ -189,6 +193,16 @@ func (w *Web) renderTaskForm(rw http.ResponseWriter, r *http.Request, status int
 		page.Action = "/browse/" + key + "/edit"
 		page.Cancel = "/browse/" + key
 		page.Submit = "Save changes"
+
+		may, err := w.mayDeleteTask(r, editingID(form))
+		if err != nil {
+			w.serverError(rw, r, err)
+			return
+		}
+
+		if may {
+			page.Delete = "/browse/" + key + "/delete"
+		}
 	}
 
 	if problem != "" {

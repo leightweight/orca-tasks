@@ -375,6 +375,12 @@ func (c *Client) Assign(ctx context.Context, key, username string) error {
 	return c.send(ctx, http.MethodPut, "/rest/api/2/issue/"+url.PathEscape(key)+"/assignee", map[string]string{"name": username}, nil)
 }
 
+// DeleteIssue deletes an issue. The server refuses one with child issues, and
+// lets only its reporter or a project administrator delete it.
+func (c *Client) DeleteIssue(ctx context.Context, key string) error {
+	return c.do(ctx, http.MethodDelete, "/rest/api/2/issue/"+url.PathEscape(key), "", nil, nil)
+}
+
 // AddComment comments on an issue.
 func (c *Client) AddComment(ctx context.Context, key, body string) (*Comment, error) {
 	var comment Comment

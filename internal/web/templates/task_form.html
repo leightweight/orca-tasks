@@ -17,7 +17,7 @@
           <small data-hint>Markdown. Attach images on the task's page, then paste the Markdown it gives you here.</small>
         </div>
       </div>
-      <div class="buttons mt-6"><button>{{.Data.Submit}}</button><a class="button outline" href="{{.Data.Cancel}}">Cancel</a></div>
+      <div class="buttons mt-6"><button>{{.Data.Submit}}</button><a class="button outline" href="{{.Data.Cancel}}">Cancel</a>{{with .Data.Delete}}<a class="button outline push-end" data-variant="danger" href="{{.}}">Delete task</a>{{end}}</div>
     </section>
   </div>
   <aside class="card split-side">

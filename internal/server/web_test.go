@@ -690,3 +690,36 @@ func TestFilteringChildTasks(t *testing.T) {
 		}
 	}
 }
+
+func TestDeletingATask(t *testing.T) {
+	t.Parallel()
+
+	s := newSite(t)
+	alice, _ := signUp(t, s)
+	alice.expectRedirect(alice.post("/projects", url.Values{"key": {"OPS"}}), "/projects/OPS/tasks")
+	parent := createIssue(t, s, "Rotate every credential", "To Do", nil)
+	createIssue(t, s, "Rotate the keys", "To Do", &parent)
+
+	if page := alice.get("/browse/OPS-1/edit").body; !strings.Contains(page, `href="/browse/OPS-1/delete"`) {
+		t.Errorf("the edit page has no Delete button: %.3000s", page)
+	}
+
+	// A task with a child task says so instead of asking.
+	alice.expectRedirect(alice.get("/browse/OPS-1/delete"), "/browse/OPS-1#children")
+	alice.expectRedirect(alice.post("/browse/OPS-1/delete", nil), "/browse/OPS-1#children")
+
+	page := alice.get("/browse/OPS-2/delete")
+	if page.status != http.StatusOK || !strings.Contains(page.body, "Delete OPS-2?") ||
+		!strings.Contains(page.body, `<form method="post" action="/browse/OPS-2/delete"`) {
+		t.Errorf("the delete confirmation: status %d: %.1500s", page.status, page.body)
+	}
+
+	alice.expectRedirect(alice.post("/browse/OPS-2/delete", nil), "/projects/OPS/tasks")
+	alice.expectRedirect(alice.post("/browse/OPS-1/delete", nil), "/projects/OPS/tasks")
+
+	for _, path := range []string{"/browse/OPS-1", "/browse/OPS-2", "/browse/OPS-2/delete"} {
+		if r := alice.get(path); r.status != http.StatusNotFound {
+			t.Errorf("%s after deleting: status %d, want 404", path, r.status)
+		}
+	}
+}

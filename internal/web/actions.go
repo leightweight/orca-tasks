@@ -231,3 +231,71 @@ func attachmentMarkdown(a db.Attachment, link attachmentLink) string {
 
 	return markdown
 }
+
+// mayDeleteTask is whether the signed-in user may delete a task they can see.
+func (w *Web) mayDeleteTask(r *http.Request, issueID int64) (bool, error) {
+	d, err := w.Store.IssueDeletion(r.Context(), db.IssueDeletionParams{IssueID: issueID, PrincipalID: currentUser(r.Context()).ID})
+	if err != nil {
+		return false, err
+	}
+
+	return store.MayDelete(d), nil
+}
+
+// confirmDeleteTask asks before deleting a task, or says why it can't be.
+func (w *Web) confirmDeleteTask(rw http.ResponseWriter, r *http.Request) {
+	row, ok := w.visibleIssue(rw, r)
+	if !ok {
+		return
+	}
+
+	key := issueKey(row)
+
+	d, err := w.Store.IssueDeletion(r.Context(), db.IssueDeletionParams{IssueID: row.Issue.ID, PrincipalID: currentUser(r.Context()).ID})
+	if err != nil {
+		w.serverError(rw, r, err)
+		return
+	}
+
+	switch {
+	case !store.MayDelete(d):
+		w.redirectError(rw, r, "/browse/"+key, "Only the reporter or a project administrator can delete "+key+".")
+	case d.HasChildren:
+		w.redirectError(rw, r, "/browse/"+key+"#children", key+" has child tasks. Move them to another parent or delete them first.")
+	default:
+		w.confirm(rw, r, "Delete "+key+"?", confirmPage{
+			Detail: key + " is \"" + row.Issue.Summary + "\". " +
+				"Deleting it removes its description, comments, history, and attachments for every member of the project. " +
+				"There is no undo. To drop work but keep its record, move it to Cancelled instead.",
+			Button: "Delete task",
+			Cancel: "/browse/" + key + "/edit",
+		})
+	}
+}
+
+// deleteTask deletes a task and goes to its project's task list. The task's
+// history goes with it, so the log records the deletion.
+func (w *Web) deleteTask(rw http.ResponseWriter, r *http.Request) {
+	row, ok := w.visibleIssue(rw, r)
+	if !ok {
+		return
+	}
+
+	key := issueKey(row)
+	user := currentUser(r.Context())
+
+	switch err := w.Store.DeleteIssue(r.Context(), user.ID, row.Issue.ID); {
+	case errors.Is(err, store.ErrNotReporter):
+		w.redirectError(rw, r, "/browse/"+key, "Only the reporter or a project administrator can delete "+key+".")
+		return
+	case errors.Is(err, store.ErrHasChildren):
+		w.redirectError(rw, r, "/browse/"+key+"#children", key+" has child tasks. Move them to another parent or delete them first.")
+		return
+	case err != nil:
+		w.serverError(rw, r, err)
+		return
+	}
+
+	w.Log.Info("deleted an issue", "project", row.Issue.ProjectID, "number", row.Issue.Number, "principal", user.ID)
+	w.redirect(rw, r, "/projects/"+row.ProjectKey+"/tasks", "Deleted "+key+".")
+}

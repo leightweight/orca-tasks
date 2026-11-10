@@ -502,6 +502,11 @@ form.buttons,
   gap: var(--space-3);
 }
 
+/* A destructive button sits apart from the ones beside it, at the far end. */
+.buttons .push-end {
+  margin-inline-start: auto;
+}
+
 tr.muted td {
   color: var(--muted-foreground);
 }

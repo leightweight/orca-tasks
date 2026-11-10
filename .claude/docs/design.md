@@ -81,7 +81,7 @@ People are chosen, and actions are recorded.
 - Wherever something records who acted, it may be a user or an agent: an issue's reporter, a comment's author, an attachment's uploader, and history entries.
 - An agent acts for its owner.
   Assigning to `-1`, Jira's automatic assignee, assigns the caller's user, so an agent assigns its owner.
-  Wherever a permission depends on who did something, such as deleting an attachment, the owner and their agents count as one, and an agent has its owner's role.
+  Wherever a permission depends on who did something, such as deleting an issue or an attachment, the owner and their agents count as one, and an agent has its owner's role.
 
 ### Memberships
 
@@ -131,8 +131,19 @@ Statuses, issue types, and priorities are shared by every project and seeded on 
 Issue types are Task, Bug, Story, Epic, and Chore.
 Priorities are Highest, High, Medium, Low, and Lowest.
 
-Issues can't be deleted.
-Moving one to Cancelled is the way to drop it.
+### Deleting an issue
+
+The reporter and the project's administrators can delete an issue, from its edit page in the web interface, through the API, or with `task delete`.
+An issue made by mistake is what deletion is for.
+Moving an issue to Cancelled keeps its record, so that is the way to drop work that was real.
+
+An issue with child issues can't be deleted until each child is moved to another parent or deleted.
+The check runs under the project's lock, the same one that changing a parent and creating an issue take, so a child can't appear between the check and the delete.
+
+Deletion removes the issue, its comments, its history, and its attachment rows in one transaction.
+The attachment files go in the next cleanup pass, and the server logs who deleted which issue, since the issue's own history goes with it.
+Its number isn't reused, because numbers come from a counter on the project.
+There is no undo.
 
 ### Parents
 
@@ -298,7 +309,7 @@ The selected project is the one the page belongs to, or the one the user opened 
 A profile menu at the top right has Profile, API keys, Agents, and Sign out, and those three account pages share tabs.
 
 Times read as relative, such as "4 days ago", and show the exact time in UTC on hover, since the server doesn't know the viewer's time zone.
-Revoking a key, removing or leaving a member, disabling an agent or user, and changing site administration link to a page that says what will happen, and its button posts the change.
+Revoking a key, removing or leaving a member, deleting a task, disabling an agent or user, and changing site administration link to a page that says what will happen, and its button posts the change.
 
 | Page | Who | Purpose |
 | --- | --- | --- |
@@ -317,7 +328,7 @@ Revoking a key, removing or leaving a member, disabling an agent or user, and ch
 | `/admin/projects` | Site administrators | List every project with counts and members. |
 | `/admin/projects/{id}` | Site administrators | Show one project's members and delete the project. `/admin/projects/{id}/members/new` adds a member. |
 | `/admin/proxy` | Site administrators | Show the connecting address, the forwarding headers, which hops are trusted, and the client address the server resolved. |
-| `/browse/{key}` | Project members | Show one task with its parent, description, child tasks, comments, and attachments, under its project in the sidebar, and move it, assign it, comment, and attach files. `/browse/{key}/edit` edits it. |
+| `/browse/{key}` | Project members | Show one task with its parent, description, child tasks, comments, and attachments, under its project in the sidebar, and move it, assign it, comment, and attach files. `/browse/{key}/edit` edits it, and its Delete button leads to `/browse/{key}/delete`, which asks before deleting. |
 
 Orca links each issue to `{site}/browse/{KEY}`, so a task's page lives at that path.
 The task list's filters are URL parameters, so a view can be bookmarked: `show` (open, done, or all), `assignee` (me, none, or a username), `type`, `priority`, `labels`, `q` for text, and `sort` (created, priority, or key, else most recently updated).
@@ -346,7 +357,7 @@ Version 2 sends descriptions and comments as plain text, so Markdown reaches Orc
 | `GET /rest/api/2/filter/favourite` | Saved filters, empty for now. |
 | `GET /rest/api/2/field` | Field metadata. |
 | `POST /rest/api/2/issue` | Create an issue. |
-| `GET`, `PUT /rest/api/2/issue/{key}` | Read or edit an issue. |
+| `GET`, `PUT`, `DELETE /rest/api/2/issue/{key}` | Read, edit, or delete an issue. |
 | `PUT /rest/api/2/issue/{key}/assignee` | Assign an issue. |
 | `GET`, `POST /rest/api/2/issue/{key}/transitions` | List statuses or move to one. |
 | `GET`, `POST /rest/api/2/issue/{key}/comment` | List or add comments. |
@@ -355,6 +366,10 @@ Version 2 sends descriptions and comments as plain text, so Markdown reaches Orc
 | `GET /secure/attachment/{id}/{filename}`, `GET /rest/api/2/attachment/content/{id}` | Download an attachment's contents. |
 | `GET /rest/api/2/issue/createmeta/{project}/issuetypes[/{type}]` | Create metadata. |
 | `GET /rest/agile/1.0/board`, `GET /rest/agile/1.0/board/{id}/configuration` | One board per project, with a column per status. |
+
+`DELETE /rest/api/2/issue/{key}` answers 204 No Content.
+It answers 403 to a caller who isn't the reporter or a project administrator, and 400 for an issue with child issues.
+Jira deletes the children too when the request has `deleteSubtasks=true`, but this server refuses either way, so nothing deletes a tree of issues at once.
 
 An issue's `renderedFields.description` is its GitHub-flavored Markdown rendered to HTML by goldmark, with raw HTML dropped.
 Orca finds the attachments to download in it.
@@ -430,6 +445,7 @@ orca-tasks task edit OPS-12 --summary "..." --add-label blocked --remove-label s
 orca-tasks task move OPS-12 "In Progress" --comment "Starting on the key rotation."
 orca-tasks task comment OPS-12 -
 orca-tasks task attach OPS-12 diagram.png
+orca-tasks task delete OPS-12
 ```
 
 `catalog` lists the projects, statuses, issue types, priorities, and users the other commands accept.
@@ -441,6 +457,7 @@ orca-tasks task attach OPS-12 diagram.png
 `--assignee` takes a user.
 `--assign-to-me` on `create`, `edit`, and `move` assigns the caller's user, which with an agent's key is the agent's owner.
 `task attach` uploads a file and prints the Markdown that embeds it, to paste into a description or comment.
+`task delete` deletes a task, under the rules in [Deleting an issue](#deleting-an-issue), and prints its key.
 Names of projects, statuses, types, and priorities are case-insensitive.
 An unknown one exits with status 2 and lists the valid choices.
 
@@ -698,7 +715,7 @@ Renovate opens dependency updates weekly.
 
 ## Deferred
 
-- Deleting issues, and showing their history in the web interface.
+- Showing an issue's history in the web interface.
 - Exporting a server's data and attachments, for backups and moving servers.
 - Custom statuses, types, and priorities per project.
 - Email, including emailed password resets.

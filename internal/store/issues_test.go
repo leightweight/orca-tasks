@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/leightweight/orca-tasks/internal/store"
@@ -271,5 +272,64 @@ func TestConcurrentEditsBothLand(t *testing.T) {
 	got := rows[0].Issue
 	if got.Summary != "Rotate every key" || got.StatusID != done.ID || len(got.Labels) != 3 {
 		t.Errorf("issue = %q, status %d, labels %q; want every edit applied", got.Summary, got.StatusID, got.Labels)
+	}
+}
+
+func TestDeletingAnIssue(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	ctx := testutil.Context(t)
+
+	// Alice's agent reported it, so bob, a member, can't delete it, and
+	// alice can, as the agent's owner and as the administrator.
+	issue := f.createIssue(t, f.ops, f.agent, "Made by mistake")
+
+	if _, err := f.s.AddComment(ctx, f.membership(t, f.ops, f.bob), issue, "Is this real?"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := f.s.DeleteIssue(ctx, f.bob.ID, issue.ID); !errors.Is(err, store.ErrNotReporter) {
+		t.Errorf("bob deleting the agent's issue: %v, want ErrNotReporter", err)
+	}
+
+	// Bob can delete his own, but not while it has a child.
+	bobs := f.createIssue(t, f.ops, f.bob, "Bob's parent")
+
+	child, err := f.s.CreateIssue(ctx, store.NewIssue{
+		ProjectID: f.ops.ID, Summary: "A child", StatusID: f.catalog.Statuses[0].ID, TypeID: f.catalog.IssueTypes[0].ID,
+		Reporter: f.membership(t, f.ops, f.bob), Parent: &store.Parent{ID: bobs.ID, Number: bobs.Number},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := f.s.DeleteIssue(ctx, f.bob.ID, bobs.ID); !errors.Is(err, store.ErrHasChildren) {
+		t.Errorf("deleting a parent: %v, want ErrHasChildren", err)
+	}
+
+	for _, id := range []int64{child.ID, bobs.ID} {
+		if err := f.s.DeleteIssue(ctx, f.bob.ID, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := f.s.DeleteIssue(ctx, f.alice.ID, issue.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := f.visible(t, f.alice, nil); len(got) != 0 {
+		t.Errorf("alice still sees %v", got)
+	}
+
+	users, err := f.s.ListUsers(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, u := range users {
+		if u.IssuesReported != 0 || u.Comments != 0 {
+			t.Errorf("%s still has %d issues and %d comments", u.Principal.Username, u.IssuesReported, u.Comments)
+		}
 	}
 }

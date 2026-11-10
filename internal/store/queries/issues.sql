@@ -213,3 +213,29 @@ WITH RECURSIVE ancestors AS (
     )
 SELECT  id
 FROM    ancestors;
+
+-- name: IssueDeletion :one
+-- Whether a principal may delete an issue, and whether the issue has children.
+-- An agent acts for its owner, so the account of the reporter and of the
+-- caller, and the account's role, decide it, as they do for attachments.
+SELECT   COALESCE(rp.owner_id, rp.id)::BIGINT                               AS  reporter_account
+        ,COALESCE(cp.owner_id, cp.id)::BIGINT                               AS  caller_account
+        ,COALESCE(am.role, m.role)::TEXT                                    AS  account_role
+        ,EXISTS (SELECT 1 FROM issues c WHERE c.parent_id = i.id)::BOOLEAN  AS  has_children
+FROM        issues      i
+JOIN        memberships m   ON  m.project_id = i.project_id
+JOIN        principals  cp  ON  cp.id = m.principal_id
+JOIN        memberships rm  ON  rm.id = i.reporter_id
+JOIN        principals  rp  ON  rp.id = rm.principal_id
+LEFT JOIN   memberships am  ON  am.project_id = i.project_id
+                            AND am.principal_id = COALESCE(cp.owner_id, cp.id)
+                            AND am.removed_at IS NULL
+WHERE   i.id = @issue_id
+        AND m.principal_id = @principal_id
+        AND m.removed_at IS NULL;
+
+-- name: DeleteIssue :exec
+-- Deletes an issue. Its comments, attachments, and history cascade.
+DELETE
+FROM    issues
+WHERE   id = @id;

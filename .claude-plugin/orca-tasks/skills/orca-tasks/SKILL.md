@@ -60,3 +60,7 @@ orca-tasks task move OPS-12 Done --comment "All environments rotated; old keys r
 
 Move a task to `In Progress` when you start it and to `Done` when it's finished, with a comment saying what was done.
 Leave tasks assigned to other people alone unless asked.
+
+To drop a task, move it to `Cancelled` with a comment saying why, so its record stays.
+`orca-tasks task delete OPS-12` is only for a task you created by mistake, such as a duplicate or one in the wrong project, or when the user asks.
+It can't be undone, and the server refuses it for a task with child tasks or one that neither you nor the user you work for reported, unless the user administers the project.

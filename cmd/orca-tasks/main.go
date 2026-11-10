@@ -45,6 +45,7 @@ type taskCmd struct {
 	Move    cli.TaskMove    `cmd:"" help:"Move a task to another status."`
 	Comment cli.TaskComment `cmd:"" help:"Comment on a task."`
 	Attach  cli.TaskAttach  `cmd:"" help:"Attach files to a task and print the Markdown that shows them."`
+	Delete  cli.TaskDelete  `cmd:"" help:"Delete a task made by mistake. Move real work to Cancelled instead."`
 }
 
 // usageError is a mistake on the command line or in its input, which exits 2.

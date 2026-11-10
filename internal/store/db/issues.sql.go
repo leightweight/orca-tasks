@@ -34,6 +34,18 @@ func (q *Queries) ActiveMembership(ctx context.Context, arg ActiveMembershipPara
 	return id, err
 }
 
+const deleteIssue = `-- name: DeleteIssue :exec
+DELETE
+FROM    issues
+WHERE   id = $1
+`
+
+// Deletes an issue. Its comments, attachments, and history cascade.
+func (q *Queries) DeleteIssue(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, deleteIssue, id)
+	return err
+}
+
 type InsertHistoryParams struct {
 	ProjectID int64
 	IssueID   int64
@@ -157,6 +169,51 @@ func (q *Queries) IssueAncestors(ctx context.Context, id int64) ([]int64, error)
 		return nil, err
 	}
 	return items, nil
+}
+
+const issueDeletion = `-- name: IssueDeletion :one
+SELECT   COALESCE(rp.owner_id, rp.id)::BIGINT                               AS  reporter_account
+        ,COALESCE(cp.owner_id, cp.id)::BIGINT                               AS  caller_account
+        ,COALESCE(am.role, m.role)::TEXT                                    AS  account_role
+        ,EXISTS (SELECT 1 FROM issues c WHERE c.parent_id = i.id)::BOOLEAN  AS  has_children
+FROM        issues      i
+JOIN        memberships m   ON  m.project_id = i.project_id
+JOIN        principals  cp  ON  cp.id = m.principal_id
+JOIN        memberships rm  ON  rm.id = i.reporter_id
+JOIN        principals  rp  ON  rp.id = rm.principal_id
+LEFT JOIN   memberships am  ON  am.project_id = i.project_id
+                            AND am.principal_id = COALESCE(cp.owner_id, cp.id)
+                            AND am.removed_at IS NULL
+WHERE   i.id = $1
+        AND m.principal_id = $2
+        AND m.removed_at IS NULL
+`
+
+type IssueDeletionParams struct {
+	IssueID     int64
+	PrincipalID int64
+}
+
+type IssueDeletionRow struct {
+	ReporterAccount int64
+	CallerAccount   int64
+	AccountRole     string
+	HasChildren     bool
+}
+
+// Whether a principal may delete an issue, and whether the issue has children.
+// An agent acts for its owner, so the account of the reporter and of the
+// caller, and the account's role, decide it, as they do for attachments.
+func (q *Queries) IssueDeletion(ctx context.Context, arg IssueDeletionParams) (IssueDeletionRow, error) {
+	row := q.db.QueryRow(ctx, issueDeletion, arg.IssueID, arg.PrincipalID)
+	var i IssueDeletionRow
+	err := row.Scan(
+		&i.ReporterAccount,
+		&i.CallerAccount,
+		&i.AccountRole,
+		&i.HasChildren,
+	)
+	return i, err
 }
 
 const listHistory = `-- name: ListHistory :many

@@ -209,6 +209,8 @@ func (w *Web) Register(mux *http.ServeMux) error {
 	page("POST /browse/{key}/assignee", w.signedIn(w.assignTask))
 	page("POST /browse/{key}/comments", w.signedIn(w.commentOnTask))
 	page("POST /browse/{key}/attachments", w.signedIn(w.attachToTask))
+	page("GET /browse/{key}/delete", w.signedIn(w.confirmDeleteTask))
+	page("POST /browse/{key}/delete", w.signedIn(w.deleteTask))
 
 	return nil
 }

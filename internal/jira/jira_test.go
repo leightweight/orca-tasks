@@ -873,3 +873,58 @@ func TestUnknownProjectListsTheValidOnes(t *testing.T) {
 		t.Errorf("status %d: %s", response.StatusCode, body)
 	}
 }
+
+func TestDeletingIssues(t *testing.T) {
+	t.Parallel()
+
+	a := newAPI(t)
+
+	// Bob, a member, can delete what he reported but not what alice reported.
+	// Claude acts for alice, the administrator, so it can delete either.
+	bobs := a.create(a.bob, "OPS", "Bob's mistake")
+	alices := a.create(a.alice, "OPS", "Alice's mistake")
+
+	if status := a.call(a.bob, "DELETE", "/rest/api/2/issue/"+alices, "", nil); status != http.StatusForbidden {
+		t.Errorf("bob deleting alice's issue: status %d, want 403", status)
+	}
+
+	a.mustCall(a.bob, "DELETE", "/rest/api/2/issue/"+bobs, "", nil)
+	a.mustCall(a.claude, "POST", "/rest/api/2/issue/"+alices+"/comment", `{"body":"Made by mistake."}`, nil)
+
+	if status, body := upload(t, a, a.alice, alices, "notes.txt", "notes"); status != http.StatusOK {
+		t.Fatalf("upload: status %d: %s", status, body)
+	}
+
+	a.mustCall(a.claude, "DELETE", "/rest/api/2/issue/"+alices, "", nil)
+
+	for _, key := range []string{bobs, alices} {
+		if status := a.call(a.alice, "GET", "/rest/api/2/issue/"+key, "", nil); status != http.StatusNotFound {
+			t.Errorf("reading deleted %s: status %d, want 404", key, status)
+		}
+	}
+
+	// A parent can't go while it has children, even with Jira's
+	// deleteSubtasks, and goes once they do.
+	parent := a.create(a.alice, "OPS", "Parent")
+	child := a.create(a.alice, "OPS", "Child")
+	a.mustCall(a.alice, "PUT", "/rest/api/2/issue/"+child, fmt.Sprintf(`{"fields":{"parent":{"key":%q}}}`, parent), nil)
+
+	for _, query := range []string{"", "?deleteSubtasks=true"} {
+		if status := a.call(a.alice, "DELETE", "/rest/api/2/issue/"+parent+query, "", nil); status != http.StatusBadRequest {
+			t.Errorf("deleting a parent%s: status %d, want 400", query, status)
+		}
+	}
+
+	a.mustCall(a.alice, "DELETE", "/rest/api/2/issue/"+child, "", nil)
+	a.mustCall(a.alice, "DELETE", "/rest/api/2/issue/"+parent, "", nil)
+
+	// Numbers aren't reused, so a new issue doesn't take a deleted one's key.
+	if next := a.create(a.alice, "OPS", "Next"); next != "OPS-5" {
+		t.Errorf("the next issue is %s, want OPS-5", next)
+	}
+
+	private := a.create(a.alice, "PRIVATE", "Hidden from bob")
+	if status := a.call(a.bob, "DELETE", "/rest/api/2/issue/"+private, "", nil); status != http.StatusNotFound {
+		t.Errorf("deleting in a project bob can't see: status %d, want 404", status)
+	}
+}

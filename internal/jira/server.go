@@ -173,6 +173,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	handle("POST /rest/api/2/issue", s.createIssue)
 	handle("GET /rest/api/2/issue/{key}", s.getIssue)
 	handle("PUT /rest/api/2/issue/{key}", s.updateIssue)
+	handle("DELETE /rest/api/2/issue/{key}", s.deleteIssue)
 	handle("PUT /rest/api/2/issue/{key}/assignee", s.assign)
 	handle("GET /rest/api/2/issue/{key}/transitions", s.transitions)
 	handle("POST /rest/api/2/issue/{key}/transitions", s.transition)

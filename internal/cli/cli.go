@@ -741,3 +741,35 @@ func (c *TaskAttach) Run(ctx context.Context, env *Env) error {
 func DefaultEnv() *Env {
 	return &Env{Stdout: os.Stdout, Stdin: os.Stdin}
 }
+
+// TaskDelete deletes a task.
+type TaskDelete struct {
+	Flags
+
+	Key string `arg:"" help:"Task key, such as OPS-1."`
+}
+
+type deleted struct {
+	Key string `json:"key"`
+}
+
+// Run deletes the task and prints its key.
+func (c *TaskDelete) Run(ctx context.Context, env *Env) error {
+	api, err := c.client()
+	if err != nil {
+		return err
+	}
+
+	key := strings.ToUpper(c.Key)
+	if err := api.DeleteIssue(ctx, key); err != nil {
+		return check(err)
+	}
+
+	if c.Format == "json" {
+		return c.render(env, deleted{Key: key}, nil)
+	}
+
+	_, err = fmt.Fprintf(env.Stdout, "Deleted %s.\n", key)
+
+	return err
+}

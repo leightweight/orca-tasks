@@ -771,3 +771,28 @@ func (s *Server) boardConfiguration(w http.ResponseWriter, r *http.Request, c *C
 
 	return nil
 }
+
+// deleteIssue lets the reporter or a project administrator delete an issue
+// with no child issues. Jira deletes the children when the request has
+// deleteSubtasks=true; this server refuses either way. The issue's history
+// goes with it, so the log records the deletion.
+func (s *Server) deleteIssue(w http.ResponseWriter, r *http.Request, c *Caller) error {
+	row, err := s.issue(r.Context(), c, r.PathValue("key"))
+	if err != nil {
+		return err
+	}
+
+	switch err := s.Store.DeleteIssue(r.Context(), c.PrincipalID, row.Issue.ID); {
+	case errors.Is(err, store.ErrNotReporter):
+		return forbidden("Only the reporter or a project administrator can delete %s.", issueKey(row))
+	case errors.Is(err, store.ErrHasChildren):
+		return badRequest("%s has child issues. Move them to another parent or delete them first.", issueKey(row))
+	case err != nil:
+		return err
+	}
+
+	s.Log.Info("deleted an issue", "project", row.Issue.ProjectID, "number", row.Issue.Number, "principal", c.PrincipalID)
+	writeJSON(w, http.StatusNoContent, nil)
+
+	return nil
+}

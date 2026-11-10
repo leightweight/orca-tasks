@@ -38,6 +38,7 @@ type commands struct {
 		Move    cli.TaskMove    `cmd:""`
 		Comment cli.TaskComment `cmd:""`
 		Attach  cli.TaskAttach  `cmd:""`
+		Delete  cli.TaskDelete  `cmd:""`
 	} `cmd:""`
 }
 
@@ -261,5 +262,31 @@ func TestChangesPrintOneTaskAsAnObject(t *testing.T) {
 		if err := json.Unmarshal([]byte(mustRun(t, base, key, "", args...)), &task); err != nil || task.Key != "OPS-1" {
 			t.Errorf("%q printed %+v, %v; want an object with key OPS-1", args[1], task, err)
 		}
+	}
+}
+
+func TestDeletingATask(t *testing.T) {
+	t.Parallel()
+
+	base, key := newServer(t)
+
+	mustRun(t, base, key, "", "task", "create", "OPS", "Rotate every credential")
+	mustRun(t, base, key, "", "task", "create", "OPS", "Rotate the keys", "--parent", "OPS-1")
+
+	if _, err := run(t, base, key, "", "task", "delete", "OPS-1"); !errors.As(err, new(cli.UsageError)) ||
+		!strings.Contains(err.Error(), "child issues") {
+		t.Errorf("deleting a parent: %v, want a usage error about its children", err)
+	}
+
+	if out := mustRun(t, base, key, "", "task", "delete", "ops-2"); out != "Deleted OPS-2.\n" {
+		t.Errorf("delete printed %q", out)
+	}
+
+	if out := mustRun(t, base, key, "", "task", "delete", "OPS-1", "-f", "json"); !strings.Contains(out, `"key": "OPS-1"`) {
+		t.Errorf("delete -f json printed %q", out)
+	}
+
+	if out := mustRun(t, base, key, "", "task", "list"); strings.Contains(out, "OPS-") {
+		t.Errorf("after deleting both, list printed %q", out)
 	}
 }
