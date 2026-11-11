@@ -334,6 +334,8 @@ Orca links each issue to `{site}/browse/{KEY}`, so a task's page lives at that p
 The task list's filters are URL parameters, so a view can be bookmarked: `show` (open, done, or all), `assignee` (me, none, or a username), `type`, `priority`, `labels`, `q` for text, and `sort` (created, priority, or key, else most recently updated).
 The board shows done tasks too unless `show` says otherwise; with scripts running, dropping a card on another column moves the task, and without them a card links to its task.
 The page turns them into JQL and filters with the same code as search, so a filter matches the same tasks in Orca, and a Filters/JQL switch swaps the filter bar for a JQL box that starts with the query the filters make.
+With scripts running, changing a filter menu or clearing the search box applies the filters at once, and the Filter button hides.
+With scripts blocked, the Filter button applies them.
 A task's child tasks have Open, Done, and All tabs, through the `children` parameter.
 Attaching a file on a task's page shows the Markdown that embeds it, to paste into the description or a comment, as `task attach` prints it.
 The edit form sends each field as it was when the form opened, and saving changes only the fields that differ, so a change someone made in Orca meanwhile stays.

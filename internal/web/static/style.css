@@ -8,6 +8,12 @@
   --link: light-dark(#1d4ed8, #8ab4ff);
 }
 
+/* Oat gives buttons and other elements a display, which would otherwise beat
+   the hidden attribute that app.js and the templates use to hide them. */
+[hidden] {
+  display: none !important;
+}
+
 /* Top bar and sidebar */
 
 nav[data-topnav] {

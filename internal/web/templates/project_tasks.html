@@ -32,7 +32,7 @@
   </form>
   <p class="text-light small jql-hint">The same query works in <code>orca-tasks task list</code> and Orca's Tasks page, with <code>project = {{$d.Membership.Key}} AND</code> in front.</p>
   {{else}}
-  <form method="get" class="filters" role="search">
+  <form method="get" class="filters" role="search" data-auto-filter>
     {{with $f.Get "show"}}<input type="hidden" name="show" value="{{.}}">{{end}}
     {{with $f.Get "view"}}<input type="hidden" name="view" value="{{.}}">{{end}}
     <input type="search" name="q" value="{{$f.Get "q"}}" placeholder="Search" aria-label="Search summaries, descriptions, and labels">
@@ -62,7 +62,7 @@
       <option value="priority"{{if eq $s "priority"}} selected{{end}}>Priority</option>
       <option value="key"{{if eq $s "key"}} selected{{end}}>Key</option>
     </select>
-    <button class="small" data-variant="secondary">Filter</button>
+    <button class="small" data-variant="secondary" data-filter-button>Filter</button>
   </form>
   {{end}}
   {{with $d.Problem}}<div role="alert" data-variant="danger" class="mb-4">{{.}}</div>{{end}}

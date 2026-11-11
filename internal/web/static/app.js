@@ -76,3 +76,19 @@ document.querySelectorAll("[data-board]").forEach((board) => {
 function recount(column) {
   column.querySelector(".count").textContent = column.querySelectorAll(".task-card").length;
 }
+
+// Applies the task list's filters as soon as one changes, so there's no Filter
+// button to forget. Enter in the search box submits the form as it always
+// does, and clearing the box shows every task again. Without this script, the
+// Filter button applies them.
+document.querySelectorAll("form[data-auto-filter]").forEach((form) => {
+  form.querySelectorAll("[data-filter-button]").forEach((button) => (button.hidden = true));
+
+  form.addEventListener("change", (event) => {
+    if (event.target.matches("select")) form.requestSubmit();
+  });
+
+  form.addEventListener("input", (event) => {
+    if (event.target.matches("input[type=search]") && event.target.value === "") form.requestSubmit();
+  });
+});
