@@ -10,7 +10,7 @@ require (
 	github.com/alexedwards/scs/v2 v2.9.0
 	github.com/dustin/go-humanize v1.1.0
 	github.com/fergusstrange/embedded-postgres/v2 v2.0.1
-	github.com/gofrs/flock v0.13.1
+	github.com/gofrs/flock v0.13.2
 	github.com/google/renameio/v2 v2.0.2
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/jedib0t/go-pretty/v6 v6.8.3
