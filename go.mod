@@ -12,7 +12,7 @@ require (
 	github.com/fergusstrange/embedded-postgres/v2 v2.0.1
 	github.com/gofrs/flock v0.13.1
 	github.com/google/renameio/v2 v2.0.2
-	github.com/jackc/pgx/v5 v5.12.0
+	github.com/jackc/pgx/v5 v5.13.0
 	github.com/jedib0t/go-pretty/v6 v6.8.3
 	github.com/pquerna/otp v1.5.0
 	github.com/pressly/goose/v3 v3.29.0
