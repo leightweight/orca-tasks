@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/kong v1.17.0
 	github.com/alecthomas/participle/v2 v2.1.4
 	github.com/alexedwards/argon2id v1.0.0
-	github.com/alexedwards/scs/pgxstore v0.0.0-20251002162104-209de6e426de
+	github.com/alexedwards/scs/pgxstore v0.0.0-20261119174900-ed2e92329119
 	github.com/alexedwards/scs/v2 v2.9.0
 	github.com/dustin/go-humanize v1.1.0
 	github.com/fergusstrange/embedded-postgres/v2 v2.0.1
