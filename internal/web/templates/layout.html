@@ -33,11 +33,11 @@
     <header>
       <ot-dropdown class="project-picker">
         <button type="button" class="outline" popovertarget="project-menu">
-          {{with .Project}}<span class="picked"><span class="key">{{.Membership.Key}}</span> {{.Project.Name}}</span>{{else}}<span class="picked">Choose a project</span>{{end}}
+          {{with .Project}}<span class="picked">{{.Project.Name}}</span>{{else}}<span class="picked">Choose a project</span>{{end}}
           <span aria-hidden="true">▾</span>
         </button>
         <menu popover id="project-menu">
-          {{range .Projects}}<a role="menuitem" href="/projects/{{.Membership.Key}}/tasks"><span class="key">{{.Membership.Key}}</span><span>{{.Project.Name}}</span></a>{{end}}
+          {{range .Projects}}<a role="menuitem" href="/projects/{{.Membership.Key}}/tasks">{{.Project.Name}}</a>{{end}}
           {{if .Projects}}<hr>{{end}}
           <a role="menuitem" href="/projects">All your projects</a>
         </menu>

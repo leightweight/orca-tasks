@@ -304,7 +304,7 @@ Forms that create something have a page of their own, at the list's path followe
 A form that fails shows again with the problem and what was typed.
 
 Pages are organized around projects.
-A sidebar has a project selector, then Tasks, Members, and Settings for the selected project, and, for site administrators, the administration pages at its foot.
+A sidebar has a project selector, which lists projects by name, then Tasks, Members, and Settings for the selected project, and, for site administrators, the administration pages at its foot.
 The selected project is the one the page belongs to, or the one the user opened last, and `/` opens that project's tasks.
 A profile menu at the top right has Profile, API keys, Agents, and Sign out, and those three account pages share tabs.
 
