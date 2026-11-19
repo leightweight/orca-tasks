@@ -20,7 +20,7 @@ require (
 	github.com/sethvargo/go-limiter v1.2.0
 	github.com/testcontainers/testcontainers-go v0.45.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.45.0
-	github.com/yuin/goldmark/v2 v2.1.15
+	github.com/yuin/goldmark/v2 v2.1.16
 	golang.org/x/crypto v0.58.0
 )
 
