@@ -28,6 +28,16 @@ nav[data-topnav] .brand {
   color: var(--foreground);
 }
 
+nav[data-topnav] a.topnav-link {
+  margin-inline-start: var(--space-3);
+  color: var(--muted-foreground);
+}
+
+nav[data-topnav] a.topnav-link:is(:hover, [aria-current]) {
+  color: var(--foreground);
+  text-decoration: none;
+}
+
 nav[data-topnav] .profile {
   margin-inline-start: auto;
 }

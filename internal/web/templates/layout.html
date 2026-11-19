@@ -16,6 +16,7 @@
   <nav data-topnav>
     <button type="button" class="ghost small" data-sidebar-toggle aria-label="Show the sidebar">☰</button>
     <a class="brand" href="/">orca-tasks</a>
+    <a class="topnav-link" href="/projects"{{if or (eq $.Path "/projects") (eq $.Path "/projects/new")}} aria-current="page"{{end}}>Projects</a>
     <ot-dropdown class="profile">
       <button type="button" class="ghost small" popovertarget="profile-menu">{{.User.Username}} <span aria-hidden="true">▾</span></button>
       <menu popover id="profile-menu">
@@ -39,7 +40,7 @@
         <menu popover id="project-menu">
           {{range .Projects}}<a role="menuitem" href="/projects/{{.Membership.Key}}/tasks">{{.Project.Name}}</a>{{end}}
           {{if .Projects}}<hr>{{end}}
-          <a role="menuitem" href="/projects">All your projects</a>
+          <a role="menuitem" href="/projects/new">New project</a>
         </menu>
       </ot-dropdown>
     </header>
