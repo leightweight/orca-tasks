@@ -64,8 +64,8 @@ SELECT   m.project_id
         ,'member'
         ,m.key
         ,m.removed_at
-FROM    memberships m
-JOIN    principals  a   ON  a.owner_id = m.principal_id
+FROM        memberships m
+INNER JOIN  principals  a   ON  a.owner_id = m.principal_id
 WHERE   m.principal_id = @user_id
         AND (
             sqlc.narg(project_id)::BIGINT IS NULL
@@ -101,8 +101,8 @@ WHERE   project_id = @project_id
 -- A principal's project under the key it sees the project by.
 SELECT   sqlc.embed(m)
         ,sqlc.embed(p)
-FROM    memberships m
-JOIN    projects    p   ON  p.id = m.project_id
+FROM        memberships m
+INNER JOIN  projects    p   ON  p.id = m.project_id
 WHERE   m.principal_id = @principal_id
         AND m.key = UPPER(@key)
         AND m.removed_at IS NULL;
@@ -117,10 +117,21 @@ WHERE   project_id = @project_id
 -- name: ListMyProjects :many
 SELECT   sqlc.embed(m)
         ,sqlc.embed(p)
-        ,(SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id)::BIGINT                                                                                                  AS  issues
-        ,(SELECT COUNT(*) FROM memberships x JOIN principals xp ON xp.id = x.principal_id WHERE x.project_id = p.id AND x.removed_at IS NULL AND xp.kind = 'user')::BIGINT  AS  members
-FROM    memberships m
-JOIN    projects    p   ON  p.id = m.project_id
+        ,(
+            SELECT  COUNT(*)
+            FROM    issues  i
+            WHERE   i.project_id = p.id
+         )::BIGINT  AS  issues
+        ,(
+            SELECT  COUNT(*)
+            FROM        memberships x
+            INNER JOIN  principals  xp  ON  xp.id = x.principal_id
+            WHERE   x.project_id = p.id
+                    AND x.removed_at IS NULL
+                    AND xp.kind = 'user'
+         )::BIGINT  AS  members
+FROM        memberships m
+INNER JOIN  projects    p   ON  p.id = m.project_id
 WHERE   m.principal_id = @principal_id
         AND m.removed_at IS NULL
 ORDER BY m.key;
@@ -129,8 +140,8 @@ ORDER BY m.key;
 -- A project's users. Their agents are members too, but aren't listed.
 SELECT   sqlc.embed(m)
         ,sqlc.embed(u)
-FROM    memberships m
-JOIN    principals  u   ON  u.id = m.principal_id
+FROM        memberships m
+INNER JOIN  principals  u   ON  u.id = m.principal_id
 WHERE   m.project_id = @project_id
         AND m.removed_at IS NULL
         AND u.kind = 'user'
@@ -138,8 +149,22 @@ ORDER BY u.username;
 
 -- name: ListAllProjects :many
 SELECT   sqlc.embed(p)
-        ,(SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id)::BIGINT                                                                                                                                                  AS  issues
-        ,COALESCE((SELECT ARRAY_AGG(u.username ORDER BY u.username) FROM memberships x JOIN principals u ON u.id = x.principal_id WHERE x.project_id = p.id AND x.removed_at IS NULL AND u.kind = 'user'), '{}')::TEXT[]    AS  members
+        ,(
+            SELECT  COUNT(*)
+            FROM    issues  i
+            WHERE   i.project_id = p.id
+         )::BIGINT  AS  issues
+        ,COALESCE(
+             (
+                SELECT  ARRAY_AGG(u.username ORDER BY u.username)
+                FROM        memberships x
+                INNER JOIN  principals  u   ON  u.id = x.principal_id
+                WHERE   x.project_id = p.id
+                        AND x.removed_at IS NULL
+                        AND u.kind = 'user'
+             )
+            ,'{}'
+         )::TEXT[]  AS  members
 FROM    projects    p
 ORDER BY p.key
         ,p.id;
@@ -155,8 +180,8 @@ FOR NO KEY UPDATE;
 -- How many active administrators a project has besides one user. Disabled users
 -- count as gone, since they can't sign in to administer it.
 SELECT  COUNT(*)
-FROM    memberships m
-JOIN    principals  p   ON  p.id = m.principal_id
+FROM        memberships m
+INNER JOIN  principals  p   ON  p.id = m.principal_id
 WHERE   m.project_id = @project_id
         AND m.principal_id <> @user_id  -- 🤮
         AND m.role = 'admin'

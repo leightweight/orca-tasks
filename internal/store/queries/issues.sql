@@ -19,10 +19,10 @@ SELECT   sqlc.embed(i)
         ,pi.status_id                                               AS  parent_status_id
         ,pi.type_id                                                 AS  parent_type_id
 FROM        memberships m
-JOIN        projects    p   ON  p.id = m.project_id
-JOIN        issues      i   ON  i.project_id = m.project_id
-JOIN        memberships rm  ON  rm.id = i.reporter_id
-JOIN        principals  r   ON  r.id = rm.principal_id
+INNER JOIN  projects    p   ON  p.id = m.project_id
+INNER JOIN  issues      i   ON  i.project_id = m.project_id
+INNER JOIN  memberships rm  ON  rm.id = i.reporter_id
+INNER JOIN  principals  r   ON  r.id = rm.principal_id
 LEFT JOIN   memberships am  ON  am.id = i.assignee_id
 LEFT JOIN   principals  a   ON  a.id = am.principal_id
 LEFT JOIN   issues      pi  ON  pi.id = i.parent_id
@@ -129,8 +129,8 @@ ORDER BY created_at
 -- The membership a user has in a project, if it's active and the user isn't
 -- disabled. Assignment looks people up this way; agents can't be assignees.
 SELECT  m.id
-FROM    memberships m
-JOIN    principals  u   ON  u.id = m.principal_id
+FROM        memberships m
+INNER JOIN  principals  u   ON  u.id = m.principal_id
 WHERE   m.project_id = @project_id
         AND u.username = LOWER(@username)
         AND m.removed_at IS NULL
@@ -145,12 +145,12 @@ SELECT DISTINCT
          u.username
         ,u.display_name
         ,u.email
-FROM    memberships mine
-JOIN    memberships other   ON  other.project_id = mine.project_id
-                            AND other.removed_at IS NULL
-JOIN    principals  u       ON  u.id = other.principal_id
-                            AND u.disabled_at IS NULL
-                            AND u.kind = 'user'
+FROM        memberships mine
+INNER JOIN  memberships other   ON  other.project_id = mine.project_id
+                                AND other.removed_at IS NULL
+INNER JOIN  principals  u       ON  u.id = other.principal_id
+                                AND u.disabled_at IS NULL
+                                AND u.kind = 'user'
 WHERE   mine.principal_id = @principal_id
         AND mine.removed_at IS NULL
         AND (
@@ -188,10 +188,10 @@ FOR UPDATE OF i;
 -- and two of them can't make a cycle together. It takes the lock that
 -- numbering a new issue does, so callers take it before locking any issue.
 SELECT  p.id
-FROM    projects p
+FROM    projects    p
 WHERE   p.id = (
             SELECT  i.project_id
-            FROM    issues i
+            FROM    issues  i
             WHERE   i.id = @issue_id
         )
 FOR NO KEY UPDATE;
@@ -208,8 +208,8 @@ WITH RECURSIVE ancestors AS (
 
         SELECT   i.id
                 ,i.parent_id
-        FROM    issues      i
-        JOIN    ancestors   a   ON  a.parent_id = i.id
+        FROM        issues      i
+        INNER JOIN  ancestors   a   ON  a.parent_id = i.id
     )
 SELECT  id
 FROM    ancestors;
@@ -218,15 +218,19 @@ FROM    ancestors;
 -- Whether a principal may delete an issue, and whether the issue has children.
 -- An agent acts for its owner, so the account of the reporter and of the
 -- caller, and the account's role, decide it, as they do for attachments.
-SELECT   COALESCE(rp.owner_id, rp.id)::BIGINT                               AS  reporter_account
-        ,COALESCE(cp.owner_id, cp.id)::BIGINT                               AS  caller_account
-        ,COALESCE(am.role, m.role)::TEXT                                    AS  account_role
-        ,EXISTS (SELECT 1 FROM issues c WHERE c.parent_id = i.id)::BOOLEAN  AS  has_children
+SELECT   COALESCE(rp.owner_id, rp.id)::BIGINT   AS  reporter_account
+        ,COALESCE(cp.owner_id, cp.id)::BIGINT   AS  caller_account
+        ,COALESCE(am.role, m.role)::TEXT        AS  account_role
+        ,EXISTS (
+            SELECT  1
+            FROM    issues  c
+            WHERE   c.parent_id = i.id
+         )::BOOLEAN                             AS  has_children
 FROM        issues      i
-JOIN        memberships m   ON  m.project_id = i.project_id
-JOIN        principals  cp  ON  cp.id = m.principal_id
-JOIN        memberships rm  ON  rm.id = i.reporter_id
-JOIN        principals  rp  ON  rp.id = rm.principal_id
+INNER JOIN  memberships m   ON  m.project_id = i.project_id
+INNER JOIN  principals  cp  ON  cp.id = m.principal_id
+INNER JOIN  memberships rm  ON  rm.id = i.reporter_id
+INNER JOIN  principals  rp  ON  rp.id = rm.principal_id
 LEFT JOIN   memberships am  ON  am.project_id = i.project_id
                             AND am.principal_id = COALESCE(cp.owner_id, cp.id)
                             AND am.removed_at IS NULL

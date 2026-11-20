@@ -26,9 +26,9 @@ SELECT   sqlc.embed(t)
         ,u.display_name                                             AS  uploader_name
         ,u.email                                                    AS  uploader_email
         ,(m.removed_at IS NULL AND u.disabled_at IS NULL)::BOOLEAN  AS  uploader_active
-FROM    attachments t
-JOIN    memberships m   ON  m.id = t.uploader_id
-JOIN    principals  u   ON  u.id = m.principal_id
+FROM        attachments t
+INNER JOIN  memberships m   ON  m.id = t.uploader_id
+INNER JOIN  principals  u   ON  u.id = m.principal_id
 WHERE   t.issue_id = ANY(@issue_ids::BIGINT[])
 ORDER BY t.issue_id
         ,t.created_at
@@ -46,11 +46,11 @@ SELECT   sqlc.embed(t)
         ,COALESCE(cp.owner_id, cp.id)::BIGINT   AS  caller_account
         ,COALESCE(am.role, m.role)::TEXT        AS  account_role
 FROM        attachments t
-JOIN        issues      i   ON  i.id = t.issue_id
-JOIN        memberships m   ON  m.project_id = t.project_id
-JOIN        principals  cp  ON  cp.id = m.principal_id
-JOIN        memberships up  ON  up.id = t.uploader_id
-JOIN        principals  upp ON  upp.id = up.principal_id
+INNER JOIN  issues      i   ON  i.id = t.issue_id
+INNER JOIN  memberships m   ON  m.project_id = t.project_id
+INNER JOIN  principals  cp  ON  cp.id = m.principal_id
+INNER JOIN  memberships up  ON  up.id = t.uploader_id
+INNER JOIN  principals  upp ON  upp.id = up.principal_id
 LEFT JOIN   memberships am  ON  am.project_id = t.project_id
                             AND am.principal_id = COALESCE(cp.owner_id, cp.id)
                             AND am.removed_at IS NULL

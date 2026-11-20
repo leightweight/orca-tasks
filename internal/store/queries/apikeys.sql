@@ -28,9 +28,18 @@ SELECT   @api_key_id
 -- reach, under the user's keys for them.
 SELECT   sqlc.embed(k)
         ,p.username
-        ,COALESCE((SELECT ARRAY_AGG(m.key ORDER BY m.key) FROM api_key_projects kp JOIN memberships m ON m.project_id = kp.project_id AND m.principal_id = @owner_id WHERE kp.api_key_id = k.id), '{}')::TEXT[] AS  project_keys
-FROM    api_keys    k
-JOIN    principals  p   ON  p.id = k.principal_id
+        ,COALESCE(
+             (
+                SELECT  ARRAY_AGG(m.key ORDER BY m.key)
+                FROM        api_key_projects    kp
+                INNER JOIN  memberships         m   ON  m.project_id = kp.project_id
+                                                    AND m.principal_id = @owner_id
+                WHERE   kp.api_key_id = k.id
+             )
+            ,'{}'
+         )::TEXT[]  AS  project_keys
+FROM        api_keys    k
+INNER JOIN  principals  p   ON  p.id = k.principal_id
 WHERE   p.id = @owner_id
         OR  p.owner_id = @owner_id
 ORDER BY k.revoked_at IS NOT NULL
@@ -57,15 +66,22 @@ WHERE   k.id = @id
 SELECT   k.id
         ,k.read_only
         ,k.all_projects
-        ,p.id                                                                                                               AS  principal_id
+        ,p.id           AS  principal_id
         ,p.username
         ,p.display_name
         ,p.email
-        ,u.username                                                                                                         AS  user_username
-        ,COALESCE((SELECT ARRAY_AGG(kp.project_id) FROM api_key_projects kp WHERE kp.api_key_id = k.id), '{}')::BIGINT[]    AS  project_ids
-FROM    api_keys    k
-JOIN    principals  p   ON  p.id = k.principal_id
-JOIN    principals  u   ON  u.id = COALESCE(p.owner_id, p.id)
+        ,u.username     AS  user_username
+        ,COALESCE(
+             (
+                SELECT  ARRAY_AGG(kp.project_id)
+                FROM    api_key_projects    kp
+                WHERE   kp.api_key_id = k.id
+             )
+            ,'{}'
+         )::BIGINT[]    AS  project_ids
+FROM        api_keys    k
+INNER JOIN  principals  p   ON  p.id = k.principal_id
+INNER JOIN  principals  u   ON  u.id = COALESCE(p.owner_id, p.id)
 WHERE   k.key_hash = @key_hash
         AND k.revoked_at IS NULL
         AND (

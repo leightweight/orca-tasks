@@ -77,7 +77,7 @@ jobs:
           # Tag builds can read caches that runs on main wrote, so a poisoned cache could put files into a signed release.
           cache: false
           # Only what this job runs. It holds write and signing permissions, so it
-          # shouldn't build Rust and the other development tools.
+          # shouldn't install the development tools.
           install_args: go goreleaser cosign helm go:github.com/google/go-licenses/v2
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0

@@ -91,8 +91,8 @@ func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (M
 const getMembershipByKey = `-- name: GetMembershipByKey :one
 SELECT   m.id, m.project_id, m.principal_id, m.role, m.key, m.created_at, m.removed_at
         ,p.id, p.key, p.name, p.next_number, p.created_at
-FROM    memberships m
-JOIN    projects    p   ON  p.id = m.project_id
+FROM        memberships m
+INNER JOIN  projects    p   ON  p.id = m.project_id
 WHERE   m.principal_id = $1
         AND m.key = UPPER($2)
         AND m.removed_at IS NULL
@@ -179,8 +179,22 @@ func (q *Queries) InsertProject(ctx context.Context, arg InsertProjectParams) (P
 
 const listAllProjects = `-- name: ListAllProjects :many
 SELECT   p.id, p.key, p.name, p.next_number, p.created_at
-        ,(SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id)::BIGINT                                                                                                                                                  AS  issues
-        ,COALESCE((SELECT ARRAY_AGG(u.username ORDER BY u.username) FROM memberships x JOIN principals u ON u.id = x.principal_id WHERE x.project_id = p.id AND x.removed_at IS NULL AND u.kind = 'user'), '{}')::TEXT[]    AS  members
+        ,(
+            SELECT  COUNT(*)
+            FROM    issues  i
+            WHERE   i.project_id = p.id
+         )::BIGINT  AS  issues
+        ,COALESCE(
+             (
+                SELECT  ARRAY_AGG(u.username ORDER BY u.username)
+                FROM        memberships x
+                INNER JOIN  principals  u   ON  u.id = x.principal_id
+                WHERE   x.project_id = p.id
+                        AND x.removed_at IS NULL
+                        AND u.kind = 'user'
+             )
+            ,'{}'
+         )::TEXT[]  AS  members
 FROM    projects    p
 ORDER BY p.key
         ,p.id
@@ -223,8 +237,8 @@ func (q *Queries) ListAllProjects(ctx context.Context) ([]ListAllProjectsRow, er
 const listMembers = `-- name: ListMembers :many
 SELECT   m.id, m.project_id, m.principal_id, m.role, m.key, m.created_at, m.removed_at
         ,u.id, u.kind, u.username, u.display_name, u.email, u.owner_id, u.site_admin, u.password_hash, u.totp_secret, u.totp_last_step, u.session_version, u.disabled_at, u.created_at, u.last_sign_in_at
-FROM    memberships m
-JOIN    principals  u   ON  u.id = m.principal_id
+FROM        memberships m
+INNER JOIN  principals  u   ON  u.id = m.principal_id
 WHERE   m.project_id = $1
         AND m.removed_at IS NULL
         AND u.kind = 'user'
@@ -282,10 +296,21 @@ func (q *Queries) ListMembers(ctx context.Context, projectID int64) ([]ListMembe
 const listMyProjects = `-- name: ListMyProjects :many
 SELECT   m.id, m.project_id, m.principal_id, m.role, m.key, m.created_at, m.removed_at
         ,p.id, p.key, p.name, p.next_number, p.created_at
-        ,(SELECT COUNT(*) FROM issues i WHERE i.project_id = p.id)::BIGINT                                                                                                  AS  issues
-        ,(SELECT COUNT(*) FROM memberships x JOIN principals xp ON xp.id = x.principal_id WHERE x.project_id = p.id AND x.removed_at IS NULL AND xp.kind = 'user')::BIGINT  AS  members
-FROM    memberships m
-JOIN    projects    p   ON  p.id = m.project_id
+        ,(
+            SELECT  COUNT(*)
+            FROM    issues  i
+            WHERE   i.project_id = p.id
+         )::BIGINT  AS  issues
+        ,(
+            SELECT  COUNT(*)
+            FROM        memberships x
+            INNER JOIN  principals  xp  ON  xp.id = x.principal_id
+            WHERE   x.project_id = p.id
+                    AND x.removed_at IS NULL
+                    AND xp.kind = 'user'
+         )::BIGINT  AS  members
+FROM        memberships m
+INNER JOIN  projects    p   ON  p.id = m.project_id
 WHERE   m.principal_id = $1
         AND m.removed_at IS NULL
 ORDER BY m.key
@@ -348,8 +373,8 @@ func (q *Queries) LockProject(ctx context.Context, id int64) error {
 
 const otherAdmins = `-- name: OtherAdmins :one
 SELECT  COUNT(*)
-FROM    memberships m
-JOIN    principals  p   ON  p.id = m.principal_id
+FROM        memberships m
+INNER JOIN  principals  p   ON  p.id = m.principal_id
 WHERE   m.project_id = $1
         AND m.principal_id <> $2  -- 🤮
         AND m.role = 'admin'
@@ -465,8 +490,8 @@ SELECT   m.project_id
         ,'member'
         ,m.key
         ,m.removed_at
-FROM    memberships m
-JOIN    principals  a   ON  a.owner_id = m.principal_id
+FROM        memberships m
+INNER JOIN  principals  a   ON  a.owner_id = m.principal_id
 WHERE   m.principal_id = $1
         AND (
             $2::BIGINT IS NULL

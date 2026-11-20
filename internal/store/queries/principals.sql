@@ -122,8 +122,8 @@ WHERE   id = @id
 WITH accounts AS (
         SELECT   m.id                       AS  membership_id
                 ,COALESCE(p.owner_id, p.id) AS  account_id
-        FROM    memberships m
-        JOIN    principals  p   ON  p.id = m.principal_id
+        FROM        memberships m
+        INNER JOIN  principals  p   ON  p.id = m.principal_id
     )
     ,projects AS (
         SELECT   principal_id   AS  account_id
@@ -140,54 +140,64 @@ WITH accounts AS (
         GROUP BY owner_id
     )
     ,keys AS (
-        SELECT   COALESCE(p.owner_id, p.id)                                                                         AS  account_id
-                ,COUNT(*) FILTER (WHERE k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > NOW()))    AS  active
-                ,MAX(k.last_used_at)                                                                                AS  last_used_at
-        FROM    api_keys    k
-        JOIN    principals  p   ON  p.id = k.principal_id
+        SELECT   COALESCE(p.owner_id, p.id) AS  account_id
+                ,COUNT(*) FILTER (
+                    WHERE   k.revoked_at IS NULL
+                            AND (
+                                k.expires_at IS NULL
+                                OR  k.expires_at > NOW()
+                            )
+                 )                          AS  active
+                ,MAX(k.last_used_at)        AS  last_used_at
+        FROM        api_keys    k
+        INNER JOIN  principals  p   ON  p.id = k.principal_id
         GROUP BY COALESCE(p.owner_id, p.id)
     )
     ,reported AS (
         SELECT   a.account_id
                 ,COUNT(*)                           AS  n
                 ,SUM(octet_length(i.description))   AS  bytes
-        FROM    issues      i
-        JOIN    accounts    a   ON  a.membership_id = i.reporter_id
+        FROM        issues      i
+        INNER JOIN  accounts    a   ON  a.membership_id = i.reporter_id
         GROUP BY a.account_id
     )
     ,assigned AS (
         SELECT   a.account_id
                 ,COUNT(*)   AS  n
-        FROM    issues      i
-        JOIN    accounts    a   ON  a.membership_id = i.assignee_id
+        FROM        issues      i
+        INNER JOIN  accounts    a   ON  a.membership_id = i.assignee_id
         GROUP BY a.account_id
     )
     ,commented AS (
         SELECT   a.account_id
                 ,COUNT(*)                   AS  n
                 ,SUM(octet_length(c.body))  AS  bytes
-        FROM    comments    c
-        JOIN    accounts    a   ON  a.membership_id = c.author_id
+        FROM        comments    c
+        INNER JOIN  accounts    a   ON  a.membership_id = c.author_id
         GROUP BY a.account_id
     )
     ,attached AS (
         SELECT   a.account_id
                 ,COUNT(*)       AS  n
                 ,SUM(t.size)    AS  bytes
-        FROM    attachments t
-        JOIN    accounts    a   ON  a.membership_id = t.uploader_id
+        FROM        attachments t
+        INNER JOIN  accounts    a   ON  a.membership_id = t.uploader_id
         GROUP BY a.account_id
     )
 SELECT   sqlc.embed(u)
-        ,COALESCE(projects.n, 0)::BIGINT                                                                    AS  projects
-        ,COALESCE(agents.n, 0)::BIGINT                                                                      AS  agents
-        ,COALESCE(keys.active, 0)::BIGINT                                                                   AS  active_keys
-        ,COALESCE(keys.last_used_at, 'epoch')::TIMESTAMPTZ                                                  AS  last_key_use
-        ,COALESCE(reported.n, 0)::BIGINT                                                                    AS  issues_reported
-        ,COALESCE(assigned.n, 0)::BIGINT                                                                    AS  issues_assigned
-        ,COALESCE(commented.n, 0)::BIGINT                                                                   AS  comments
-        ,COALESCE(attached.n, 0)::BIGINT                                                                    AS  attachments
-        ,(COALESCE(reported.bytes, 0) + COALESCE(commented.bytes, 0) + COALESCE(attached.bytes, 0))::BIGINT AS  bytes
+        ,COALESCE(projects.n, 0)::BIGINT                    AS  projects
+        ,COALESCE(agents.n, 0)::BIGINT                      AS  agents
+        ,COALESCE(keys.active, 0)::BIGINT                   AS  active_keys
+        ,COALESCE(keys.last_used_at, 'epoch')::TIMESTAMPTZ  AS  last_key_use
+        ,COALESCE(reported.n, 0)::BIGINT                    AS  issues_reported
+        ,COALESCE(assigned.n, 0)::BIGINT                    AS  issues_assigned
+        ,COALESCE(commented.n, 0)::BIGINT                   AS  comments
+        ,COALESCE(attached.n, 0)::BIGINT                    AS  attachments
+        ,(
+            COALESCE(reported.bytes, 0)
+            +   COALESCE(commented.bytes, 0)
+            +   COALESCE(attached.bytes, 0)
+         )::BIGINT                                          AS  bytes
 FROM        principals  u
 LEFT JOIN   projects        ON  projects.account_id = u.id
 LEFT JOIN   agents          ON  agents.account_id = u.id
@@ -236,8 +246,8 @@ VALUES
 
 -- name: GetResetLink :one
 SELECT  sqlc.embed(p)
-FROM    reset_links r
-JOIN    principals  p   ON  p.id = r.principal_id
+FROM        reset_links r
+INNER JOIN  principals  p   ON  p.id = r.principal_id
 WHERE   r.token_hash = @token_hash
         AND r.used_at IS NULL
         AND r.expires_at > NOW()
@@ -261,8 +271,8 @@ SELECT  pg_advisory_xact_lock(7262797);
 -- that belongs to the first user, while both are enabled.
 SELECT   sqlc.embed(a)
         ,u.username AS  owner_username
-FROM    principals  a
-JOIN    principals  u   ON  u.id = a.owner_id
+FROM        principals  a
+INNER JOIN  principals  u   ON  u.id = a.owner_id
 WHERE   a.username = u.username || '/agent'
         AND a.disabled_at IS NULL
         AND u.disabled_at IS NULL

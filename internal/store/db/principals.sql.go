@@ -217,8 +217,8 @@ func (q *Queries) GetPrincipalByUsername(ctx context.Context, username string) (
 
 const getResetLink = `-- name: GetResetLink :one
 SELECT  p.id, p.kind, p.username, p.display_name, p.email, p.owner_id, p.site_admin, p.password_hash, p.totp_secret, p.totp_last_step, p.session_version, p.disabled_at, p.created_at, p.last_sign_in_at
-FROM    reset_links r
-JOIN    principals  p   ON  p.id = r.principal_id
+FROM        reset_links r
+INNER JOIN  principals  p   ON  p.id = r.principal_id
 WHERE   r.token_hash = $1
         AND r.used_at IS NULL
         AND r.expires_at > NOW()
@@ -330,8 +330,8 @@ const listUsers = `-- name: ListUsers :many
 WITH accounts AS (
         SELECT   m.id                       AS  membership_id
                 ,COALESCE(p.owner_id, p.id) AS  account_id
-        FROM    memberships m
-        JOIN    principals  p   ON  p.id = m.principal_id
+        FROM        memberships m
+        INNER JOIN  principals  p   ON  p.id = m.principal_id
     )
     ,projects AS (
         SELECT   principal_id   AS  account_id
@@ -348,54 +348,64 @@ WITH accounts AS (
         GROUP BY owner_id
     )
     ,keys AS (
-        SELECT   COALESCE(p.owner_id, p.id)                                                                         AS  account_id
-                ,COUNT(*) FILTER (WHERE k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > NOW()))    AS  active
-                ,MAX(k.last_used_at)                                                                                AS  last_used_at
-        FROM    api_keys    k
-        JOIN    principals  p   ON  p.id = k.principal_id
+        SELECT   COALESCE(p.owner_id, p.id) AS  account_id
+                ,COUNT(*) FILTER (
+                    WHERE   k.revoked_at IS NULL
+                            AND (
+                                k.expires_at IS NULL
+                                OR  k.expires_at > NOW()
+                            )
+                 )                          AS  active
+                ,MAX(k.last_used_at)        AS  last_used_at
+        FROM        api_keys    k
+        INNER JOIN  principals  p   ON  p.id = k.principal_id
         GROUP BY COALESCE(p.owner_id, p.id)
     )
     ,reported AS (
         SELECT   a.account_id
                 ,COUNT(*)                           AS  n
                 ,SUM(octet_length(i.description))   AS  bytes
-        FROM    issues      i
-        JOIN    accounts    a   ON  a.membership_id = i.reporter_id
+        FROM        issues      i
+        INNER JOIN  accounts    a   ON  a.membership_id = i.reporter_id
         GROUP BY a.account_id
     )
     ,assigned AS (
         SELECT   a.account_id
                 ,COUNT(*)   AS  n
-        FROM    issues      i
-        JOIN    accounts    a   ON  a.membership_id = i.assignee_id
+        FROM        issues      i
+        INNER JOIN  accounts    a   ON  a.membership_id = i.assignee_id
         GROUP BY a.account_id
     )
     ,commented AS (
         SELECT   a.account_id
                 ,COUNT(*)                   AS  n
                 ,SUM(octet_length(c.body))  AS  bytes
-        FROM    comments    c
-        JOIN    accounts    a   ON  a.membership_id = c.author_id
+        FROM        comments    c
+        INNER JOIN  accounts    a   ON  a.membership_id = c.author_id
         GROUP BY a.account_id
     )
     ,attached AS (
         SELECT   a.account_id
                 ,COUNT(*)       AS  n
                 ,SUM(t.size)    AS  bytes
-        FROM    attachments t
-        JOIN    accounts    a   ON  a.membership_id = t.uploader_id
+        FROM        attachments t
+        INNER JOIN  accounts    a   ON  a.membership_id = t.uploader_id
         GROUP BY a.account_id
     )
 SELECT   u.id, u.kind, u.username, u.display_name, u.email, u.owner_id, u.site_admin, u.password_hash, u.totp_secret, u.totp_last_step, u.session_version, u.disabled_at, u.created_at, u.last_sign_in_at
-        ,COALESCE(projects.n, 0)::BIGINT                                                                    AS  projects
-        ,COALESCE(agents.n, 0)::BIGINT                                                                      AS  agents
-        ,COALESCE(keys.active, 0)::BIGINT                                                                   AS  active_keys
-        ,COALESCE(keys.last_used_at, 'epoch')::TIMESTAMPTZ                                                  AS  last_key_use
-        ,COALESCE(reported.n, 0)::BIGINT                                                                    AS  issues_reported
-        ,COALESCE(assigned.n, 0)::BIGINT                                                                    AS  issues_assigned
-        ,COALESCE(commented.n, 0)::BIGINT                                                                   AS  comments
-        ,COALESCE(attached.n, 0)::BIGINT                                                                    AS  attachments
-        ,(COALESCE(reported.bytes, 0) + COALESCE(commented.bytes, 0) + COALESCE(attached.bytes, 0))::BIGINT AS  bytes
+        ,COALESCE(projects.n, 0)::BIGINT                    AS  projects
+        ,COALESCE(agents.n, 0)::BIGINT                      AS  agents
+        ,COALESCE(keys.active, 0)::BIGINT                   AS  active_keys
+        ,COALESCE(keys.last_used_at, 'epoch')::TIMESTAMPTZ  AS  last_key_use
+        ,COALESCE(reported.n, 0)::BIGINT                    AS  issues_reported
+        ,COALESCE(assigned.n, 0)::BIGINT                    AS  issues_assigned
+        ,COALESCE(commented.n, 0)::BIGINT                   AS  comments
+        ,COALESCE(attached.n, 0)::BIGINT                    AS  attachments
+        ,(
+            COALESCE(reported.bytes, 0)
+            +   COALESCE(commented.bytes, 0)
+            +   COALESCE(attached.bytes, 0)
+         )::BIGINT                                          AS  bytes
 FROM        principals  u
 LEFT JOIN   projects        ON  projects.account_id = u.id
 LEFT JOIN   agents          ON  agents.account_id = u.id
@@ -472,8 +482,8 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 const localAgent = `-- name: LocalAgent :one
 SELECT   a.id, a.kind, a.username, a.display_name, a.email, a.owner_id, a.site_admin, a.password_hash, a.totp_secret, a.totp_last_step, a.session_version, a.disabled_at, a.created_at, a.last_sign_in_at
         ,u.username AS  owner_username
-FROM    principals  a
-JOIN    principals  u   ON  u.id = a.owner_id
+FROM        principals  a
+INNER JOIN  principals  u   ON  u.id = a.owner_id
 WHERE   a.username = u.username || '/agent'
         AND a.disabled_at IS NULL
         AND u.disabled_at IS NULL
