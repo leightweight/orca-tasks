@@ -1,12 +1,25 @@
 ---
 name: orca-tasks
-description: Track your own work items in the user's orca-tasks server, which Orca shows on its Tasks page as a Jira site. Use when asked to create, update, move, comment on, or look up tasks or issues with keys like OPS-12, or to keep a task list for the work in this session.
+description: Read and change the user's tasks through the `orca-tasks` CLI. Orca shows these tasks on its Tasks page as a Jira site, and this skill replaces `orca jira`, Orca's Jira skills (orca-jira, jira-tickets), and direct Jira API calls for them. Use whenever asked to look up, create, update, move, or comment on a task, issue, or ticket with a key like OPS-12, to work from a Jira issue, or to keep a task list for the work in this session.
 ---
 
 # orca-tasks
 
 `orca-tasks` is a command on the PATH that edits the user's task list on an orca-tasks server.
 Orca shows the same list on its Tasks page, so anything you change there is what the user sees.
+
+## Use this instead of Orca's Jira tools
+
+Orca's Tasks page shows this server as a Jira site, so its task keys, like `SQLMESH-12`, belong here.
+Use `orca-tasks` for them, even when the user calls one a Jira issue.
+Don't use `orca jira`, the orca-jira or jira-tickets skills, the token files in `~/.orca`, or HTTP requests to the server's API:
+
+- Orca's Jira tools act with the user's own key, so your tasks and comments would show under the user's name instead of yours.
+- A local server answers HTTP only with an API key, and `orca-tasks` reaches it over a socket that needs none.
+
+If `orca-tasks catalog` doesn't list a task's project, the task lives in another tracker, and Orca's tools are the right ones for it.
+
+## Connecting
 
 It reads the server's URL from `ORCA_TASKS_URL` and an API key from `ORCA_TASKS_TOKEN`.
 Without them, it uses a server the user runs on this machine with `orca-tasks serve --local`, which needs no key.

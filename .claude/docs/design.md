@@ -540,6 +540,7 @@ Each project costs a fixed number of queries whatever its size: one COPY for its
 
 The repository ships the skill as a Claude Code plugin, so `/plugin marketplace add leightweight/orca-tasks` installs it.
 The skill tells the agent to use the commands above, look before it writes, move tasks through their statuses with a comment, leave assigning to the user except to assign the user a task it starts, and leave other people's tasks alone unless asked.
+It also tells the agent to use these commands instead of Orca's own Jira commands and skills, which act with the user's key, so its work stays under the agent's name.
 
 ## Storage
 
