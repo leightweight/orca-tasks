@@ -19,7 +19,7 @@ import (
 )
 
 // PostgresImage is the Postgres the tests run against.
-const PostgresImage = "postgres:18-alpine"
+const PostgresImage = "postgres:19-alpine"
 
 const templateName = "orca_template"
 
