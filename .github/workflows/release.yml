@@ -19,9 +19,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
         with:
-          version: 2026.11.9
+          version: 2026.11.14
           cache: false
       - run: mise run lint
       - name: Check the plugin version matches the tag
@@ -47,9 +47,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
         with:
-          version: 2026.11.9
+          version: 2026.11.14
           cache: false
       - run: mise run test
 
@@ -71,9 +71,9 @@ jobs:
           # goreleaser needs the tags to find the previous release.
           fetch-depth: 0
           persist-credentials: false
-      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
         with:
-          version: 2026.11.9
+          version: 2026.11.14
           # Tag builds can read caches that runs on main wrote, so a poisoned cache could put files into a signed release.
           cache: false
           # Only what this job runs. It holds write and signing permissions, so it
@@ -135,7 +135,7 @@ jobs:
       # Attest the archives' build provenance.
       attestations: write
     steps:
-      - uses: jdx/packslip@e0340e0c1d10c90a434de2b90f3a1ba345923564 # v1.11.4
+      - uses: jdx/packslip@9d5b1c469ba90d26b6dbd0a0162e84a95da524d5 # v1.11.5
         id: packslip
         with:
           download: orca-tasks_*.tar.gz
